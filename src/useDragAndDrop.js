@@ -12,17 +12,17 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
     const handleDragOver = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.backgroundColor = "lightgreen";
+      el.style.backgroundColor = "#cfc";
     };
 
     const handleDragLeave = () => {
-      el.style.backgroundColor = "white";
+      el.style.backgroundColor = "";
     };
 
     const handleDrop = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.backgroundColor = "white";
+      el.style.backgroundColor = "";
 
       let newImages = Array.from(e.dataTransfer.files);
       handleImageUpload(newImages);
