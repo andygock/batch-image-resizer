@@ -1,7 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from "react";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
+import CompressionSelect from "./CompressionSelect";
+import OutputImages from "./OutputImages";
+import SizeSelect from "./SizeSelect";
+import { useDragAndDrop } from "./useDragAndDrop";
+import Errors from "./Errors";
 
 function App() {
   const [images, setImages] = useState([]);
@@ -10,70 +15,54 @@ function App() {
   const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
   const [compressionLevel, setCompressionLevel] = useState(0.8); // Default compression level
   const [allowDownload, setAllowDownload] = useState(false);
+  const [autoRegenerate, setAutoRegenerate] = useState(true);
+  const [enableSuffix, setEnableSuffix] = useState(true);
+  const [suffix, setSuffix] = useState("_small");
+  const [disableUpscale, setDisableUpscale] = useState(true);
+  const [processingTime, setProcessingTime] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const dropRef = useRef(null);
-
-  // drag and drop handling
-  useEffect(() => {
-    const handleDragOver = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropRef.current.style.backgroundColor = "lightblue";
-    };
-
-    const handleDragLeave = () => {
-      dropRef.current.style.backgroundColor = "white";
-    };
-
-    const handleDrop = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropRef.current.style.backgroundColor = "white";
-
-      let newImages = Array.from(e.dataTransfer.files);
-      handleImageUpload(newImages);
-    };
-
-    dropRef.current.addEventListener("dragover", handleDragOver);
-    dropRef.current.addEventListener("dragleave", handleDragLeave);
-    dropRef.current.addEventListener("drop", handleDrop);
-
-    return () => {
-      dropRef.current.removeEventListener("dragover", handleDragOver);
-      dropRef.current.removeEventListener("dragleave", handleDragLeave);
-      dropRef.current.removeEventListener("drop", handleDrop);
-    };
-  }, []);
 
   const handleImageUpload = (files) => {
     const newErrors = [];
     const newImages = [];
 
     for (const file of files) {
-      if (!file.type.startsWith("image/jpeg")) {
-        newErrors.push(`File ${file.name} is not a JPEG image.`);
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        newErrors.push(`File "${file.name}" is not a JPEG, PNG or WebP image.`);
         continue;
       }
-
-      // (Checksum implementation for duplicate check is omitted for brevity,
-      // but would involve reading file blobs and comparing hashes)
-      // TODO: Check for duplicate images
-
       newImages.push(file);
     }
 
-    setErrors([...errors, ...newErrors]);
-    setImages([...images, ...newImages]);
+    // don't append images, just replace
+    // perhaps in the future, we can update this so users can add one image at a time
+    setErrors(newErrors);
+    setImages(newImages);
   };
+
+  // drag and drop handling
+  useDragAndDrop(dropRef, handleImageUpload);
 
   const handleResize = useCallback(async () => {
     const resizedImagesTemp = [];
 
+    setProcessingTime(0);
+    setIsProcessing(true);
+
+    // Start the timer
+    const startTime = performance.now();
+
     for (const imageFile of images) {
+      // get filesize of original image
+      const filesizeBefore = imageFile.size;
+
+      // https://developer.mozilla.org/en-US/docs/Web/API/createImageBitmap
       try {
         const img = await createImageBitmap(imageFile);
 
-        // Calculate the aspect ratio of the image
+        // Calculate the aspect ratio of the original image
         const imgAspectRatio = img.width / img.height;
 
         // Calculate the aspect ratio of the bounding box
@@ -84,27 +73,32 @@ function App() {
         // If the image's aspect ratio is greater than the bounding box's aspect ratio
         // then the image's width will be the limiting factor
         if (imgAspectRatio > boundingBoxAspectRatio) {
-          canvasWidth = Math.min(boundingBox.width, img.width);
-          canvasHeight = Math.min(
-            boundingBox.width / imgAspectRatio,
-            img.height
-          );
+          canvasWidth = disableUpscale
+            ? Math.min(boundingBox.width, img.width)
+            : boundingBox.width;
+          canvasHeight = disableUpscale
+            ? Math.min(boundingBox.width / imgAspectRatio, img.height)
+            : boundingBox.width / imgAspectRatio;
         } else {
           // Otherwise, the image's height will be the limiting factor
-          canvasHeight = Math.min(boundingBox.height, img.height);
-          canvasWidth = Math.min(
-            boundingBox.height * imgAspectRatio,
-            img.width
-          );
+          canvasHeight = disableUpscale
+            ? Math.min(boundingBox.height, img.height)
+            : boundingBox.height;
+          canvasWidth = disableUpscale
+            ? Math.min(boundingBox.height * imgAspectRatio, img.width)
+            : boundingBox.height * imgAspectRatio;
         }
+
+        // set flag to indicate if image is upscaled
+        const isUpscaled = img.width > canvasWidth || img.height > canvasHeight;
 
         // canvas width and height need to be floored to integers
         canvasWidth = Math.floor(canvasWidth);
         canvasHeight = Math.floor(canvasHeight);
 
+        // Create an offscreen canvas and create out images there
         const offscreenCanvas = new OffscreenCanvas(canvasWidth, canvasHeight);
         const ctx = offscreenCanvas.getContext("2d");
-
         ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
 
         // convert to blob, jpeg
@@ -123,18 +117,30 @@ function App() {
         resizedImagesTemp.push({
           filename,
           blob,
-          size: blobSize,
-          width: canvasWidth,
-          height: canvasHeight,
+          filesizeBefore,
+          filesizeAfter: blobSize,
+          widthAfter: canvasWidth,
+          heightAfter: canvasHeight,
+          widthBefore: img.width,
+          heightBefore: img.height,
+          isUpscaled,
         });
-      } catch (error) {
-        console.error("Error resizing image:", error);
-        setErrors([...errors, `Error resizing ${imageFile.name}`]);
+      } catch (e) {
+        const msg = `Error loading "${imageFile.name}"`;
+        setErrors([...errors, msg]);
+        continue;
       }
     }
 
+    // Stop the timer and calculate the processing time
+    const endTime = performance.now();
+    const processingTime = ((endTime - startTime) / 1000).toFixed(2); // in seconds, rounded to two decimal places
+    setProcessingTime(processingTime);
+
     setResizedImages(resizedImagesTemp);
-  }, [images, boundingBox, compressionLevel, errors]);
+
+    setIsProcessing(false);
+  }, [images, boundingBox, compressionLevel, disableUpscale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // perform resize when uploaded images are updated
   useEffect(() => {
@@ -146,13 +152,28 @@ function App() {
     setAllowDownload(resizedImages.length > 0);
   }, [resizedImages]);
 
+  const handleReset = () => {
+    setAllowDownload(false);
+    setImages([]);
+    setResizedImages([]);
+    setErrors([]);
+  };
+
   // download all resized images as a ZIP file
   const downloadZip = () => {
     const zip = new JSZip();
 
     // add all blobs to zip
     for (const { filename, blob } of resizedImages) {
-      zip.file(filename, blob);
+      // if there is a suffix, append it to the filename
+      let saveFilename = filename;
+      if (enableSuffix) {
+        const lastDotIndex = filename.lastIndexOf(".");
+        const name = filename.substring(0, lastDotIndex);
+        const ext = filename.substring(lastDotIndex + 1);
+        saveFilename = `${name}${suffix}.${ext}`;
+      }
+      zip.file(saveFilename, blob);
     }
 
     zip
@@ -170,106 +191,90 @@ function App() {
     handleResize();
   };
 
-  const handleReset = () => {
-    setAllowDownload(false);
-    setImages([]);
-    setResizedImages([]);
-    setErrors([]);
-  };
-
   return (
-    <div ref={dropRef} style={{ border: "2px dashed gray", padding: "20px" }}>
+    <div ref={dropRef} className="app">
       <h1>Batch Image Resizer</h1>
-      <input
-        type="number"
-        value={boundingBox.width}
-        onChange={(e) =>
-          setBoundingBox({
-            ...boundingBox,
-            width: parseInt(e.target.value, 10) || 1024,
-          })
-        }
-      />
-      x
-      <input
-        type="number"
-        value={boundingBox.height}
-        onChange={(e) =>
-          setBoundingBox({
-            ...boundingBox,
-            height: parseInt(e.target.value, 10) || 1024,
-          })
-        }
-      />
-      <label htmlFor="compression">JPEG Compression:</label>
-      <input
-        type="range"
-        id="compression"
-        min="0"
-        max="1"
-        step="0.1"
-        value={compressionLevel}
-        onChange={(e) => setCompressionLevel(parseFloat(e.target.value))}
-      />
-      <span>{compressionLevel}</span>
-      <div>
-        <button onClick={regenerate} disabled={!allowDownload}>
-          Regenerate
-        </button>
-        <button onClick={downloadZip} disabled={!allowDownload}>
-          Download as ZIP
-        </button>
-        <button onClick={handleReset}>Reset</button>
-        {errors.length > 0 && (
-          <div>
-            <h2>Errors:</h2>
-            <ul>
-              {errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          flexWrap: "wrap",
+      <SizeSelect
+        onChange={(sizeStr) => {
+          const [width, height] = sizeStr
+            .split("x")
+            .map((s) => parseInt(s, 10));
+          setBoundingBox({ width, height });
         }}
-      >
-        {resizedImages.map(
-          ({ filename, blob: image, size, width, height }, index) => {
-            const url = URL.createObjectURL(image);
-            return (
-              <div
-                key={index}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  margin: "3px",
-                }}
-              >
-                <a href={url} download={filename}>
-                  <div>
-                    <img
-                      src={url}
-                      alt={filename}
-                      width={width}
-                      height={height}
-                    />
-                  </div>
-                </a>
-                <div>{filename}</div>
-                <div>{Math.round(size / 1024)} kB</div>
-                <div>
-                  {width}x{height} px
-                </div>
-              </div>
-            );
-          }
-        )}
+        width={boundingBox.width}
+        height={boundingBox.height}
+        disabled={isProcessing}
+      />
+      <CompressionSelect
+        onChange={setCompressionLevel}
+        value={compressionLevel}
+        disabled={isProcessing}
+      />
+
+      {/* auto-regenerate */}
+      {/* <label>
+        <input
+          type="checkbox"
+          checked={autoRegenerate}
+          onChange={() => setAutoRegenerate(!autoRegenerate)}
+        />
+        Auto
+      </label> */}
+
+      {/* disable upscale */}
+      <label>
+        <input
+          type="checkbox"
+          checked={disableUpscale}
+          onChange={() => setDisableUpscale(!disableUpscale)}
+        />
+        Disable Upscale
+      </label>
+
+      {/* enable suffix */}
+      <label>
+        <input
+          type="checkbox"
+          checked={enableSuffix}
+          onChange={() => setEnableSuffix(!enableSuffix)}
+        />
+        Enable Suffix
+      </label>
+
+      {/* suffix */}
+      <input
+        type="text"
+        value={suffix}
+        onChange={(e) => setSuffix(e.target.value)}
+        placeholder="Suffix"
+        disabled={!enableSuffix}
+      />
+
+      {/* <button onClick={regenerate} disabled={!allowDownload}>
+          Regenerate
+        </button> */}
+      <button onClick={downloadZip} disabled={!allowDownload || isProcessing}>
+        Download as ZIP
+      </button>
+      <button onClick={handleReset}>Reset</button>
+
+      <Errors errors={errors} />
+
+      <OutputImages
+        resizedImages={resizedImages}
+        suffix={suffix}
+        enableSuffix={enableSuffix}
+        loading={isProcessing}
+      />
+
+      {processingTime !== 0 && <p>Processing time: {processingTime} seconds</p>}
+      <div className="footer">
+        <p>
+          All images are resized on the client side using the HTML5 Canvas API,
+          within the web browser. Images are never uploaded to any third party
+          server.{" "}
+          <a href="https://github.com/andygock/batch-image-resizer/">GitHub</a>
+        </p>
       </div>
     </div>
   );
