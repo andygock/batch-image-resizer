@@ -2,12 +2,12 @@ body::after {
   content: "";
   background: url("/favicon_pig.svg") no-repeat center center fixed;
   background-size: cover;
-  opacity: 0.1;
+  opacity: 0.2;
   top: 0;
   left: 0;
   bottom: 0;
   right: 0;
-  position: absolute;
+  position: fixed;
   z-index: -1;
 }
 
@@ -25,6 +25,11 @@ body {
 
   /* use full height of viewport, if contents are smaller */
   min-height: 100vh;
+}
+
+.header {
+  background-color: rgba(255, 255, 255, 0.75);
+  padding: 0.3rem;
 }
 
 h1 {
@@ -56,6 +61,12 @@ button:hover {
   background-color: #f1f1f1;
 }
 
+button:disabled {
+  background-color: #eee;
+  color: #666;
+  cursor: not-allowed;
+}
+
 /* Checkboxes */
 input[type="checkbox"] {
   width: 15px;
@@ -63,6 +74,10 @@ input[type="checkbox"] {
   cursor: pointer;
   margin: 0.3rem;
   padding: 0.3rem;
+}
+
+.input-suffix {
+  width: 10ch;
 }
 
 /* OutImages */
@@ -84,7 +99,12 @@ input[type="checkbox"] {
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 5px;
+  margin: 0.3rem;
+}
+
+.image-info {
+  text-align: center;
+  padding: 0.3rem;
 }
 
 .green {
@@ -107,6 +127,14 @@ input[type="checkbox"] {
   margin-top: 20px;
   text-align: center;
   font-size: small;
+}
+
+.center {
+  text-align: center;
+}
+
+.pad-3rem {
+  padding: 3rem;
 }
 
 a {

@@ -160,7 +160,8 @@ function App() {
   };
 
   // download all resized images as a ZIP file
-  const downloadZip = () => {
+  const downloadZip = async () => {
+    setIsProcessing(true);
     const zip = new JSZip();
 
     // add all blobs to zip
@@ -176,87 +177,92 @@ function App() {
       zip.file(saveFilename, blob);
     }
 
-    zip
-      .generateAsync({ type: "blob" })
-      .then((blob) => {
-        saveAs(blob, "resized_images.zip");
-      })
-      .catch((error) => {
-        console.error("Error creating ZIP:", error);
-        setErrors([...errors, "Error creating ZIP file."]);
-      });
+    try {
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveAs(blob, "resized_images.zip");
+    } catch (error) {
+      console.error("Error creating ZIP:", error);
+      setErrors([...errors, "Error creating ZIP file."]);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const regenerate = () => {
     handleResize();
   };
 
+  const isEmpty = images.length === 0;
+
   return (
     <div ref={dropRef} className="app">
-      <h1>Batch Image Resizer</h1>
-      <SizeSelect
-        onChange={(sizeStr) => {
-          const [width, height] = sizeStr
-            .split("x")
-            .map((s) => parseInt(s, 10));
-          setBoundingBox({ width, height });
-        }}
-        width={boundingBox.width}
-        height={boundingBox.height}
-        disabled={isProcessing}
-      />
-      <CompressionSelect
-        onChange={setCompressionLevel}
-        value={compressionLevel}
-        disabled={isProcessing}
-      />
-
-      {/* auto-regenerate */}
-      {/* <label>
-        <input
-          type="checkbox"
-          checked={autoRegenerate}
-          onChange={() => setAutoRegenerate(!autoRegenerate)}
+      <div className="header">
+        <h1>Batch Image Resizer</h1>
+        <SizeSelect
+          onChange={(sizeStr) => {
+            const [width, height] = sizeStr
+              .split("x")
+              .map((s) => parseInt(s, 10));
+            setBoundingBox({ width, height });
+          }}
+          width={boundingBox.width}
+          height={boundingBox.height}
+          disabled={isProcessing}
         />
-        Auto
-      </label> */}
-
-      {/* disable upscale */}
-      <label>
-        <input
-          type="checkbox"
-          checked={disableUpscale}
-          onChange={() => setDisableUpscale(!disableUpscale)}
+        <CompressionSelect
+          onChange={setCompressionLevel}
+          value={compressionLevel}
+          disabled={isProcessing}
         />
-        Disable Upscale
-      </label>
-
-      {/* enable suffix */}
-      <label>
+        {/* auto-regenerate */}
+        {/* <label>
+          <input
+            type="checkbox"
+            checked={autoRegenerate}
+            onChange={() => setAutoRegenerate(!autoRegenerate)}
+          />
+          Auto
+        </label> */}
+        {/* disable upscale */}
+        <label>
+          <input
+            type="checkbox"
+            checked={disableUpscale}
+            onChange={() => setDisableUpscale(!disableUpscale)}
+          />
+          Disable Upscale
+        </label>
+        {/* enable suffix */}
+        <label>
+          <input
+            type="checkbox"
+            checked={enableSuffix}
+            onChange={() => setEnableSuffix(!enableSuffix)}
+          />
+          Enable Suffix
+        </label>
+        {/* suffix */}
         <input
-          type="checkbox"
-          checked={enableSuffix}
-          onChange={() => setEnableSuffix(!enableSuffix)}
+          type="text"
+          value={suffix}
+          onChange={(e) => setSuffix(e.target.value)}
+          placeholder="Suffix"
+          disabled={!enableSuffix}
+          className="input-suffix"
         />
-        Enable Suffix
-      </label>
-
-      {/* suffix */}
-      <input
-        type="text"
-        value={suffix}
-        onChange={(e) => setSuffix(e.target.value)}
-        placeholder="Suffix"
-        disabled={!enableSuffix}
-      />
-
-      {/* <button onClick={regenerate} disabled={!allowDownload}>
-          Regenerate
-        </button> */}
-      <button onClick={downloadZip} disabled={!allowDownload || isProcessing}>
-        Download as ZIP
-      </button>
-      <button onClick={handleReset}>Reset</button>
+        {/* <button onClick={regenerate} disabled={!allowDownload}>
+            Regenerate
+          </button> */}
+        <button
+          onClick={downloadZip}
+          disabled={!allowDownload || isProcessing || isEmpty}
+        >
+          Download as ZIP
+        </button>
+        <button onClick={handleReset} disabled={isEmpty}>
+          Reset
+        </button>
+      </div>
 
       <Errors errors={errors} />
 
@@ -267,7 +273,9 @@ function App() {
         loading={isProcessing}
       />
 
-      {processingTime !== 0 && <p>Processing time: {processingTime} seconds</p>}
+      {processingTime >= 0.01 && (
+        <p>Processing time: {processingTime} seconds</p>
+      )}
       <div className="footer">
         <p>
           All images are resized on the client side using the HTML5 Canvas API,

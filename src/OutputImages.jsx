@@ -17,7 +17,7 @@ export default function OutputImages({
 
   if (!resizedImages.length) {
     return (
-      <div>
+      <div className="center pad-3rem">
         <p>
           Drag and drop JPG, PNG or WebP image(s) into this window to batch
           resize.
@@ -67,7 +67,11 @@ export default function OutputImages({
 
           return (
             <div key={index} className="output-images">
-              <a href={url} download={downloadFilename}>
+              <a
+                href={url}
+                download={downloadFilename}
+                title={`Click to download "${downloadFilename}"`}
+              >
                 <div>
                   <img
                     src={url}
@@ -77,17 +81,19 @@ export default function OutputImages({
                   />
                 </div>
               </a>
-              <div>{filename}</div>
-              <div>
-                {Math.ceil(filesizeBefore / 1024)}&nbsp;⭢&nbsp;
-                {Math.ceil(filesizeAfter / 1024)} kB (
-                {fileSizeIsLower && <span className="green">🠫 </span>}
-                {!fileSizeIsLower && <span className="red">🠅 </span>}
-                {fileSizePercent}%)
-              </div>
-              <div>
-                {widthBefore}x{heightBefore}&nbsp;⭢&nbsp;{widthAfter}x
-                {heightAfter} px
+              <div className="image-info">
+                <div>{filename}</div>
+                <div>
+                  {Math.ceil(filesizeBefore / 1024)}&nbsp;⭢&nbsp;
+                  {Math.ceil(filesizeAfter / 1024)} kB (
+                  {fileSizeIsLower && <span className="green">🠫 </span>}
+                  {!fileSizeIsLower && <span className="red">🠅 </span>}
+                  {fileSizePercent}%)
+                </div>
+                <div>
+                  {widthBefore}x{heightBefore}&nbsp;⭢&nbsp;{widthAfter}x
+                  {heightAfter} px
+                </div>
               </div>
             </div>
           );

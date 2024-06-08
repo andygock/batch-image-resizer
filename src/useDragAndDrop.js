@@ -25,6 +25,12 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
       el.style.backgroundColor = "";
 
       let newImages = Array.from(e.dataTransfer.files);
+
+      if (!newImages.length) {
+        // no files were dropped, this can happen if the user drops a non-file, such as a image within the browser
+        return;
+      }
+
       handleImageUpload(newImages);
     };
 
