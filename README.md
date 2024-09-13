@@ -4,4 +4,4 @@ A web application which resizes multiple images at once. The user can upload mul
 
 All images are resized on the client side using the HTML5 Canvas API, within the web browser. The images are not uploaded to any third party server.
 
-<https://s.gock.net/bir/>
+<https://bir.gock.net/>
