@@ -1,6 +1,6 @@
 body::after {
   content: "";
-  background: url("/favicon_pig.svg") no-repeat center center fixed;
+  /* background: url("/favicon_pig.svg") no-repeat center center fixed; */
   background-size: cover;
   opacity: 0.2;
   top: 0;
