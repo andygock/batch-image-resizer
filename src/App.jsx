@@ -292,10 +292,10 @@ function App() {
       )}
       <div className="footer">
         <p>
-          All images are resized on the client side using the HTML5 Canvas API,
-          within the web browser. Images are never uploaded to any third party
-          server.{" "}
-          <a href="https://github.com/andygock/batch-image-resizer/">GitHub</a>
+          Your images are resized directly in your browser using the HTML5
+          Canvas API, ensuring privacy and speed. No data is uploaded to any
+          server. Source code on{" "}
+          <a href="https://github.com/andygock/batch-image-resizer/">GitHub</a>.
         </p>
       </div>
     </div>
