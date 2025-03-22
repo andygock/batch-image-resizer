@@ -24,6 +24,13 @@ function App() {
 
   const dropRef = useRef(null);
 
+  const handleFileInputChange = (event) => {
+    const files = event.target.files;
+    if (files) {
+      handleImageUpload(files);
+    }
+  };
+
   const handleImageUpload = (files) => {
     const newErrors = [];
     const newImages = [];
@@ -214,15 +221,7 @@ function App() {
           value={compressionLevel}
           disabled={isProcessing}
         />
-        {/* auto-regenerate */}
-        {/* <label>
-          <input
-            type="checkbox"
-            checked={autoRegenerate}
-            onChange={() => setAutoRegenerate(!autoRegenerate)}
-          />
-          Auto
-        </label> */}
+
         {/* disable upscale */}
         <label>
           <input
@@ -232,6 +231,7 @@ function App() {
           />
           Disable Upscale
         </label>
+
         {/* enable suffix */}
         <label>
           <input
@@ -241,6 +241,7 @@ function App() {
           />
           Enable Suffix
         </label>
+
         {/* suffix */}
         <input
           type="text"
@@ -250,18 +251,31 @@ function App() {
           disabled={!enableSuffix}
           className="input-suffix"
         />
-        {/* <button onClick={regenerate} disabled={!allowDownload}>
-            Regenerate
-          </button> */}
+
+        {/* download as ZIP */}
         <button
           onClick={downloadZip}
           disabled={!allowDownload || isProcessing || isEmpty}
         >
           Download as ZIP
         </button>
+
+        {/* reset button */}
         <button onClick={handleReset} disabled={isEmpty}>
           Reset
         </button>
+
+        {/* File upload button */}
+        <label className="file-upload-label">
+          <input
+            type="file"
+            accept="image/jpeg, image/png, image/webp"
+            multiple
+            onChange={handleFileInputChange}
+            disabled={isProcessing}
+            style={{ display: "block" }}
+          />
+        </label>
       </div>
 
       <Errors errors={errors} />

@@ -145,3 +145,32 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
+/* File Input */
+input[type="file"] {
+  display: none;
+}
+
+.file-upload-label {
+  display: inline-block;
+  margin: 0.3rem;
+  padding: 0.3rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: white;
+  color: black;
+  cursor: pointer;
+  text-align: center;
+}
+
+.file-upload-label:hover {
+  background-color: #f1f1f1;
+}
+
+.file-upload-label:disabled {
+  background-color: #eee;
+  color: #666;
+  cursor: not-allowed;
+}
