@@ -174,3 +174,23 @@ input[type="file"] {
   color: #666;
   cursor: not-allowed;
 }
+
+.download {
+  display: inline-block;
+  margin: 0.3rem;
+  padding: 0.3rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 14px;
+  background-color: white;
+  color: black;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+}
+
+.download:hover {
+  background-color: #f1f1f1;
+  text-decoration: none;
+}

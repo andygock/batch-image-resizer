@@ -67,20 +67,12 @@ export default function OutputImages({
 
           return (
             <div key={index} className="output-images">
-              <a
-                href={url}
-                download={downloadFilename}
-                title={`Click to download "${downloadFilename}"`}
-              >
-                <div>
-                  <img
-                    src={url}
-                    alt={filename}
-                    width={widthAfter}
-                    height={heightAfter}
-                  />
-                </div>
-              </a>
+              <img
+                src={url}
+                alt={filename}
+                width={widthAfter}
+                height={heightAfter}
+              />
               <div className="image-info">
                 <div>{filename}</div>
                 <div>
@@ -94,6 +86,14 @@ export default function OutputImages({
                   {widthBefore}x{heightBefore}&nbsp;⭢&nbsp;{widthAfter}x
                   {heightAfter} px
                 </div>
+                <a
+                  href={url}
+                  download={downloadFilename}
+                  title={`Click to download "${downloadFilename}"`}
+                  className="download"
+                >
+                  Download {Math.ceil(filesizeAfter / 1024)} kB
+                </a>
               </div>
             </div>
           );
