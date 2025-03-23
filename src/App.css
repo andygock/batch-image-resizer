@@ -1,3 +1,8 @@
+:root {
+  --margin: 0.2rem;
+  --padding: 0.2rem;
+}
+
 body::after {
   content: "";
   /* background: url("/favicon_pig.svg") no-repeat center center fixed; */
@@ -20,8 +25,7 @@ body {
 }
 
 .app {
-  /* border: 2px dashed gray; */
-  padding: 20px;
+  padding: 1rem;
 
   /* use full height of viewport, if contents are smaller */
   min-height: 100vh;
@@ -29,7 +33,7 @@ body {
 
 .header {
   background-color: rgba(255, 255, 255, 0.75);
-  padding: 0.3rem;
+  padding: var(--padding);
 }
 
 h1 {
@@ -40,12 +44,11 @@ h1 {
 button,
 input[type="text"],
 select {
-  margin: 0.3rem;
-  padding: 0.3rem;
+  /* margin: 0.3rem; */
+  /* padding: 0.3rem; */
   border: 1px solid #ccc;
-  border-radius: 4px;
   box-sizing: border-box;
-  font-size: 14px;
+  font-size: normal;
   background-color: white;
 }
 
@@ -53,8 +56,8 @@ button {
   background-color: white;
   color: black;
   cursor: pointer;
-  margin: 0 0.3rem;
-  padding: 0.3rem;
+  margin: var(--margin);
+  padding: var(--padding);
 }
 
 button:hover {
@@ -69,11 +72,9 @@ button:disabled {
 
 /* Checkboxes */
 input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
   cursor: pointer;
-  margin: 0.3rem;
-  padding: 0.3rem;
+  margin: var(--margin);
+  padding: var(--padding);
 }
 
 .input-suffix {
@@ -99,12 +100,12 @@ input[type="checkbox"] {
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 0.3rem;
+  margin: var(--margin);
 }
 
 .image-info {
   text-align: center;
-  padding: 0.3rem;
+  padding: var(--padding);
 }
 
 .green {
@@ -124,8 +125,12 @@ input[type="checkbox"] {
 }
 
 .footer {
-  margin-top: 20px;
+  margin-top: 1rem;
   text-align: center;
+  font-size: small;
+}
+
+.small {
   font-size: small;
 }
 
@@ -146,6 +151,10 @@ a:hover {
   text-decoration: underline;
 }
 
+label {
+  margin-right: var(--margin);
+}
+
 /* File Input */
 input[type="file"] {
   display: none;
@@ -156,9 +165,7 @@ input[type="file"] {
   margin: 0.3rem;
   padding: 0.3rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
   box-sizing: border-box;
-  font-size: 14px;
   background-color: white;
   color: black;
   cursor: pointer;
@@ -177,12 +184,10 @@ input[type="file"] {
 
 .download {
   display: inline-block;
-  margin: 0.3rem;
-  padding: 0.3rem;
+  margin: var(--margin);
+  padding: var(--padding);
   border: 1px solid #ccc;
-  border-radius: 4px;
   box-sizing: border-box;
-  font-size: 14px;
   background-color: white;
   color: black;
   cursor: pointer;
@@ -193,4 +198,51 @@ input[type="file"] {
 .download:hover {
   background-color: #f1f1f1;
   text-decoration: none;
+}
+
+.config {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  font-size: small;
+}
+
+.config button {
+  max-width: fit-content;
+}
+
+@media screen and (max-width: 768px) {
+  body {
+    font-size: smaller;
+  }
+
+  .app {
+    padding: 0.5rem;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+  }
+
+  .output-images {
+    margin: 2px;
+  }
+
+  .file-upload-label,
+  .download {
+    padding: 0.2rem;
+  }
+
+  .config {
+    display: flex;
+    flex-direction: column;
+    font-size: small;
+    border: 1px solid #ccc;
+    padding: var(--padding);
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
 }

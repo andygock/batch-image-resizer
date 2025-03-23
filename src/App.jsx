@@ -205,77 +205,85 @@ function App() {
     <div ref={dropRef} className="app">
       <div className="header">
         <h1>Batch Image Resizer</h1>
-        <SizeSelect
-          onChange={(sizeStr) => {
-            const [width, height] = sizeStr
-              .split("x")
-              .map((s) => parseInt(s, 10));
-            setBoundingBox({ width, height });
-          }}
-          width={boundingBox.width}
-          height={boundingBox.height}
-          disabled={isProcessing}
-        />
-        <CompressionSelect
-          onChange={setCompressionLevel}
-          value={compressionLevel}
-          disabled={isProcessing}
-        />
-
-        {/* disable upscale */}
-        <label>
-          <input
-            type="checkbox"
-            checked={disableUpscale}
-            onChange={() => setDisableUpscale(!disableUpscale)}
-          />
-          Disable Upscale
-        </label>
-
-        {/* enable suffix */}
-        <label>
-          <input
-            type="checkbox"
-            checked={enableSuffix}
-            onChange={() => setEnableSuffix(!enableSuffix)}
-          />
-          Enable Suffix
-        </label>
-
-        {/* suffix */}
-        <input
-          type="text"
-          value={suffix}
-          onChange={(e) => setSuffix(e.target.value)}
-          placeholder="Suffix"
-          disabled={!enableSuffix}
-          className="input-suffix"
-        />
-
-        {/* download as ZIP */}
-        <button
-          onClick={downloadZip}
-          disabled={!allowDownload || isProcessing || isEmpty}
-        >
-          Download as ZIP
-        </button>
-
-        {/* reset button */}
-        <button onClick={handleReset} disabled={isEmpty}>
-          Reset
-        </button>
-
-        {/* File upload button */}
-        <label className="file-upload-label">
-          <input
-            type="file"
-            accept="image/jpeg, image/png, image/webp"
-            multiple
-            onChange={handleFileInputChange}
+        <div className="config">
+          {/* select output size */}
+          <SizeSelect
+            onChange={(sizeStr) => {
+              const [width, height] = sizeStr
+                .split("x")
+                .map((s) => parseInt(s, 10));
+              setBoundingBox({ width, height });
+            }}
+            width={boundingBox.width}
+            height={boundingBox.height}
             disabled={isProcessing}
-            style={{ display: "block" }}
           />
-        </label>
+
+          {/* select compression ratio */}
+          <CompressionSelect
+            onChange={setCompressionLevel}
+            value={compressionLevel}
+            disabled={isProcessing}
+          />
+
+          {/* disable upscale */}
+          <label>
+            <input
+              type="checkbox"
+              checked={disableUpscale}
+              onChange={() => setDisableUpscale(!disableUpscale)}
+            />
+            Disable Upscale
+          </label>
+
+          <div>
+            {/* enable suffix */}
+            <label>
+              <input
+                type="checkbox"
+                checked={enableSuffix}
+                onChange={() => setEnableSuffix(!enableSuffix)}
+              />
+              Enable Suffix
+            </label>
+
+            {/* suffix */}
+            <input
+              type="text"
+              value={suffix}
+              onChange={(e) => setSuffix(e.target.value)}
+              placeholder="Suffix"
+              disabled={!enableSuffix}
+              className="input-suffix"
+            />
+          </div>
+
+          <div>
+            {/* download as ZIP */}
+            <button
+              onClick={downloadZip}
+              disabled={!allowDownload || isProcessing || isEmpty}
+            >
+              Download as ZIP
+            </button>
+            {/* reset button */}
+            <button onClick={handleReset} disabled={isEmpty}>
+              Reset
+            </button>
+          </div>
+
+          {/* File upload button */}
+          <label className="file-upload-label">
+            <input
+              type="file"
+              accept="image/jpeg, image/png, image/webp"
+              multiple
+              onChange={handleFileInputChange}
+              disabled={isProcessing}
+              style={{ display: "block" }}
+            />
+          </label>
+        </div>
       </div>
 
       <Errors errors={errors} />
@@ -288,7 +296,9 @@ function App() {
       />
 
       {processingTime >= 0.01 && (
-        <p>Processing time: {processingTime} seconds</p>
+        <p className="small center">
+          Processing time: {processingTime} seconds
+        </p>
       )}
       <div className="footer">
         <p>
