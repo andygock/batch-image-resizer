@@ -58,12 +58,18 @@ export default function OutputImages({
           );
 
           // use suffix if needed
-          const downloadFilename = enableSuffix
+          let downloadFilename = enableSuffix
             ? `${filename.substring(
                 0,
                 filename.lastIndexOf(".")
               )}${suffix}${filename.substring(filename.lastIndexOf("."))}`
             : filename;
+
+          // always use .jpg as extension, user input could have been .png, .webp, etc.
+          downloadFilename = `${downloadFilename.substring(
+            0,
+            downloadFilename.lastIndexOf(".")
+          )}.jpg`;
 
           return (
             <div key={index} className="output-images">
@@ -92,7 +98,7 @@ export default function OutputImages({
                   title={`Click to download "${downloadFilename}"`}
                   className="download"
                 >
-                  Download {Math.ceil(filesizeAfter / 1024)} kB
+                  Download {Math.ceil(filesizeAfter / 1024)} kB JPG
                 </a>
               </div>
             </div>
