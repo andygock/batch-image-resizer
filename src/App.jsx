@@ -178,8 +178,8 @@ function App() {
       if (enableSuffix) {
         const lastDotIndex = filename.lastIndexOf(".");
         const name = filename.substring(0, lastDotIndex);
-        const ext = filename.substring(lastDotIndex + 1);
-        saveFilename = `${name}${suffix}.${ext}`;
+        // const ext = filename.substring(lastDotIndex + 1); // ignore original extension
+        saveFilename = `${name}${suffix}.jpg`;
       }
       zip.file(saveFilename, blob);
     }
