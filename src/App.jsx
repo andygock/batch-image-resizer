@@ -262,7 +262,9 @@ function App() {
             {/* download as ZIP */}
             <button
               onClick={downloadZip}
-              disabled={!allowDownload || isProcessing || isEmpty}
+              disabled={
+                !allowDownload || isProcessing || isEmpty || images.length === 0
+              }
             >
               Download as ZIP
             </button>
