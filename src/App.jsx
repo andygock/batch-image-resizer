@@ -147,7 +147,7 @@ function App() {
     setResizedImages(resizedImagesTemp);
 
     setIsProcessing(false);
-  }, [images, boundingBox, compressionLevel, disableUpscale]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [images, boundingBox, compressionLevel, disableUpscale]);
 
   // perform resize when uploaded images are updated
   useEffect(() => {

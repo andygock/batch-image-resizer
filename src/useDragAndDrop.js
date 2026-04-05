@@ -43,5 +43,5 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
       el.removeEventListener("dragleave", handleDragLeave);
       el.removeEventListener("drop", handleDrop);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 };
