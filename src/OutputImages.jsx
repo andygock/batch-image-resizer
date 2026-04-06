@@ -27,13 +27,7 @@ export default function OutputImages({
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        flexWrap: "wrap",
-      }}
-    >
+    <div className="output-grid">
       {resizedImages.map(
         (
           {
@@ -46,7 +40,7 @@ export default function OutputImages({
             widthAfter,
             heightAfter,
           },
-          index
+          index,
         ) => {
           const url = URL.createObjectURL(image);
 
@@ -54,25 +48,32 @@ export default function OutputImages({
 
           // file size after, as percentage of file size before, rounded to integer
           const fileSizePercent = Math.round(
-            (filesizeAfter / filesizeBefore) * 100
+            (filesizeAfter / filesizeBefore) * 100,
           );
 
           // use suffix if needed
           let downloadFilename = enableSuffix
             ? `${filename.substring(
                 0,
-                filename.lastIndexOf(".")
+                filename.lastIndexOf("."),
               )}${suffix}${filename.substring(filename.lastIndexOf("."))}`
             : filename;
 
           // always use .jpg as extension, user input could have been .png, .webp, etc.
           downloadFilename = `${downloadFilename.substring(
             0,
-            downloadFilename.lastIndexOf(".")
+            downloadFilename.lastIndexOf("."),
           )}.jpg`;
 
+          // calculate max width for the image container, based on the image width + some extra space for padding and borders, with a minimum of 220px
+          const rootStyle = getComputedStyle(document.documentElement);
+          const pad = parseFloat(rootStyle.getPropertyValue("--pad"));
+          const border = 1;
+          const extraWidth = 2 * (pad + border);
+          const maxWidth = Math.max(widthAfter, 220) + extraWidth;
+
           return (
-            <div key={index} className="output-images">
+            <div key={index} className="output-images" style={{ maxWidth }}>
               <img
                 src={url}
                 alt={filename}
@@ -81,29 +82,33 @@ export default function OutputImages({
               />
               <div className="image-info">
                 <div>{filename}</div>
-                <div>
-                  {Math.ceil(filesizeBefore / 1024)}&nbsp;⭢&nbsp;
-                  {Math.ceil(filesizeAfter / 1024)} kB (
-                  {fileSizeIsLower && <span className="green">🠫 </span>}
-                  {!fileSizeIsLower && <span className="red">🠅 </span>}
-                  {fileSizePercent}%)
+                <div className="file-info">
+                  <div className="file-size">
+                    {Math.ceil(filesizeBefore / 1024)}&nbsp;⭢&nbsp;
+                    <strong>{Math.ceil(filesizeAfter / 1024)}</strong> kB (
+                    {fileSizeIsLower && <span className="green">🠫 </span>}
+                    {!fileSizeIsLower && <span className="red">🠅 </span>}
+                    {fileSizePercent}%)
+                  </div>
+                  <div className="dimensions">
+                    {widthBefore}x{heightBefore}&nbsp;⭢&nbsp;{widthAfter}x
+                    {heightAfter} px
+                  </div>
+                  <div>
+                    <a
+                      href={url}
+                      download={downloadFilename}
+                      title={`Click to download "${downloadFilename}"`}
+                      className="download"
+                    >
+                      Download
+                    </a>
+                  </div>
                 </div>
-                <div>
-                  {widthBefore}x{heightBefore}&nbsp;⭢&nbsp;{widthAfter}x
-                  {heightAfter} px
-                </div>
-                <a
-                  href={url}
-                  download={downloadFilename}
-                  title={`Click to download "${downloadFilename}"`}
-                  className="download"
-                >
-                  Download {Math.ceil(filesizeAfter / 1024)} kB JPG
-                </a>
               </div>
             </div>
           );
-        }
+        },
       )}
     </div>
   );

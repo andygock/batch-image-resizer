@@ -282,8 +282,8 @@ function App() {
               multiple
               onChange={handleFileInputChange}
               disabled={isProcessing}
-              style={{ display: "block" }}
             />
+            Upload Images
           </label>
         </div>
       </div>

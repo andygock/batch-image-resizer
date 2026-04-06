@@ -1,81 +1,103 @@
 :root {
-  --margin: 0.2rem;
-  --padding: 0.2rem;
+  --bg: #f6f6f7;
+  --panel: #ffffff;
+  --text: #1f1f1f;
+  --muted: #6f6f76;
+  --border: #e6e6e8;
+  --accent: #0f0f0f;
+  --radius: 4px;
+  --gap: 6px;
+  --pad: 6px;
+  --font-size: 1rem;
+  --button-hover-bg: #e6e6e8;
 }
 
-body::after {
-  content: "";
-  /* background: url("/favicon_pig.svg") no-repeat center center fixed; */
-  background-size: cover;
-  opacity: 0.2;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  position: fixed;
-  z-index: -1;
-}
-
+/* subtle background */
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial,
     "Noto Sans", sans-serif;
   margin: 0;
   padding: 0;
-  color: #333;
+  color: var(--text);
+  background: var(--bg);
 }
 
 .app {
-  padding: 1rem;
-
-  /* use full height of viewport, if contents are smaller */
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 16px 18px;
   min-height: 100vh;
 }
 
 .header {
-  background-color: rgba(255, 255, 255, 0.75);
-  padding: var(--padding);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--gap);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: var(--pad);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-weight: 700;
+  font-size: var(--font-size);
+  margin: 0;
+  color: var(--accent);
 }
 
 /* Buttons, Text Inputs, Select Inputs */
 button,
 input[type="text"],
 select {
-  /* margin: 0.3rem; */
-  /* padding: 0.3rem; */
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-  font-size: normal;
-  background-color: white;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  padding: var(--pad);
+  border-radius: var(--radius);
+  font-size: var(--font-size);
 }
 
 button {
-  background-color: white;
-  color: black;
   cursor: pointer;
-  margin: var(--margin);
-  padding: var(--padding);
+  margin: 0 var(--gap) 0 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: var(--pad);
+  border-radius: var(--radius);
+  color: var(--accent);
 }
 
-button:hover {
-  background-color: #f1f1f1;
+button:hover,
+.file-upload-label:hover,
+.download:hover {
+  background: var(--button-hover-bg);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
 button:disabled {
-  background-color: #eee;
-  color: #666;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Accessibility focus styles */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.file-upload-label:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(15, 15, 15, 0.06);
 }
 
 /* Checkboxes */
 input[type="checkbox"] {
   cursor: pointer;
-  margin: var(--margin);
-  padding: var(--padding);
 }
 
 .input-suffix {
@@ -83,167 +105,183 @@ input[type="checkbox"] {
 }
 
 /* OutImages */
-.output-images {
+.output-grid {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 3px;
-  font-size: small;
-  border: 1px solid #ccc;
+  flex-wrap: wrap;
+  gap: var(--gap);
+  justify-content: flex-start;
+  align-items: flex-start;
 }
 
-/* border on hover */
-.output-images:hover {
-  border: 1px solid #666;
+.output-images {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  flex: 0 0 auto;
+  /* min-width: 220px; */
+  /* width: auto; */
+  /* max-width: 256px; */
+
+  /* max-width needs to be set dynamically by JS */
 }
 
 .output-images img {
-  max-width: 100%;
-  height: auto;
+  border-radius: var(--radius);
   display: block;
-  margin: var(--margin);
+  /* width: auto !important; */
+  /* max-width: none !important; */
+  /* min-width: auto !important; */
+  /* max-height: none !important; */
+  /* height: auto !important; */
 }
 
 .image-info {
-  text-align: center;
-  padding: var(--padding);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  font-size: calc(var(--font-size) * 0.7);
+  color: var(--muted);
+  gap: var(--gap);
+}
+
+.file-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+  min-width: 0;
+}
+
+/* make download link look like a button and align left */
+.image-info .download {
+  align-self: flex-start;
+  padding: var(--pad);
+}
+
+.file-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--gap);
+  font-size: calc(var(--font-size) * 0.7);
+  color: var(--muted);
 }
 
 .green {
-  color: green;
+  color: darkgreen;
 }
-
 .red {
-  color: red;
+  color: darkred;
 }
 
 .large {
-  font-size: large;
+  font-size: calc(var(--font-size) * 1.2);
 }
-
 .bold {
   font-weight: bold;
 }
 
 .footer {
-  margin-top: 1rem;
+  margin-top: 18px;
   text-align: center;
-  font-size: small;
+  color: var(--muted);
+  font-size: calc(var(--font-size) * 0.8);
 }
-
 .small {
-  font-size: small;
+  font-size: calc(var(--font-size) * 0.8);
 }
-
 .center {
   text-align: center;
 }
-
 .pad-3rem {
   padding: 3rem;
 }
 
 a {
-  color: blue;
-  text-decoration: none;
+  color: var(--accent);
 }
-
 a:hover {
   text-decoration: underline;
 }
 
 label {
-  margin-right: var(--margin);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  margin: 0;
+  font-size: var(--font-size);
 }
 
 /* File Input */
 input[type="file"] {
   display: none;
 }
-
 .file-upload-label {
-  display: inline-block;
-  margin: 0.3rem;
-  padding: 0.3rem;
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-  background-color: white;
-  color: black;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: var(--pad);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
   cursor: pointer;
-  text-align: center;
+  font-size: var(--font-size);
 }
-
+.file-upload-label svg {
+  display: inline-block;
+}
 .file-upload-label:hover {
-  background-color: #f1f1f1;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
-
-.file-upload-label:disabled {
-  background-color: #eee;
-  color: #666;
+.file-upload-label[disabled] {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .download {
   display: inline-block;
-  margin: var(--margin);
-  padding: var(--padding);
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-  background-color: white;
-  color: black;
-  cursor: pointer;
-  text-align: center;
+  padding: var(--pad);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
   text-decoration: none;
+  color: var(--accent);
+  background: transparent;
 }
-
 .download:hover {
-  background-color: #f1f1f1;
   text-decoration: none;
 }
 
 .config {
   display: flex;
-  flex-direction: row;
-  justify-content: flex-start;
-  align-items: center;
-  align-content: flex-start;
   flex-wrap: wrap;
-  font-size: small;
+  gap: var(--gap);
+  align-items: center;
+  margin: 0;
 }
-
+.config > div,
+.config label {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  margin: 0;
+}
 .config button {
+  margin: 0;
   max-width: fit-content;
 }
 
 @media screen and (max-width: 768px) {
-  body {
-    font-size: smaller;
+  :root {
+    --gap: 4px;
+    --pad: 4px;
+    --font-size: 0.8rem;
   }
-
-  .app {
-    padding: 0.5rem;
-  }
-
-  h1 {
-    font-size: 1.2rem;
-  }
-
   .output-images {
-    margin: 2px;
-  }
-
-  .file-upload-label,
-  .download {
-    padding: 0.2rem;
-  }
-
-  .config {
-    display: flex;
-    flex-direction: column;
-    font-size: small;
-    border: 1px solid #ccc;
-    padding: var(--padding);
-    align-items: flex-start;
-    justify-content: flex-start;
+    width: inherit;
+    max-width: 100%;
   }
 }
