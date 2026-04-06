@@ -6,7 +6,7 @@ export default defineConfig({
   base: "./",
   plugins: [
     preact(),
-    visualizer({ filename: "dist/bundle-analysis.html", open: true }),
+    // visualizer({ filename: "dist/bundle-analysis.html", open: true }),
   ],
   resolve: {
     alias: {
