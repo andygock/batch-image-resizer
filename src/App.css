@@ -6,6 +6,8 @@
   --border: #e1e1e4;
   --border-strong: #c8c8ce;
   --accent: #0f0f0f;
+  --drop: #2563eb;
+  --drop-bg: #eef4ff;
   --danger: #9b1c1c;
   --success: #166534;
   --radius: 4px;
@@ -39,6 +41,7 @@ body,
 }
 
 .app {
+  position: relative;
   width: 100%;
   min-height: 100vh;
   padding: 18px;
@@ -48,8 +51,30 @@ body,
 }
 
 .app.is-dragging {
-  background: #f0f0f1;
-  box-shadow: inset 0 0 0 2px var(--border-strong);
+  background: var(--drop-bg);
+  box-shadow: inset 0 0 0 3px var(--drop);
+}
+
+.app.is-dragging::after {
+  position: fixed;
+  inset: 18px;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--drop);
+  border-radius: 6px;
+  background: rgba(238, 244, 255, 0.86);
+  color: var(--drop);
+  content: "Drop to add images";
+  font-size: 18px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.app.is-dragging .empty-state,
+.app.is-dragging .output-images,
+.app.is-dragging .batch-summary {
+  border-color: var(--drop);
 }
 
 .header {
@@ -330,6 +355,20 @@ label {
 .download {
   min-height: 28px;
   padding: 4px 8px;
+  font-size: var(--meta-size);
+}
+
+.image-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.remove-image {
+  min-height: 28px;
+  padding: 4px 8px;
+  color: var(--danger);
   font-size: var(--meta-size);
 }
 

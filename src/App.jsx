@@ -55,6 +55,7 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const dropRef = useRef(null);
+  const imageIdRef = useRef(0);
 
   const handleImageUpload = useCallback((files) => {
     const newErrors = [];
@@ -65,19 +66,22 @@ function App() {
         newErrors.push(`File "${file.name}" is not a JPEG, PNG or WebP image.`);
         continue;
       }
-      newImages.push(file);
+      newImages.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${imageIdRef.current}`,
+        file,
+      });
+      imageIdRef.current += 1;
     }
 
-    // don't append images, just replace
-    // perhaps in the future, we can update this so users can add one image at a time
     setErrors(newErrors);
-    setImages(newImages);
+    setImages((currentImages) => [...currentImages, ...newImages]);
   }, []);
 
   const handleFileInputChange = (event) => {
     const files = event.target.files;
     if (files) {
       handleImageUpload(files);
+      event.target.value = "";
     }
   };
 
@@ -102,7 +106,7 @@ function App() {
     // Start the timer
     const startTime = performance.now();
 
-    for (const imageFile of images) {
+    for (const { id, file: imageFile } of images) {
       // get filesize of original image
       const filesizeBefore = imageFile.size;
 
@@ -165,6 +169,7 @@ function App() {
 
         // Add the resized image to the array of resized images
         resizedImagesTemp.push({
+          id,
           filename,
           blob,
           filesizeBefore,
@@ -212,6 +217,15 @@ function App() {
     setImages([]);
     setResizedImages([]);
     setErrors([]);
+  };
+
+  const handleRemoveImage = (id) => {
+    setImages((currentImages) =>
+      currentImages.filter((imageEntry) => imageEntry.id !== id),
+    );
+    setResizedImages((currentImages) =>
+      currentImages.filter((imageEntry) => imageEntry.id !== id),
+    );
   };
 
   // download all resized images as a ZIP file
@@ -322,7 +336,7 @@ function App() {
                 onChange={handleFileInputChange}
                 disabled={isProcessing}
               />
-              Load images
+              {isEmpty ? "Load images" : "Add images"}
             </label>
           </div>
         </div>
@@ -338,6 +352,7 @@ function App() {
         processingTime={processingTime}
         onFileInputChange={handleFileInputChange}
         inputDisabled={isProcessing}
+        onRemoveImage={handleRemoveImage}
       />
 
       <div className="footer">

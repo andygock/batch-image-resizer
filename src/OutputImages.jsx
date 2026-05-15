@@ -18,6 +18,7 @@ export default function OutputImages({
   processingTime,
   onFileInputChange,
   inputDisabled,
+  onRemoveImage,
 }) {
   const imageUrls = useMemo(
     () =>
@@ -94,6 +95,7 @@ export default function OutputImages({
           (
             {
               filename,
+              id,
               filesizeBefore,
               filesizeAfter,
               widthBefore,
@@ -122,7 +124,7 @@ export default function OutputImages({
             const maxWidth = Math.max(widthAfter, 220) + extraWidth;
 
             return (
-              <div key={filename + index} className="output-images" style={{ maxWidth }}>
+              <div key={id} className="output-images" style={{ maxWidth }}>
                 <img
                   src={url}
                   alt={filename}
@@ -149,14 +151,24 @@ export default function OutputImages({
                       {fileSizeDelta}%
                     </span>
                   </div>
-                  <a
-                    href={url}
-                    download={downloadFilename}
-                    title={`Download "${downloadFilename}"`}
-                    className="download"
-                  >
-                    Download
-                  </a>
+                  <div className="image-actions">
+                    <a
+                      href={url}
+                      download={downloadFilename}
+                      title={`Download "${downloadFilename}"`}
+                      className="download"
+                    >
+                      Download
+                    </a>
+                    <button
+                      type="button"
+                      className="remove-image"
+                      onClick={() => onRemoveImage(id)}
+                      title={`Remove "${filename}"`}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             );
