@@ -1,109 +1,168 @@
+import { useEffect, useMemo } from "react";
+
+const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
+
+const getDownloadFilename = (filename, extension, enableSuffix, suffix) => {
+  const lastDotIndex = filename.lastIndexOf(".");
+  const name =
+    lastDotIndex === -1 ? filename : filename.substring(0, lastDotIndex);
+
+  return `${enableSuffix ? `${name}${suffix}` : name}.${extension}`;
+};
+
 export default function OutputImages({
   resizedImages,
   suffix,
   enableSuffix,
   loading,
+  processingTime,
+  onFileInputChange,
+  inputDisabled,
 }) {
-  // console.table(resizedImages);
+  const imageUrls = useMemo(
+    () =>
+      resizedImages.map(({ blob }) => ({
+        blob,
+        url: URL.createObjectURL(blob),
+      })),
+    [resizedImages],
+  );
+
+  useEffect(
+    () => () => {
+      imageUrls.forEach(({ url }) => URL.revokeObjectURL(url));
+    },
+    [imageUrls],
+  );
 
   if (loading) {
-    // display a spinner or some sort of loading indicator
     return (
-      <div>
-        <p>Processing images, please wait a moment...</p>
+      <div className="status-panel" role="status">
+        Processing images...
       </div>
     );
   }
 
   if (!resizedImages.length) {
     return (
-      <div className="center pad-3rem">
-        <p>
-          Drag and drop JPG, PNG or WebP image(s) into this window to batch
-          resize.
-        </p>
+      <div className="empty-state">
+        <p>Drop JPG, PNG or WebP files here.</p>
+        <label className="file-upload-label primary-action">
+          <input
+            type="file"
+            accept="image/jpeg, image/png, image/webp"
+            multiple
+            onChange={onFileInputChange}
+            disabled={inputDisabled}
+          />
+          Choose images
+        </label>
       </div>
     );
   }
 
+  const totalBefore = resizedImages.reduce(
+    (total, image) => total + image.filesizeBefore,
+    0,
+  );
+  const totalAfter = resizedImages.reduce(
+    (total, image) => total + image.filesizeAfter,
+    0,
+  );
+  const savedPercent =
+    totalBefore > 0 ? Math.round((1 - totalAfter / totalBefore) * 100) : 0;
+
   return (
-    <div className="output-grid">
-      {resizedImages.map(
-        (
-          {
-            filename,
-            blob: image,
-            filesizeBefore,
-            filesizeAfter,
-            widthBefore,
-            heightBefore,
-            widthAfter,
-            heightAfter,
-            outputExtension,
-          },
-          index,
-        ) => {
-          const url = URL.createObjectURL(image);
+    <>
+      <div className="batch-summary">
+        <span>
+          {resizedImages.length}{" "}
+          {resizedImages.length === 1 ? "image" : "images"} resized
+        </span>
+        <span>
+          {formatKb(totalBefore)} -&gt; {formatKb(totalAfter)}
+        </span>
+        <span className={savedPercent >= 0 ? "positive" : "negative"}>
+          {savedPercent >= 0 ? "Saved" : "Increased"}{" "}
+          {Math.abs(savedPercent)}%
+        </span>
+        {processingTime >= 0.01 && <span>{processingTime}s</span>}
+      </div>
 
-          const fileSizeIsLower = filesizeAfter < filesizeBefore;
+      <div className="output-grid">
+        {resizedImages.map(
+          (
+            {
+              filename,
+              filesizeBefore,
+              filesizeAfter,
+              widthBefore,
+              heightBefore,
+              widthAfter,
+              heightAfter,
+              outputExtension,
+            },
+            index,
+          ) => {
+            const url = imageUrls[index].url;
+            const fileSizeDelta = Math.round(
+              (filesizeAfter / filesizeBefore - 1) * 100,
+            );
+            const downloadFilename = getDownloadFilename(
+              filename,
+              outputExtension,
+              enableSuffix,
+              suffix,
+            );
 
-          // file size after, as percentage of file size before, rounded to integer
-          const fileSizePercent = Math.round(
-            (filesizeAfter / filesizeBefore) * 100,
-          );
+            const rootStyle = getComputedStyle(document.documentElement);
+            const pad = parseFloat(rootStyle.getPropertyValue("--pad"));
+            const border = 1;
+            const extraWidth = 2 * (pad + border);
+            const maxWidth = Math.max(widthAfter, 220) + extraWidth;
 
-          const lastDotIndex = filename.lastIndexOf(".");
-          const name =
-            lastDotIndex === -1
-              ? filename
-              : filename.substring(0, lastDotIndex);
-          const downloadFilename = `${enableSuffix ? `${name}${suffix}` : name}.${outputExtension}`;
-
-          // calculate max width for the image container, based on the image width + some extra space for padding and borders, with a minimum of 220px
-          const rootStyle = getComputedStyle(document.documentElement);
-          const pad = parseFloat(rootStyle.getPropertyValue("--pad"));
-          const border = 1;
-          const extraWidth = 2 * (pad + border);
-          const maxWidth = Math.max(widthAfter, 220) + extraWidth;
-
-          return (
-            <div key={index} className="output-images" style={{ maxWidth }}>
-              <img
-                src={url}
-                alt={filename}
-                width={widthAfter}
-                height={heightAfter}
-              />
-              <div className="image-info">
-                <div>{filename}</div>
-                <div className="file-info">
-                  <div className="file-size">
-                    {Math.ceil(filesizeBefore / 1024)}&nbsp;⭢&nbsp;
-                    <strong>{Math.ceil(filesizeAfter / 1024)}</strong> kB (
-                    {fileSizeIsLower && <span className="green">🠫 </span>}
-                    {!fileSizeIsLower && <span className="red">🠅 </span>}
-                    {fileSizePercent}%)
+            return (
+              <div key={filename + index} className="output-images" style={{ maxWidth }}>
+                <img
+                  src={url}
+                  alt={filename}
+                  width={widthAfter}
+                  height={heightAfter}
+                />
+                <div className="image-info">
+                  <div className="filename" title={filename}>
+                    {filename}
                   </div>
-                  <div className="dimensions">
-                    {widthBefore}x{heightBefore}&nbsp;⭢&nbsp;{widthAfter}x
-                    {heightAfter} px
-                  </div>
-                  <div>
-                    <a
-                      href={url}
-                      download={downloadFilename}
-                      title={`Click to download "${downloadFilename}"`}
-                      className="download"
+                  <div className="file-info">
+                    <span>
+                      {widthBefore}x{heightBefore} -&gt; {widthAfter}x
+                      {heightAfter}
+                    </span>
+                    <span>
+                      {formatKb(filesizeBefore)} -&gt;{" "}
+                      <strong>{formatKb(filesizeAfter)}</strong>
+                    </span>
+                    <span
+                      className={fileSizeDelta <= 0 ? "positive" : "negative"}
                     >
-                      Download
-                    </a>
+                      {fileSizeDelta > 0 ? "+" : ""}
+                      {fileSizeDelta}%
+                    </span>
                   </div>
+                  <a
+                    href={url}
+                    download={downloadFilename}
+                    title={`Download "${downloadFilename}"`}
+                    className="download"
+                  >
+                    Download
+                  </a>
                 </div>
               </div>
-            </div>
-          );
-        },
-      )}
-    </div>
+            );
+          },
+        )}
+      </div>
+    </>
   );
 }

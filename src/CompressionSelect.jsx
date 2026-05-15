@@ -23,7 +23,7 @@ export default function CompressionSelect({
   if (format === "png") {
     return (
       <label htmlFor="png-colors">
-        PNG Optimisation
+        PNG colors
         <select
           id="png-colors"
           onChange={(e) => onPngColorsChange(Number(e.target.value))}
@@ -42,7 +42,7 @@ export default function CompressionSelect({
 
   return (
     <label htmlFor="compression">
-      {format === "webp" ? "WebP Quality" : "JPEG Quality"}
+      {format === "webp" ? "WebP quality" : "JPEG quality"}
       <select
         id="compression"
         onChange={(e) => {

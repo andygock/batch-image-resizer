@@ -48,8 +48,6 @@ function App() {
   const [outputFormat, setOutputFormat] = useState("jpeg");
   const [compressionLevel, setCompressionLevel] = useState(0.8); // Default compression level
   const [pngColors, setPngColors] = useState(0);
-  const [allowDownload, setAllowDownload] = useState(false);
-  const [autoRegenerate, setAutoRegenerate] = useState(true);
   const [enableSuffix, setEnableSuffix] = useState(true);
   const [suffix, setSuffix] = useState("_small");
   const [disableUpscale, setDisableUpscale] = useState(true);
@@ -58,14 +56,7 @@ function App() {
 
   const dropRef = useRef(null);
 
-  const handleFileInputChange = (event) => {
-    const files = event.target.files;
-    if (files) {
-      handleImageUpload(files);
-    }
-  };
-
-  const handleImageUpload = (files) => {
+  const handleImageUpload = useCallback((files) => {
     const newErrors = [];
     const newImages = [];
 
@@ -81,12 +72,26 @@ function App() {
     // perhaps in the future, we can update this so users can add one image at a time
     setErrors(newErrors);
     setImages(newImages);
+  }, []);
+
+  const handleFileInputChange = (event) => {
+    const files = event.target.files;
+    if (files) {
+      handleImageUpload(files);
+    }
   };
 
   // drag and drop handling
   useDragAndDrop(dropRef, handleImageUpload);
 
   const handleResize = useCallback(async () => {
+    if (!images.length) {
+      setResizedImages([]);
+      setProcessingTime(0);
+      setIsProcessing(false);
+      return;
+    }
+
     const resizedImagesTemp = [];
     const processingErrors = [];
     const { mimeType, extension } = outputFormats[outputFormat];
@@ -203,13 +208,7 @@ function App() {
     handleResize();
   }, [images, handleResize]);
 
-  // enable/disable download button
-  useEffect(() => {
-    setAllowDownload(resizedImages.length > 0);
-  }, [resizedImages]);
-
   const handleReset = () => {
-    setAllowDownload(false);
     setImages([]);
     setResizedImages([]);
     setErrors([]);
@@ -242,69 +241,56 @@ function App() {
     }
   };
 
-  const regenerate = () => {
-    handleResize();
-  };
-
   const isEmpty = images.length === 0;
+  const allowDownload = resizedImages.length > 0;
 
   return (
     <div ref={dropRef} className="app">
       <div className="header">
         <h1>Batch Image Resizer</h1>
         <div className="config">
-          {/* select output size */}
-          <SizeSelect
-            onChange={(sizeStr) => {
-              const [width, height] = sizeStr
-                .split("x")
-                .map((s) => parseInt(s, 10));
-              setBoundingBox({ width, height });
-            }}
-            width={boundingBox.width}
-            height={boundingBox.height}
-            disabled={isProcessing}
-          />
-
-          {/* select output format */}
-          <OutputFormatSelect
-            onChange={setOutputFormat}
-            value={outputFormat}
-            disabled={isProcessing}
-          />
-
-          {/* select compression ratio */}
-          <CompressionSelect
-            format={outputFormat}
-            onChange={setCompressionLevel}
-            value={compressionLevel}
-            pngColors={pngColors}
-            onPngColorsChange={setPngColors}
-            disabled={isProcessing}
-          />
-
-          {/* disable upscale */}
-          <label>
-            <input
-              type="checkbox"
-              checked={disableUpscale}
-              onChange={() => setDisableUpscale(!disableUpscale)}
+          <div className="control-group">
+            <SizeSelect
+              onChange={setBoundingBox}
+              width={boundingBox.width}
+              height={boundingBox.height}
+              disabled={isProcessing}
             />
-            Disable Upscale
-          </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={disableUpscale}
+                onChange={() => setDisableUpscale(!disableUpscale)}
+              />
+              Do not enlarge
+            </label>
+          </div>
 
-          <div>
-            {/* enable suffix */}
+          <div className="control-group">
+            <OutputFormatSelect
+              onChange={setOutputFormat}
+              value={outputFormat}
+              disabled={isProcessing}
+            />
+            <CompressionSelect
+              format={outputFormat}
+              onChange={setCompressionLevel}
+              value={compressionLevel}
+              pngColors={pngColors}
+              onPngColorsChange={setPngColors}
+              disabled={isProcessing}
+            />
+          </div>
+
+          <div className="control-group">
             <label>
               <input
                 type="checkbox"
                 checked={enableSuffix}
                 onChange={() => setEnableSuffix(!enableSuffix)}
               />
-              Enable Suffix
+              Add suffix
             </label>
-
-            {/* suffix */}
             <input
               type="text"
               value={suffix}
@@ -315,33 +301,30 @@ function App() {
             />
           </div>
 
-          <div>
-            {/* download as ZIP */}
+          <div className="control-group actions">
             <button
               onClick={downloadZip}
               disabled={
                 !allowDownload || isProcessing || isEmpty || images.length === 0
               }
+              className={allowDownload ? "primary-action" : undefined}
             >
-              Download as ZIP
+              Download ZIP
             </button>
-            {/* reset button */}
             <button onClick={handleReset} disabled={isEmpty}>
               Reset
             </button>
+            <label className="file-upload-label">
+              <input
+                type="file"
+                accept="image/jpeg, image/png, image/webp"
+                multiple
+                onChange={handleFileInputChange}
+                disabled={isProcessing}
+              />
+              Load images
+            </label>
           </div>
-
-          {/* File upload button */}
-          <label className="file-upload-label">
-            <input
-              type="file"
-              accept="image/jpeg, image/png, image/webp"
-              multiple
-              onChange={handleFileInputChange}
-              disabled={isProcessing}
-            />
-            Load image(s)
-          </label>
         </div>
       </div>
 
@@ -352,13 +335,11 @@ function App() {
         suffix={suffix}
         enableSuffix={enableSuffix}
         loading={isProcessing}
+        processingTime={processingTime}
+        onFileInputChange={handleFileInputChange}
+        inputDisabled={isProcessing}
       />
 
-      {processingTime >= 0.01 && (
-        <p className="small center">
-          Processing time: {processingTime} seconds
-        </p>
-      )}
       <div className="footer">
         <p>
           Your images are resized directly in your browser using the HTML5

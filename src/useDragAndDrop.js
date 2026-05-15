@@ -12,19 +12,19 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
     const handleDragOver = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.backgroundColor = "#cfc";
+      el.classList.add("is-dragging");
     };
 
     const handleDragLeave = () => {
-      el.style.backgroundColor = "";
+      el.classList.remove("is-dragging");
     };
 
     const handleDrop = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.backgroundColor = "";
+      el.classList.remove("is-dragging");
 
-      let newImages = Array.from(e.dataTransfer.files);
+      const newImages = Array.from(e.dataTransfer.files);
 
       if (!newImages.length) {
         // no files were dropped, this can happen if the user drops a non-file, such as a image within the browser
@@ -43,5 +43,5 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
       el.removeEventListener("dragleave", handleDragLeave);
       el.removeEventListener("drop", handleDrop);
     };
-  }, []);
+  }, [dropRef, handleImageUpload]);
 };

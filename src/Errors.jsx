@@ -1,18 +1,17 @@
 export default function Errors({ errors }) {
+  if (!errors.length) {
+    return null;
+  }
+
   return (
-    <div>
-      {/* display list of errors */}
-      {errors.length > 0 && (
-        <div>
-          <ul>
-            {errors.map((error, index) => (
-              <li key={index}>
-                <span className="red large">⚠</span> {error}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+    <div className="error-panel" role="alert">
+      <ul>
+        {errors.map((error, index) => (
+          <li key={index}>
+            <strong>Warning:</strong> {error}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
