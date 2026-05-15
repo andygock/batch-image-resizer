@@ -340,7 +340,7 @@ function App() {
               onChange={handleFileInputChange}
               disabled={isProcessing}
             />
-            Upload Images
+            Load image(s)
           </label>
         </div>
       </div>
