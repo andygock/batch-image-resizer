@@ -1,5 +1,5 @@
 {
-  "name": "image-resizer",
+  "name": "batch-image-resizer",
   "private": true,
   "version": "0.0.0",
   "type": "module",
