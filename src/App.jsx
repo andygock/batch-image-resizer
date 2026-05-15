@@ -1,19 +1,53 @@
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
+import UPNG from "upng-js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import CompressionSelect from "./CompressionSelect";
 import OutputImages from "./OutputImages";
+import OutputFormatSelect from "./OutputFormatSelect";
 import SizeSelect from "./SizeSelect";
 import { useDragAndDrop } from "./useDragAndDrop";
 import Errors from "./Errors";
+
+const outputFormats = {
+  jpeg: {
+    mimeType: "image/jpeg",
+    extension: "jpg",
+  },
+  png: {
+    mimeType: "image/png",
+    extension: "png",
+  },
+  webp: {
+    mimeType: "image/webp",
+    extension: "webp",
+  },
+};
+
+const getOutputFilename = (filename, extension, enableSuffix, suffix) => {
+  const lastDotIndex = filename.lastIndexOf(".");
+  const name =
+    lastDotIndex === -1 ? filename : filename.substring(0, lastDotIndex);
+  const outputName = enableSuffix ? `${name}${suffix}` : name;
+  return `${outputName}.${extension}`;
+};
+
+const encodePng = (canvas, width, height, colors) => {
+  const ctx = canvas.getContext("2d");
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const pngBuffer = UPNG.encode([imageData.data.buffer], width, height, colors);
+  return new Blob([pngBuffer], { type: outputFormats.png.mimeType });
+};
 
 function App() {
   const [images, setImages] = useState([]);
   const [resizedImages, setResizedImages] = useState([]);
   const [errors, setErrors] = useState([]);
   const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
+  const [outputFormat, setOutputFormat] = useState("jpeg");
   const [compressionLevel, setCompressionLevel] = useState(0.8); // Default compression level
+  const [pngColors, setPngColors] = useState(0);
   const [allowDownload, setAllowDownload] = useState(false);
   const [autoRegenerate, setAutoRegenerate] = useState(true);
   const [enableSuffix, setEnableSuffix] = useState(true);
@@ -54,6 +88,8 @@ function App() {
 
   const handleResize = useCallback(async () => {
     const resizedImagesTemp = [];
+    const processingErrors = [];
+    const { mimeType, extension } = outputFormats[outputFormat];
 
     setProcessingTime(0);
     setIsProcessing(true);
@@ -108,11 +144,13 @@ function App() {
         const ctx = offscreenCanvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
 
-        // convert to blob, jpeg
-        const blob = await offscreenCanvas.convertToBlob({
-          type: "image/jpeg",
-          quality: compressionLevel,
-        });
+        const blob =
+          outputFormat === "png"
+            ? encodePng(offscreenCanvas, canvasWidth, canvasHeight, pngColors)
+            : await offscreenCanvas.convertToBlob({
+                type: mimeType,
+                quality: compressionLevel,
+              });
 
         // get size of blob in bytes
         const blobSize = blob.size;
@@ -131,10 +169,11 @@ function App() {
           widthBefore: img.width,
           heightBefore: img.height,
           isUpscaled,
+          outputExtension: extension,
         });
       } catch (e) {
         const msg = `Error loading "${imageFile.name}"`;
-        setErrors([...errors, msg]);
+        processingErrors.push(msg);
         continue;
       }
     }
@@ -145,9 +184,19 @@ function App() {
     setProcessingTime(processingTime);
 
     setResizedImages(resizedImagesTemp);
+    if (processingErrors.length) {
+      setErrors(processingErrors);
+    }
 
     setIsProcessing(false);
-  }, [images, boundingBox, compressionLevel, disableUpscale]);
+  }, [
+    images,
+    boundingBox,
+    outputFormat,
+    compressionLevel,
+    pngColors,
+    disableUpscale,
+  ]);
 
   // perform resize when uploaded images are updated
   useEffect(() => {
@@ -172,15 +221,13 @@ function App() {
     const zip = new JSZip();
 
     // add all blobs to zip
-    for (const { filename, blob } of resizedImages) {
-      // if there is a suffix, append it to the filename
-      let saveFilename = filename;
-      if (enableSuffix) {
-        const lastDotIndex = filename.lastIndexOf(".");
-        const name = filename.substring(0, lastDotIndex);
-        // const ext = filename.substring(lastDotIndex + 1); // ignore original extension
-        saveFilename = `${name}${suffix}.jpg`;
-      }
+    for (const { filename, blob, outputExtension } of resizedImages) {
+      const saveFilename = getOutputFilename(
+        filename,
+        outputExtension,
+        enableSuffix,
+        suffix,
+      );
       zip.file(saveFilename, blob);
     }
 
@@ -219,10 +266,20 @@ function App() {
             disabled={isProcessing}
           />
 
+          {/* select output format */}
+          <OutputFormatSelect
+            onChange={setOutputFormat}
+            value={outputFormat}
+            disabled={isProcessing}
+          />
+
           {/* select compression ratio */}
           <CompressionSelect
+            format={outputFormat}
             onChange={setCompressionLevel}
             value={compressionLevel}
+            pngColors={pngColors}
+            onPngColorsChange={setPngColors}
             disabled={isProcessing}
           />
 
@@ -305,8 +362,8 @@ function App() {
       <div className="footer">
         <p>
           Your images are resized directly in your browser using the HTML5
-          Canvas API, ensuring privacy and speed. No data is uploaded to any
-          server. Source code on{" "}
+          Canvas API and browser-side encoders, ensuring privacy and speed. No
+          data is uploaded to any server. Source code on{" "}
           <a href="https://github.com/andygock/batch-image-resizer/">GitHub</a>.
         </p>
       </div>

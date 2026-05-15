@@ -14,7 +14,8 @@
     "jszip": "^3.10.1",
     "preact": "^10.13.2",
     "react": "npm:@preact/compat",
-    "react-dom": "npm:@preact/compat"
+    "react-dom": "npm:@preact/compat",
+    "upng-js": "^2.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

@@ -39,6 +39,7 @@ export default function OutputImages({
             heightBefore,
             widthAfter,
             heightAfter,
+            outputExtension,
           },
           index,
         ) => {
@@ -51,19 +52,12 @@ export default function OutputImages({
             (filesizeAfter / filesizeBefore) * 100,
           );
 
-          // use suffix if needed
-          let downloadFilename = enableSuffix
-            ? `${filename.substring(
-                0,
-                filename.lastIndexOf("."),
-              )}${suffix}${filename.substring(filename.lastIndexOf("."))}`
-            : filename;
-
-          // always use .jpg as extension, user input could have been .png, .webp, etc.
-          downloadFilename = `${downloadFilename.substring(
-            0,
-            downloadFilename.lastIndexOf("."),
-          )}.jpg`;
+          const lastDotIndex = filename.lastIndexOf(".");
+          const name =
+            lastDotIndex === -1
+              ? filename
+              : filename.substring(0, lastDotIndex);
+          const downloadFilename = `${enableSuffix ? `${name}${suffix}` : name}.${outputExtension}`;
 
           // calculate max width for the image container, based on the image width + some extra space for padding and borders, with a minimum of 220px
           const rootStyle = getComputedStyle(document.documentElement);
