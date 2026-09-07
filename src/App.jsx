@@ -1,5 +1,6 @@
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
+import { Download, Play, RotateCcw, Upload, X } from "lucide-preact";
 import {
   useCallback,
   useEffect,
@@ -9,6 +10,7 @@ import {
   useState,
 } from "react";
 import "./App.css";
+import styles from "./App.module.css";
 import CompressionSelect from "./CompressionSelect";
 import OutputImages from "./OutputImages";
 import OutputFormatSelect from "./OutputFormatSelect";
@@ -222,11 +224,11 @@ function App() {
   const isEmpty = images.length === 0;
 
   return (
-    <div ref={dropRef} className="app">
-      <div className="header">
-        <h1>Batch Image Resizer</h1>
-        <div className="config">
-          <div className="control-group">
+    <div ref={dropRef} className={styles.app}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Batch Image Resizer</h1>
+        <div className={styles.config}>
+          <div className={styles.controlGroup}>
             <SizeSelect
               onChange={changeSetting(setBoundingBox)}
               width={boundingBox.width}
@@ -243,7 +245,7 @@ function App() {
               Do not enlarge
             </label>
           </div>
-          <div className="control-group">
+          <div className={styles.controlGroup}>
             <OutputFormatSelect
               onChange={changeSetting(setOutputFormat)}
               value={outputFormat}
@@ -256,7 +258,7 @@ function App() {
               onPngColorsChange={changeSetting(setPngColors)}
             />
           </div>
-          <div className="control-group">
+          <div className={styles.controlGroup}>
             <label>
               <input
                 type="checkbox"
@@ -274,21 +276,33 @@ function App() {
               placeholder="Suffix"
               maxLength={100}
               disabled={!enableSuffix || isZipping}
-              className="input-suffix"
+              className={styles.suffix}
             />
           </div>
-          <div className="control-group actions">
+          <div className={`${styles.controlGroup} ${styles.actions}`}>
             <button
               onClick={downloadZip}
               disabled={!outputs.length || isProcessing || isZipping || isEmpty}
-              className={outputs.length ? "primary-action" : undefined}
+              className={outputs.length ? "buttonPrimary" : undefined}
             >
+              <Download size={15} aria-hidden="true" />
               {isZipping ? "Creating ZIP..." : "Download ZIP"}
             </button>
-            <button onClick={handleReset} disabled={isEmpty}>
-              Reset
+            <button
+              className="buttonIcon"
+              onClick={handleReset}
+              disabled={isEmpty}
+              aria-label="Reset batch"
+              title="Reset batch"
+            >
+              <RotateCcw size={15} aria-hidden="true" />
             </button>
-            {isProcessing && <button onClick={cancelResize}>Cancel</button>}
+            {isProcessing && (
+              <button onClick={cancelResize}>
+                <X size={15} aria-hidden="true" />
+                Cancel
+              </button>
+            )}
             {cancelled && (
               <button
                 onClick={() => {
@@ -296,16 +310,18 @@ function App() {
                   setRetry((n) => n + 1);
                 }}
               >
+                <Play size={15} aria-hidden="true" />
                 Resume
               </button>
             )}
-            <label className="file-upload-label">
+            <label className="button">
               <input
                 type="file"
                 accept="image/jpeg, image/png, image/webp"
                 multiple
                 onChange={handleFileInputChange}
               />
+              <Upload size={15} aria-hidden="true" />
               {isEmpty ? "Load images" : "Add images"}
             </label>
           </div>
@@ -319,8 +335,12 @@ function App() {
         ]}
       />
       {cancelled && (
-        <div className="status-panel" role="status">
-          Cancelled. {progress} of {images.length} images processed.
+        <div className={styles.status} role="status">
+          Cancelled.{" "}
+          <span className="numeric">
+            {progress} of {images.length}
+          </span>{" "}
+          images processed.
         </div>
       )}
       <OutputImages
@@ -333,7 +353,7 @@ function App() {
         inputDisabled={false}
         onRemoveImage={handleRemoveImage}
       />
-      <div className="footer">
+      <div className={styles.footer}>
         <p>
           Your images are resized directly in your browser using the HTML5
           Canvas API and browser-side encoders, ensuring privacy and speed. No

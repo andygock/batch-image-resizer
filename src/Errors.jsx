@@ -4,7 +4,7 @@ export default function Errors({ errors }) {
   }
 
   return (
-    <div className="error-panel" role="alert">
+    <div className={styles.panel} role="alert">
       <ul>
         {errors.map((error, index) => (
           <li key={index}>
@@ -15,3 +15,4 @@ export default function Errors({ errors }) {
     </div>
   );
 }
+import styles from "./Errors.module.css";

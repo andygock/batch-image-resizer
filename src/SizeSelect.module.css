@@ -1,0 +1,17 @@
+.control,
+.custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.control {
+  flex-wrap: wrap;
+}
+.custom input {
+  width: 8ch;
+  font-variant-numeric: tabular-nums;
+}
+.error {
+  color: var(--destructive);
+  font-size: var(--font-size-sm);
+}

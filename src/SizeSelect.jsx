@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { MAX_DIMENSION, validateSize } from "./imageUtils.js";
+import styles from "./SizeSelect.module.css";
 
 const sizes = [
   [256, 256],
@@ -48,11 +49,12 @@ export default function SizeSelect({
   };
 
   return (
-    <div className="size-control">
+    <div className={styles.control}>
       <label htmlFor="size">
         Max size
         <select
           id="size"
+          className="numeric"
           onChange={(e) => {
             if (e.target.value === "custom") {
               setIsCustom(true);
@@ -79,12 +81,13 @@ export default function SizeSelect({
       </label>
 
       {value === "custom" && (
-        <div className="custom-size">
-          <label htmlFor="custom-width" className="visually-hidden">
+        <div className={styles.custom}>
+          <label htmlFor="custom-width" className="visuallyHidden">
             Custom width
           </label>
           <input
             id="custom-width"
+            className="numeric"
             type="number"
             min="1"
             max={MAX_DIMENSION}
@@ -100,11 +103,12 @@ export default function SizeSelect({
             disabled={disabled === true}
           />
           <span aria-hidden="true">x</span>
-          <label htmlFor="custom-height" className="visually-hidden">
+          <label htmlFor="custom-height" className="visuallyHidden">
             Custom height
           </label>
           <input
             id="custom-height"
+            className="numeric"
             type="number"
             min="1"
             max={MAX_DIMENSION}
@@ -122,7 +126,7 @@ export default function SizeSelect({
         </div>
       )}
       {error && (
-        <span id="size-error" className="size-error" role="alert">
+        <span id="size-error" className={styles.error} role="alert">
           {error}
         </span>
       )}

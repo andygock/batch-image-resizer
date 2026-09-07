@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Download, ImagePlus, Trash2 } from "lucide-preact";
+import styles from "./OutputImages.module.css";
 
 const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
 
@@ -37,8 +39,11 @@ export default function OutputImages({
 }) {
   if (loading) {
     return (
-      <div className="status-panel" role="status">
-        Processing images: {progress} of {total}
+      <div className={styles.status} role="status">
+        Processing images:{" "}
+        <span className="numeric">
+          {progress} of {total}
+        </span>
         <progress
           value={progress}
           max={Math.max(1, total)}
@@ -50,9 +55,15 @@ export default function OutputImages({
 
   if (!resizedImages.length) {
     return (
-      <div className="empty-state">
+      <div className={styles.empty}>
+        <ImagePlus
+          className={styles.emptyIcon}
+          size={24}
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
         <p>Drop JPG, PNG or WebP files here.</p>
-        <label className="file-upload-label primary-action">
+        <label className="button buttonPrimary">
           <input
             type="file"
             accept="image/jpeg, image/png, image/webp"
@@ -60,6 +71,7 @@ export default function OutputImages({
             onChange={onFileInputChange}
             disabled={inputDisabled}
           />
+          <ImagePlus size={15} aria-hidden="true" />
           Choose images
         </label>
       </div>
@@ -79,21 +91,25 @@ export default function OutputImages({
 
   return (
     <>
-      <div className="batch-summary">
-        <span>
+      <div className={styles.summary}>
+        <span className="numeric">
           {resizedImages.length}{" "}
           {resizedImages.length === 1 ? "image" : "images"} resized
         </span>
-        <span>
+        <span className="numeric">
           {formatKb(totalBefore)} -&gt; {formatKb(totalAfter)}
         </span>
-        <span className={savedPercent >= 0 ? "positive" : "negative"}>
+        <span
+          className={`numeric ${savedPercent >= 0 ? "positive" : "negative"}`}
+        >
           {savedPercent >= 0 ? "Saved" : "Increased"} {Math.abs(savedPercent)}%
         </span>
-        {processingTime >= 0.01 && <span>{processingTime}s</span>}
+        {processingTime >= 0.01 && (
+          <span className="numeric">{processingTime}s</span>
+        )}
       </div>
 
-      <div className="output-grid">
+      <div className={styles.grid}>
         {resizedImages.map(
           ({
             filename,
@@ -113,10 +129,10 @@ export default function OutputImages({
             const maxWidth = `calc(${Math.max(
               widthAfter,
               220
-            )}px + 2 * var(--pad) + 2px)`;
+            )}px + 2 * var(--image-card-padding) + 2px)`;
 
             return (
-              <div key={id} className="output-images" style={{ maxWidth }}>
+              <div key={id} className={styles.imageCard} style={{ maxWidth }}>
                 <OutputImage
                   blob={blob}
                   filename={filename}
@@ -124,11 +140,11 @@ export default function OutputImages({
                   height={heightAfter}
                 >
                   {(url) => (
-                    <div className="image-info">
-                      <div className="filename" title={filename}>
+                    <div className={styles.imageInfo}>
+                      <div className={styles.filename} title={filename}>
                         {filename}
                       </div>
-                      <div className="file-info">
+                      <div className={`${styles.fileInfo} numeric`}>
                         <span>
                           {widthBefore}x{heightBefore} -&gt; {widthAfter}x
                           {heightAfter}
@@ -146,22 +162,24 @@ export default function OutputImages({
                           {fileSizeDelta}%
                         </span>
                       </div>
-                      <div className="image-actions">
+                      <div className={styles.imageActions}>
                         <a
                           href={url || undefined}
                           download={downloadFilename}
                           title={`Download "${downloadFilename}"`}
-                          className="download"
+                          className="button buttonIcon"
+                          aria-label={`Download ${downloadFilename}`}
                         >
-                          Download
+                          <Download size={14} aria-hidden="true" />
                         </a>
                         <button
                           type="button"
-                          className="remove-image"
+                          className="buttonIcon buttonDanger"
                           onClick={() => onRemoveImage(id)}
                           title={`Remove "${filename}"`}
+                          aria-label={`Remove ${filename}`}
                         >
-                          Remove
+                          <Trash2 size={14} aria-hidden="true" />
                         </button>
                       </div>
                     </div>

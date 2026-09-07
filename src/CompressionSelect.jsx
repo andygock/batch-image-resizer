@@ -26,6 +26,7 @@ export default function CompressionSelect({
         PNG colours
         <select
           id="png-colors"
+          className="numeric"
           onChange={(e) => onPngColorsChange(Number(e.target.value))}
           value={pngColors}
           disabled={disabled === true}
@@ -45,6 +46,7 @@ export default function CompressionSelect({
       {format === "webp" ? "WebP quality" : "JPEG quality"}
       <select
         id="compression"
+        className="numeric"
         onChange={(e) => {
           onChange(Number(e.target.value));
         }}

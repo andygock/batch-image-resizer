@@ -1,0 +1,14 @@
+.panel {
+  margin-bottom: var(--space-2);
+  padding: 8px 10px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  color: #991b1b;
+  background: var(--destructive-muted);
+  font-size: var(--font-size-sm);
+}
+.panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
