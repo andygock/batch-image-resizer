@@ -1,7 +1,13 @@
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
-import UPNG from "upng-js";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import "./App.css";
 import CompressionSelect from "./CompressionSelect";
 import OutputImages from "./OutputImages";
@@ -9,41 +15,16 @@ import OutputFormatSelect from "./OutputFormatSelect";
 import SizeSelect from "./SizeSelect";
 import { useDragAndDrop } from "./useDragAndDrop";
 import Errors from "./Errors";
-
-const outputFormats = {
-  jpeg: {
-    mimeType: "image/jpeg",
-    extension: "jpg",
-  },
-  png: {
-    mimeType: "image/png",
-    extension: "png",
-  },
-  webp: {
-    mimeType: "image/webp",
-    extension: "webp",
-  },
-};
-
-const getOutputFilename = (filename, extension, enableSuffix, suffix) => {
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex === -1 ? filename : filename.substring(0, lastDotIndex);
-  const outputName = enableSuffix ? `${name}${suffix}` : name;
-  return `${outputName}.${extension}`;
-};
-
-const encodePng = (canvas, width, height, colors) => {
-  const ctx = canvas.getContext("2d");
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const pngBuffer = UPNG.encode([imageData.data.buffer], width, height, colors);
-  return new Blob([pngBuffer], { type: outputFormats.png.mimeType });
-};
+import { nameOutputs } from "./imageUtils.js";
+import { createJobOwner } from "./jobs.js";
+import { resizeImage } from "./resizeImage.js";
 
 function App() {
   const [images, setImages] = useState([]);
   const [resizedImages, setResizedImages] = useState([]);
-  const [errors, setErrors] = useState([]);
+  const [uploadErrors, setUploadErrors] = useState([]);
+  const [processingErrors, setProcessingErrors] = useState([]);
+  const [zipError, setZipError] = useState("");
   const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
   const [outputFormat, setOutputFormat] = useState("jpeg");
   const [compressionLevel, setCompressionLevel] = useState(0.8); // Default compression level
@@ -53,152 +34,119 @@ function App() {
   const [disableUpscale, setDisableUpscale] = useState(true);
   const [processingTime, setProcessingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-
+  const [isZipping, setIsZipping] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [cancelled, setCancelled] = useState(false);
+  const [retry, setRetry] = useState(0);
   const dropRef = useRef(null);
   const imageIdRef = useRef(0);
+  const resizeOwner = useRef(createJobOwner());
+  const zipOwner = useRef(createJobOwner());
+  // Retain one output per source; settings changes replace cached outputs.
+  const cache = useRef(new Map());
 
-  const handleImageUpload = useCallback((files) => {
-    const newErrors = [];
-    const newImages = [];
-
-    for (const file of files) {
-      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-        newErrors.push(`File "${file.name}" is not a JPEG, PNG or WebP image.`);
-        continue;
-      }
-      newImages.push({
-        id: `${file.name}-${file.size}-${file.lastModified}-${imageIdRef.current}`,
-        file,
-      });
-      imageIdRef.current += 1;
-    }
-
-    setErrors(newErrors);
-    setImages((currentImages) => [...currentImages, ...newImages]);
+  const invalidate = useCallback(() => {
+    resizeOwner.current.cancel();
+    zipOwner.current.cancel();
+    setIsZipping(false);
+    setIsProcessing(true);
+    setCancelled(false);
+    setZipError("");
   }, []);
 
+  const handleImageUpload = useCallback(
+    (files) => {
+      const newErrors = [];
+      const newImages = [];
+      for (const file of files) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+          newErrors.push(
+            `File "${file.name}" is not a JPEG, PNG or WebP image.`
+          );
+          continue;
+        }
+        newImages.push({ id: String(imageIdRef.current++), file });
+      }
+      setUploadErrors(newErrors);
+      if (newImages.length) {
+        invalidate();
+        setImages((current) => [...current, ...newImages]);
+      }
+    },
+    [invalidate]
+  );
+
   const handleFileInputChange = (event) => {
-    const files = event.target.files;
-    if (files) {
-      handleImageUpload(files);
+    if (event.target.files) {
+      handleImageUpload(event.target.files);
       event.target.value = "";
     }
   };
 
-  // drag and drop handling
+  // Drag and drop uses the same invalidation path as the file picker.
   useDragAndDrop(dropRef, handleImageUpload);
 
-  const handleResize = useCallback(async () => {
-    if (!images.length) {
-      setResizedImages([]);
-      setProcessingTime(0);
-      setIsProcessing(false);
-      return;
+  // Establish ownership at commit time, before a user can cancel the next run.
+  useLayoutEffect(() => {
+    const owner = resizeOwner.current;
+    const job = owner.start();
+    const settings = {
+      bounds: boundingBox,
+      format: outputFormat,
+      quality: compressionLevel,
+      colours: pngColors,
+      disableUpscale,
+    };
+    const key = JSON.stringify({
+      ...settings,
+      quality: outputFormat === "png" ? null : compressionLevel,
+      colours: outputFormat === "png" ? pngColors : null,
+    });
+    const sourceIds = new Set(images.map(({ id }) => id));
+    for (const [id, entry] of cache.current) {
+      if (!sourceIds.has(id) || entry.key !== key) cache.current.delete(id);
     }
-
-    const resizedImagesTemp = [];
-    const processingErrors = [];
-    const { mimeType, extension } = outputFormats[outputFormat];
-
+    setResizedImages([]);
+    setProcessingErrors([]);
     setProcessingTime(0);
-    setIsProcessing(true);
+    setProgress(0);
+    setCancelled(false);
+    setIsProcessing(images.length > 0);
 
-    // Start the timer
-    const startTime = performance.now();
-
-    for (const { id, file: imageFile } of images) {
-      // get filesize of original image
-      const filesizeBefore = imageFile.size;
-
-      // https://developer.mozilla.org/en-US/docs/Web/API/createImageBitmap
+    const run = async () => {
+      const results = [];
+      const failures = [];
+      const start = performance.now(); // Include cache lookups in the batch time.
       try {
-        const img = await createImageBitmap(imageFile);
-
-        // Calculate the aspect ratio of the original image
-        const imgAspectRatio = img.width / img.height;
-
-        // Calculate the aspect ratio of the bounding box
-        const boundingBoxAspectRatio = boundingBox.width / boundingBox.height;
-
-        let canvasWidth, canvasHeight;
-
-        // If the image's aspect ratio is greater than the bounding box's aspect ratio
-        // then the image's width will be the limiting factor
-        if (imgAspectRatio > boundingBoxAspectRatio) {
-          canvasWidth = disableUpscale
-            ? Math.min(boundingBox.width, img.width)
-            : boundingBox.width;
-          canvasHeight = disableUpscale
-            ? Math.min(boundingBox.width / imgAspectRatio, img.height)
-            : boundingBox.width / imgAspectRatio;
-        } else {
-          // Otherwise, the image's height will be the limiting factor
-          canvasHeight = disableUpscale
-            ? Math.min(boundingBox.height, img.height)
-            : boundingBox.height;
-          canvasWidth = disableUpscale
-            ? Math.min(boundingBox.height * imgAspectRatio, img.width)
-            : boundingBox.height * imgAspectRatio;
+        for (const source of images) {
+          if (!job.isCurrent()) return;
+          try {
+            const result =
+              cache.current.get(source.id)?.result ??
+              (await resizeImage(source, settings, job.signal));
+            if (!job.isCurrent()) return;
+            cache.current.set(source.id, { key, result });
+            results.push(result);
+          } catch (error) {
+            if (!job.isCurrent()) return;
+            failures.push(error.message);
+          }
+          setProgress(results.length + failures.length);
+          setResizedImages([...results]);
+          setProcessingErrors([...failures]);
         }
-
-        // set flag to indicate if image is upscaled
-        const isUpscaled = img.width > canvasWidth || img.height > canvasHeight;
-
-        // canvas width and height need to be floored to integers
-        canvasWidth = Math.floor(canvasWidth);
-        canvasHeight = Math.floor(canvasHeight);
-
-        // Create an offscreen canvas and create out images there
-        const offscreenCanvas = new OffscreenCanvas(canvasWidth, canvasHeight);
-        const ctx = offscreenCanvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-
-        const blob =
-          outputFormat === "png"
-            ? encodePng(offscreenCanvas, canvasWidth, canvasHeight, pngColors)
-            : await offscreenCanvas.convertToBlob({
-                type: mimeType,
-                quality: compressionLevel,
-              });
-
-        // get size of blob in bytes
-        const blobSize = blob.size;
-
-        // Add the resized image to the ZIP file
-        const filename = imageFile.name;
-
-        // Add the resized image to the array of resized images
-        resizedImagesTemp.push({
-          id,
-          filename,
-          blob,
-          filesizeBefore,
-          filesizeAfter: blobSize,
-          widthAfter: canvasWidth,
-          heightAfter: canvasHeight,
-          widthBefore: img.width,
-          heightBefore: img.height,
-          isUpscaled,
-          outputExtension: extension,
-        });
-      } catch (e) {
-        const msg = `Error loading "${imageFile.name}"`;
-        processingErrors.push(msg);
-        continue;
+      } finally {
+        // Superseded jobs must not publish results or unlock the current job.
+        if (job.isCurrent()) {
+          setProcessingTime(
+            Number(((performance.now() - start) / 1000).toFixed(2))
+          );
+          setIsProcessing(false);
+        }
       }
-    }
-
-    // Stop the timer and calculate the processing time
-    const endTime = performance.now();
-    const processingTime = ((endTime - startTime) / 1000).toFixed(2); // in seconds, rounded to two decimal places
-    setProcessingTime(processingTime);
-
-    setResizedImages(resizedImagesTemp);
-    if (processingErrors.length) {
-      setErrors(processingErrors);
-    }
-
-    setIsProcessing(false);
+    };
+    void run();
+    return () => owner.cancel();
   }, [
     images,
     boundingBox,
@@ -206,57 +154,72 @@ function App() {
     compressionLevel,
     pngColors,
     disableUpscale,
+    retry,
   ]);
 
-  // perform resize when uploaded images are updated
   useEffect(() => {
-    handleResize();
-  }, [images, handleResize]);
+    const owner = zipOwner.current;
+    return () => owner.cancel();
+  }, []);
+
+  const changeSetting = (setter) => (value) => {
+    invalidate();
+    setter(value);
+    // Restart even when a custom size is committed without changing its value.
+    setRetry((current) => current + 1);
+  };
 
   const handleReset = () => {
+    invalidate();
+    cache.current.clear();
     setImages([]);
     setResizedImages([]);
-    setErrors([]);
+    setUploadErrors([]);
+    setProcessingErrors([]);
+    setProcessingTime(0);
+    setIsProcessing(false);
   };
 
   const handleRemoveImage = (id) => {
-    setImages((currentImages) =>
-      currentImages.filter((imageEntry) => imageEntry.id !== id),
-    );
-    setResizedImages((currentImages) =>
-      currentImages.filter((imageEntry) => imageEntry.id !== id),
-    );
+    invalidate();
+    cache.current.delete(id);
+    setImages((current) => current.filter((image) => image.id !== id));
+    setResizedImages((current) => current.filter((image) => image.id !== id));
   };
 
-  // download all resized images as a ZIP file
+  const outputs = useMemo(
+    () => nameOutputs(resizedImages, enableSuffix, suffix),
+    [resizedImages, enableSuffix, suffix]
+  );
+
+  // ZIP work has independent ownership so reset cannot trigger a late download.
   const downloadZip = async () => {
-    setIsProcessing(true);
-    const zip = new JSZip();
-
-    // add all blobs to zip
-    for (const { filename, blob, outputExtension } of resizedImages) {
-      const saveFilename = getOutputFilename(
-        filename,
-        outputExtension,
-        enableSuffix,
-        suffix,
-      );
-      zip.file(saveFilename, blob);
-    }
-
+    if (isProcessing || isZipping || !outputs.length) return;
+    const job = zipOwner.current.start();
+    setIsZipping(true);
+    setZipError("");
     try {
-      const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, "resized_images.zip");
+      const zip = new JSZip();
+      for (const { downloadFilename, blob } of outputs)
+        zip.file(downloadFilename, blob);
+      const blob = await zip.generateAsync({ type: "blob" }, () =>
+        job.signal.throwIfAborted()
+      );
+      if (job.isCurrent()) saveAs(blob, "resized_images.zip");
     } catch (error) {
-      console.error("Error creating ZIP:", error);
-      setErrors([...errors, "Error creating ZIP file."]);
+      if (job.isCurrent())
+        setZipError(`Error creating ZIP file: ${error.message}`);
     } finally {
-      setIsProcessing(false);
+      if (job.isCurrent()) setIsZipping(false);
     }
   };
 
+  const cancelResize = () => {
+    resizeOwner.current.cancel();
+    setIsProcessing(false);
+    setCancelled(true);
+  };
   const isEmpty = images.length === 0;
-  const allowDownload = resizedImages.length > 0;
 
   return (
     <div ref={dropRef} className="app">
@@ -265,42 +228,40 @@ function App() {
         <div className="config">
           <div className="control-group">
             <SizeSelect
-              onChange={setBoundingBox}
+              onChange={changeSetting(setBoundingBox)}
               width={boundingBox.width}
               height={boundingBox.height}
-              disabled={isProcessing}
             />
             <label>
               <input
                 type="checkbox"
                 checked={disableUpscale}
-                onChange={() => setDisableUpscale(!disableUpscale)}
+                onChange={() =>
+                  changeSetting(setDisableUpscale)(!disableUpscale)
+                }
               />
               Do not enlarge
             </label>
           </div>
-
           <div className="control-group">
             <OutputFormatSelect
-              onChange={setOutputFormat}
+              onChange={changeSetting(setOutputFormat)}
               value={outputFormat}
-              disabled={isProcessing}
             />
             <CompressionSelect
               format={outputFormat}
-              onChange={setCompressionLevel}
+              onChange={changeSetting(setCompressionLevel)}
               value={compressionLevel}
               pngColors={pngColors}
-              onPngColorsChange={setPngColors}
-              disabled={isProcessing}
+              onPngColorsChange={changeSetting(setPngColors)}
             />
           </div>
-
           <div className="control-group">
             <label>
               <input
                 type="checkbox"
                 checked={enableSuffix}
+                disabled={isZipping}
                 onChange={() => setEnableSuffix(!enableSuffix)}
               />
               Add suffix
@@ -309,52 +270,69 @@ function App() {
               type="text"
               value={suffix}
               onChange={(e) => setSuffix(e.target.value)}
+              aria-label="Filename suffix"
               placeholder="Suffix"
-              disabled={!enableSuffix}
+              maxLength={100}
+              disabled={!enableSuffix || isZipping}
               className="input-suffix"
             />
           </div>
-
           <div className="control-group actions">
             <button
               onClick={downloadZip}
-              disabled={
-                !allowDownload || isProcessing || isEmpty || images.length === 0
-              }
-              className={allowDownload ? "primary-action" : undefined}
+              disabled={!outputs.length || isProcessing || isZipping || isEmpty}
+              className={outputs.length ? "primary-action" : undefined}
             >
-              Download ZIP
+              {isZipping ? "Creating ZIP..." : "Download ZIP"}
             </button>
             <button onClick={handleReset} disabled={isEmpty}>
               Reset
             </button>
+            {isProcessing && <button onClick={cancelResize}>Cancel</button>}
+            {cancelled && (
+              <button
+                onClick={() => {
+                  invalidate();
+                  setRetry((n) => n + 1);
+                }}
+              >
+                Resume
+              </button>
+            )}
             <label className="file-upload-label">
               <input
                 type="file"
                 accept="image/jpeg, image/png, image/webp"
                 multiple
                 onChange={handleFileInputChange}
-                disabled={isProcessing}
               />
               {isEmpty ? "Load images" : "Add images"}
             </label>
           </div>
         </div>
       </div>
-
-      <Errors errors={errors} />
-
+      <Errors
+        errors={[
+          ...uploadErrors,
+          ...processingErrors,
+          ...(zipError ? [zipError] : []),
+        ]}
+      />
+      {cancelled && (
+        <div className="status-panel" role="status">
+          Cancelled. {progress} of {images.length} images processed.
+        </div>
+      )}
       <OutputImages
-        resizedImages={resizedImages}
-        suffix={suffix}
-        enableSuffix={enableSuffix}
+        resizedImages={outputs}
         loading={isProcessing}
+        progress={progress}
+        total={images.length}
         processingTime={processingTime}
         onFileInputChange={handleFileInputChange}
-        inputDisabled={isProcessing}
+        inputDisabled={false}
         onRemoveImage={handleRemoveImage}
       />
-
       <div className="footer">
         <p>
           Your images are resized directly in your browser using the HTML5

@@ -24,9 +24,8 @@
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial,
-    "Noto Sans", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif;
   margin: 0;
   color: var(--text);
   background: var(--bg);
@@ -45,9 +44,7 @@ body,
   width: 100%;
   min-height: 100vh;
   padding: 18px;
-  transition:
-    background-color 120ms ease,
-    box-shadow 120ms ease;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .app.is-dragging {
@@ -173,7 +170,30 @@ input[type="checkbox"] {
 }
 
 input[type="file"] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.file-upload-label:focus-within {
+  outline: 2px solid var(--drop);
+  outline-offset: 2px;
+}
+
+.status-panel progress {
+  display: block;
+  width: min(100%, 320px);
+  margin: 10px auto 0;
+}
+
+.size-control {
+  flex-wrap: wrap;
+}
+.size-error {
+  color: var(--danger);
+  font-size: var(--meta-size);
 }
 
 label {

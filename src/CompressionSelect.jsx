@@ -1,9 +1,9 @@
 const pngColorOptions = [
   [0, "Lossless"],
-  [256, "256 colors"],
-  [128, "128 colors"],
-  [64, "64 colors"],
-  [32, "32 colors"],
+  [256, "256 colours"],
+  [128, "128 colours"],
+  [64, "64 colours"],
+  [32, "32 colours"],
 ];
 
 export default function CompressionSelect({
@@ -23,7 +23,7 @@ export default function CompressionSelect({
   if (format === "png") {
     return (
       <label htmlFor="png-colors">
-        PNG colors
+        PNG colours
         <select
           id="png-colors"
           onChange={(e) => onPngColorsChange(Number(e.target.value))}

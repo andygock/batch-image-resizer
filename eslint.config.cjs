@@ -23,6 +23,8 @@ module.exports = defineConfig([
     },
     settings: { react: { version: "18.2" } },
     rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
       "react/jsx-no-target-blank": "off",
       "react/prop-types": "off",
       "no-unused-vars": "off",

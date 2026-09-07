@@ -1,45 +1,49 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 
 const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
 
-const getDownloadFilename = (filename, extension, enableSuffix, suffix) => {
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex === -1 ? filename : filename.substring(0, lastDotIndex);
-
-  return `${enableSuffix ? `${name}${suffix}` : name}.${extension}`;
-};
+function OutputImage({ blob, filename, width, height, children }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const nextUrl = URL.createObjectURL(blob);
+    setUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [blob]);
+  return (
+    <>
+      {url && (
+        <img
+          src={url}
+          alt={filename}
+          width={width}
+          height={height}
+          loading="lazy"
+        />
+      )}
+      {children(url)}
+    </>
+  );
+}
 
 export default function OutputImages({
   resizedImages,
-  suffix,
-  enableSuffix,
   loading,
+  progress,
+  total,
   processingTime,
   onFileInputChange,
   inputDisabled,
   onRemoveImage,
 }) {
-  const imageUrls = useMemo(
-    () =>
-      resizedImages.map(({ blob }) => ({
-        blob,
-        url: URL.createObjectURL(blob),
-      })),
-    [resizedImages],
-  );
-
-  useEffect(
-    () => () => {
-      imageUrls.forEach(({ url }) => URL.revokeObjectURL(url));
-    },
-    [imageUrls],
-  );
-
   if (loading) {
     return (
       <div className="status-panel" role="status">
-        Processing images...
+        Processing images: {progress} of {total}
+        <progress
+          value={progress}
+          max={Math.max(1, total)}
+          aria-label="Images processed"
+        />
       </div>
     );
   }
@@ -64,11 +68,11 @@ export default function OutputImages({
 
   const totalBefore = resizedImages.reduce(
     (total, image) => total + image.filesizeBefore,
-    0,
+    0
   );
   const totalAfter = resizedImages.reduce(
     (total, image) => total + image.filesizeAfter,
-    0,
+    0
   );
   const savedPercent =
     totalBefore > 0 ? Math.round((1 - totalAfter / totalBefore) * 100) : 0;
@@ -84,95 +88,88 @@ export default function OutputImages({
           {formatKb(totalBefore)} -&gt; {formatKb(totalAfter)}
         </span>
         <span className={savedPercent >= 0 ? "positive" : "negative"}>
-          {savedPercent >= 0 ? "Saved" : "Increased"}{" "}
-          {Math.abs(savedPercent)}%
+          {savedPercent >= 0 ? "Saved" : "Increased"} {Math.abs(savedPercent)}%
         </span>
         {processingTime >= 0.01 && <span>{processingTime}s</span>}
       </div>
 
       <div className="output-grid">
         {resizedImages.map(
-          (
-            {
-              filename,
-              id,
-              filesizeBefore,
-              filesizeAfter,
-              widthBefore,
-              heightBefore,
-              widthAfter,
-              heightAfter,
-              outputExtension,
-            },
-            index,
-          ) => {
-            const url = imageUrls[index].url;
+          ({
+            filename,
+            id,
+            filesizeBefore,
+            filesizeAfter,
+            widthBefore,
+            heightBefore,
+            widthAfter,
+            heightAfter,
+            blob,
+            downloadFilename,
+          }) => {
             const fileSizeDelta = Math.round(
-              (filesizeAfter / filesizeBefore - 1) * 100,
+              (filesizeAfter / filesizeBefore - 1) * 100
             );
-            const downloadFilename = getDownloadFilename(
-              filename,
-              outputExtension,
-              enableSuffix,
-              suffix,
-            );
-
-            const rootStyle = getComputedStyle(document.documentElement);
-            const pad = parseFloat(rootStyle.getPropertyValue("--pad"));
-            const border = 1;
-            const extraWidth = 2 * (pad + border);
-            const maxWidth = Math.max(widthAfter, 220) + extraWidth;
+            const maxWidth = `calc(${Math.max(
+              widthAfter,
+              220
+            )}px + 2 * var(--pad) + 2px)`;
 
             return (
               <div key={id} className="output-images" style={{ maxWidth }}>
-                <img
-                  src={url}
-                  alt={filename}
+                <OutputImage
+                  blob={blob}
+                  filename={filename}
                   width={widthAfter}
                   height={heightAfter}
-                />
-                <div className="image-info">
-                  <div className="filename" title={filename}>
-                    {filename}
-                  </div>
-                  <div className="file-info">
-                    <span>
-                      {widthBefore}x{heightBefore} -&gt; {widthAfter}x
-                      {heightAfter}
-                    </span>
-                    <span>
-                      {formatKb(filesizeBefore)} -&gt;{" "}
-                      <strong>{formatKb(filesizeAfter)}</strong>
-                    </span>
-                    <span
-                      className={fileSizeDelta <= 0 ? "positive" : "negative"}
-                    >
-                      {fileSizeDelta > 0 ? "+" : ""}
-                      {fileSizeDelta}%
-                    </span>
-                  </div>
-                  <div className="image-actions">
-                    <a
-                      href={url}
-                      download={downloadFilename}
-                      title={`Download "${downloadFilename}"`}
-                      className="download"
-                    >
-                      Download
-                    </a>
-                    <button
-                      type="button"
-                      className="remove-image"
-                      onClick={() => onRemoveImage(id)}
-                      title={`Remove "${filename}"`}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
+                >
+                  {(url) => (
+                    <div className="image-info">
+                      <div className="filename" title={filename}>
+                        {filename}
+                      </div>
+                      <div className="file-info">
+                        <span>
+                          {widthBefore}x{heightBefore} -&gt; {widthAfter}x
+                          {heightAfter}
+                        </span>
+                        <span>
+                          {formatKb(filesizeBefore)} -&gt;{" "}
+                          <strong>{formatKb(filesizeAfter)}</strong>
+                        </span>
+                        <span
+                          className={
+                            fileSizeDelta <= 0 ? "positive" : "negative"
+                          }
+                        >
+                          {fileSizeDelta > 0 ? "+" : ""}
+                          {fileSizeDelta}%
+                        </span>
+                      </div>
+                      <div className="image-actions">
+                        <a
+                          href={url || undefined}
+                          download={downloadFilename}
+                          title={`Download "${downloadFilename}"`}
+                          className="download"
+                        >
+                          Download
+                        </a>
+                        <button
+                          type="button"
+                          className="remove-image"
+                          onClick={() => onRemoveImage(id)}
+                          title={`Remove "${filename}"`}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </OutputImage>
               </div>
             );
-          },
+          }
         )}
       </div>
     </>

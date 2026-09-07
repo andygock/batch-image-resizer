@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { MAX_DIMENSION, validateSize } from "./imageUtils.js";
 
 const sizes = [
   [256, 256],
@@ -18,24 +19,32 @@ export default function SizeSelect({
   disabled,
 }) {
   const [isCustom, setIsCustom] = useState(false);
+  const [draft, setDraft] = useState({
+    width: String(selectedWidth),
+    height: String(selectedHeight),
+  });
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
+    setError("");
+  }, [selectedWidth, selectedHeight]);
   const selectedValue = `${selectedWidth}x${selectedHeight}`;
   const isPreset = sizes.some(
     ([optionWidth, optionHeight]) =>
-      `${optionWidth}x${optionHeight}` === selectedValue,
+      `${optionWidth}x${optionHeight}` === selectedValue
   );
   const value = isCustom || !isPreset ? "custom" : selectedValue;
 
-  const updateCustomSize = (dimension, nextValue) => {
-    const parsedValue = Number(nextValue);
-
-    if (!Number.isFinite(parsedValue) || parsedValue < 1) {
-      return;
+  const commitCustomSize = () => {
+    const size = { width: Number(draft.width), height: Number(draft.height) };
+    try {
+      validateSize(size);
+      setError("");
+      if (size.width !== selectedWidth || size.height !== selectedHeight)
+        onChange(size);
+    } catch (failure) {
+      setError(failure.message);
     }
-
-    onChange({
-      width: dimension === "width" ? parsedValue : selectedWidth,
-      height: dimension === "height" ? parsedValue : selectedHeight,
-    });
   };
 
   return (
@@ -51,6 +60,7 @@ export default function SizeSelect({
             }
 
             setIsCustom(false);
+            setError("");
             const [width, height] = e.target.value
               .split("x")
               .map((size) => parseInt(size, 10));
@@ -77,8 +87,16 @@ export default function SizeSelect({
             id="custom-width"
             type="number"
             min="1"
-            value={selectedWidth}
-            onChange={(e) => updateCustomSize("width", e.target.value)}
+            max={MAX_DIMENSION}
+            step="1"
+            value={draft.width}
+            onChange={(e) => setDraft({ ...draft, width: e.target.value })}
+            onBlur={commitCustomSize}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitCustomSize();
+            }}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "size-error" : undefined}
             disabled={disabled === true}
           />
           <span aria-hidden="true">x</span>
@@ -89,11 +107,24 @@ export default function SizeSelect({
             id="custom-height"
             type="number"
             min="1"
-            value={selectedHeight}
-            onChange={(e) => updateCustomSize("height", e.target.value)}
+            max={MAX_DIMENSION}
+            step="1"
+            value={draft.height}
+            onChange={(e) => setDraft({ ...draft, height: e.target.value })}
+            onBlur={commitCustomSize}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitCustomSize();
+            }}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "size-error" : undefined}
             disabled={disabled === true}
           />
         </div>
+      )}
+      {error && (
+        <span id="size-error" className="size-error" role="alert">
+          {error}
+        </span>
       )}
     </div>
   );

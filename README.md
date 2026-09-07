@@ -18,10 +18,13 @@ Live app hosted on Vercel:
 - Optional setting to avoid enlarging smaller source images.
 - Output to JPEG, PNG or WebP.
 - JPEG/WebP quality controls.
-- PNG color optimisation options.
+- PNG colour optimisation options.
 - Optional filename suffix for generated files.
 - Download each image individually or download all resized images as a ZIP.
 - Batch summary showing output size and savings.
+- Cancel and resume processing, with per-image progress and reuse of unchanged outputs.
+- Collision-free filenames for individual downloads and ZIP entries.
+- PNG encoding in a local browser worker; no server-side image processing.
 
 ## Usage
 
@@ -32,6 +35,12 @@ Live app hosted on Vercel:
 5. Download individual files or use `Download ZIP`.
 
 The selected size is a maximum bounding box, not a crop. For example, a 1200x800 image resized to 512x512 becomes 512x341.
+
+Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding area of 16,777,216 pixels. Commit custom dimensions with Enter or by leaving the field. Transparent images exported to JPEG use a white background; PNG and WebP retain transparency. Browser encoder failures are reported rather than downloading files with misleading extensions.
+
+Cancel retains completed outputs. Resume reuses them and processes the remaining images. Reset cancels pending work and clears the batch, including cached outputs.
+
+If the PNG optimiser produces incomplete output, the browser's lossless PNG encoder is used instead; in that case the selected palette reduction is skipped.
 
 ## Development
 
@@ -66,6 +75,8 @@ pnpm preview
 ```
 
 ## Tech
+
+Run focused regression tests with `pnpm test`. These use Node's test runner and mocked browser allocation APIs; they do not run browser smoke tests.
 
 - Vite
 - Preact via React compatibility
