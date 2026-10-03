@@ -28,10 +28,13 @@
 }
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-bottom: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--border);
@@ -42,7 +45,8 @@
 
 .title {
   flex: 0 0 auto;
-  margin: 7px 4px 0 2px;
+  margin: 0 4px 0 2px;
+  white-space: nowrap;
   color: var(--card-foreground);
   font-size: 15px;
   font-weight: 650;
@@ -52,14 +56,19 @@
 .config {
   display: flex;
   flex: 1 1 auto;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 4px;
   gap: var(--space-2);
 }
 
 .controlGroup {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-2);
   padding-right: var(--space-2);
@@ -71,6 +80,10 @@
   border-right: 0;
 }
 .actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
   justify-content: flex-end;
 }
 .suffix {
@@ -129,25 +142,10 @@
   .app {
     padding: var(--space-3);
   }
-  .header {
-    display: block;
-  }
-  .title {
-    margin: 2px 2px var(--space-3);
-  }
-  .config,
-  .actions {
-    justify-content: flex-start;
-  }
-  .controlGroup {
-    width: 100%;
-    padding-right: 0;
-    padding-bottom: var(--space-2);
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .controlGroup:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-  }
+  .header { gap: 4px; padding: 4px; }
+  .actions { gap: 4px; }
+  .actions button, .actions > label { padding-inline: 6px; }
+}
+@media (max-width: 1400px) {
+  .title { display: none; }
 }

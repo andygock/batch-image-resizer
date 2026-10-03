@@ -201,7 +201,6 @@ function App() {
               pngColors={pngColors}
               onPngColorsChange={changeSetting("pngColors")}
             />
-            {outputFormat === "jpeg" && <span className={styles.hint}>Transparent areas become white in JPEG.</span>}
           </div>
           <div className={styles.controlGroup}>
             <label>
@@ -223,14 +222,17 @@ function App() {
               className={styles.suffix}
             />
           </div>
-          <div className={`${styles.controlGroup} ${styles.actions}`}>
+        </div>
+          <div className={styles.actions}>
             <button
               onClick={() => downloadZip()}
               disabled={!outputs.length || isZipping || isEmpty || sizeDraft.invalid}
               className={outputs.length ? "buttonPrimary" : undefined}
+              title={`Download ${outputs.length} ready images as ZIP`}
+              aria-label={`Download ${outputs.length} ready images as ZIP`}
             >
               <Download size={15} aria-hidden="true" />
-              {isZipping ? `Creating ZIP · ${zipState.progress}%` : `Download ${outputs.length || ""} ready as ZIP`}
+              {isZipping ? `ZIP ${zipState.progress}%` : `ZIP (${outputs.length})`}
             </button>
             <button
               className="buttonIcon"
@@ -267,10 +269,9 @@ function App() {
                 onChange={handleFileInputChange}
               />
               <Upload size={15} aria-hidden="true" />
-              {isEmpty ? "Load images" : "Add images"}
+              {isEmpty ? "Load" : "Add"}
             </label>
           </div>
-        </div>
       </div>
       {isZipping && <div className={styles.undo}>
         <span role="status">Creating {zipState.filename} from {zipState.count} images · {zipState.progress}%</span>
@@ -278,7 +279,7 @@ function App() {
         <button onClick={() => zipExporter.current.cancel()}>Cancel export</button>
       </div>}
       {!isZipping && zipState.message && <p role="status">{zipState.message}</p>}
-      {sizeDraft.invalid && <p role="status">Fix the custom size or press Escape in a dimension field to download the current {boundingBox.width}×{boundingBox.height}px outputs.</p>}
+      {sizeDraft.dirty && <p role="status">{sizeDraft.message || "Press Enter in a dimension field to apply the new size."} Current output: {boundingBox.width}×{boundingBox.height}px. Escape restores the applied dimensions.</p>}
       <Errors
         onDismiss={() => { clearErrors(); setZipState((current) => ({ ...current, error: "" })); }}
         errors={[

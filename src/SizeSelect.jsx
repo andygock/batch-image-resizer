@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MAX_DIMENSION, validateSize, describeSizeDraft } from "./imageUtils.js";
+import { MAX_DIMENSION, describeSizeDraft } from "./imageUtils.js";
 import styles from "./SizeSelect.module.css";
 
 const sizes = [
@@ -28,7 +28,6 @@ export default function SizeSelect({
     width: String(selectedWidth),
     height: String(selectedHeight),
   });
-  const [error, setError] = useState("");
   useEffect(() => {
     if (isCustom && focusRequested.current) {
       widthInput.current?.focus();
@@ -38,7 +37,6 @@ export default function SizeSelect({
   }, [isCustom]);
   useEffect(() => {
     setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
-    setError("");
   }, [selectedWidth, selectedHeight]);
   const selectedValue = `${selectedWidth}x${selectedHeight}`;
   const isPreset = [...sizes, ...recentSizes.map(({ width, height }) => [width, height])].some(
@@ -49,20 +47,14 @@ export default function SizeSelect({
   const feedback = describeSizeDraft(draft, { width: selectedWidth, height: selectedHeight });
   const invalid = value === "custom" && feedback.invalid;
   const dirty = value === "custom" && feedback.dirty;
+  const message = invalid ? feedback.message : "";
   useEffect(() => {
-    onDraftStateChange?.({ invalid, dirty });
-  }, [invalid, dirty, onDraftStateChange]);
+    onDraftStateChange?.({ invalid, dirty, message });
+  }, [invalid, dirty, message, onDraftStateChange]);
 
   const commitCustomSize = () => {
     const size = { width: Number(draft.width), height: Number(draft.height) };
-    try {
-      validateSize(size);
-      setError("");
-      if (size.width !== selectedWidth || size.height !== selectedHeight)
-        onChange(size);
-    } catch (failure) {
-      setError(failure.message);
-    }
+    if (!feedback.invalid && feedback.dirty) onChange(size);
   };
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
@@ -72,13 +64,12 @@ export default function SizeSelect({
     if (event.key === "Escape") {
       event.preventDefault();
       setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
-      setError("");
     }
   };
 
   return (
     <div className={styles.control}>
-      <label htmlFor="size">
+      <label htmlFor="size" title="Maximum bounding size in pixels. Keeps proportions without cropping.">
         Max size
         <select
           id="size"
@@ -91,7 +82,6 @@ export default function SizeSelect({
             }
 
             setIsCustom(false);
-            setError("");
             const [width, height] = e.target.value
               .split("x")
               .map((size) => parseInt(size, 10));
@@ -151,13 +141,11 @@ export default function SizeSelect({
           <span>px</span>
         </div>
       )}
-      <span className={styles.help}>Fits inside the size; keeps proportions without cropping.</span>
       {invalid && (
-        <span id="size-error" className={styles.error} role="status">
+        <span id="size-error" className="visuallyHidden">
           {feedback.message} Applied size is {selectedWidth}×{selectedHeight}px. Escape restores it.
         </span>
       )}
-      {dirty && !invalid && <span className={styles.help}>Press Enter to apply. Current output: {selectedWidth}×{selectedHeight}px.</span>}
     </div>
   );
 }

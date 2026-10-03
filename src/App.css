@@ -193,7 +193,8 @@ a:hover {
 .qualityControl {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: 6px;
 }
 .qualityControl input[type="range"] {
