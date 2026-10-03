@@ -61,9 +61,6 @@ function App() {
   const invalidate = useCallback(() => {
     markChanged();
     processor.cancel();
-    zipOwner.current.cancel();
-    setIsZipping(false);
-    setZipError("");
   }, [processor, markChanged]);
 
   const { addFiles: handleImageUpload, cancelImports, isImporting, errors: uploadErrors, clearErrors } = useImageImports((accepted) => {
@@ -137,15 +134,16 @@ function App() {
     [resizedImages, enableSuffix, suffix]
   );
 
-  // ZIP work has independent ownership so reset cannot trigger a late download.
+  // Exports own their output snapshot so editing the next batch cannot cancel them.
   const downloadZip = async () => {
     if (isZipping || !outputs.length || sizeDraft.invalid) return;
     const job = zipOwner.current.start();
+    const snapshot = [...outputs];
     setIsZipping(true);
     setZipError("");
     try {
       const zip = new JSZip();
-      for (const { downloadFilename, blob } of outputs)
+      for (const { downloadFilename, blob } of snapshot)
         zip.file(downloadFilename, blob);
       const blob = await zip.generateAsync({ type: "blob" }, () =>
         job.signal.throwIfAborted()
@@ -210,7 +208,6 @@ function App() {
               <input
                 type="checkbox"
                 checked={enableSuffix}
-                disabled={isZipping}
                 onChange={() => { markChanged(); setPreference("enableSuffix", !enableSuffix); }}
               />
               Add suffix
@@ -222,7 +219,7 @@ function App() {
               aria-label="Filename suffix"
               placeholder="Suffix"
               maxLength={100}
-              disabled={!enableSuffix || isZipping}
+              disabled={!enableSuffix}
               className={styles.suffix}
             />
           </div>
