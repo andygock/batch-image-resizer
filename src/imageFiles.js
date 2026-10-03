@@ -91,6 +91,7 @@ export async function partitionImageFiles(
 ) {
   const accepted = [];
   const duplicates = [];
+  const duplicateFiles = [];
   const errors = [];
   const previousFiles = (existingSources ?? []).map(sourceFile).filter(Boolean);
   const allowDuplicates = options.allowDuplicates === true;
@@ -113,6 +114,7 @@ export async function partitionImageFiles(
         }
         if (duplicate) {
           duplicates.push(filename);
+          duplicateFiles.push(file);
           continue;
         }
       }
@@ -123,5 +125,5 @@ export async function partitionImageFiles(
     }
   }
 
-  return { accepted, duplicates, errors };
+  return { accepted, duplicates, duplicateFiles, errors };
 }

@@ -63,7 +63,7 @@ function App() {
     processor.cancel();
   }, [processor, markChanged]);
 
-  const { addFiles: handleImageUpload, cancelImports, isImporting, errors: uploadErrors, clearErrors } = useImageImports((accepted) => {
+  const { addFiles: handleImageUpload, cancelImports, isImporting, errors: uploadErrors, clearErrors, duplicates, dismissDuplicates } = useImageImports((accepted) => {
     invalidate();
     setImages((current) => [...current, ...accepted.map((source) => ({ ...source, id: crypto.randomUUID() }))]);
   }, images);
@@ -270,6 +270,11 @@ function App() {
         ]}
       />
       {isImporting && <p role="status">Checking image files…</p>}
+      {duplicates.length > 0 && <div className={styles.undo}>
+        <span role="status">Skipped {duplicates.length} identical {duplicates.length === 1 ? "image" : "images"} already in the batch.</span>
+        <button onClick={() => { handleImageUpload(duplicates, true); dismissDuplicates(); }}>Add duplicates anyway</button>
+        <button onClick={dismissDuplicates}>Dismiss</button>
+      </div>}
       {undoHistory.length > 0 && <div className={styles.undo} role="status">
         <span>Removed {undoHistory.at(-1).removed.length} images.</span>
         <button onClick={undoRemoval}>Undo removal</button>

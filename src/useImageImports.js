@@ -9,7 +9,8 @@ export default function useImageImports(onImport, images) {
   const pending = useRef(0);
   const [isImporting, setIsImporting] = useState(false);
   const [errors, setErrors] = useState([]);
-  const addFiles = useCallback((files) => {
+  const [duplicates, setDuplicates] = useState([]);
+  const addFiles = useCallback((files, allowDuplicates = false) => {
     const incoming = Array.from(files);
     if (!incoming.length) return;
     const request = generation.current;
@@ -17,10 +18,14 @@ export default function useImageImports(onImport, images) {
     setIsImporting(true);
     queue.current = queue.current.then(async () => {
       if (request !== generation.current) return;
-      const result = await partitionImageFiles(incoming, current.current.images, { allowDuplicates: true });
+      const result = await partitionImageFiles(incoming, current.current.images, { allowDuplicates });
       if (request !== generation.current) return;
       setErrors(result.errors.map(({ message }) => message));
-      if (result.accepted.length) current.current.onImport(result.accepted);
+      setDuplicates(result.duplicateFiles);
+      if (result.accepted.length) {
+        current.current.images = [...current.current.images, ...result.accepted];
+        current.current.onImport(result.accepted);
+      }
     }).catch((error) => {
       if (request === generation.current) setErrors([`Could not add images: ${error.message}`]);
     }).finally(() => {
@@ -35,6 +40,7 @@ export default function useImageImports(onImport, images) {
     pending.current = 0;
     setIsImporting(false);
     setErrors([]);
+    setDuplicates([]);
   }, []);
-  return { addFiles, cancelImports, isImporting, errors, clearErrors: () => setErrors([]) };
+  return { addFiles, cancelImports, isImporting, errors, duplicates, dismissDuplicates: () => setDuplicates([]), clearErrors: () => setErrors([]) };
 }
