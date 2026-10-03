@@ -22,6 +22,7 @@ export default function OutputImages({
   images, records, resizedImages, loading, progress, total, processingTime,
   onFileInputChange, inputDisabled, onRemoveImage, onRetryImage, onRetryFailed,
   downloadsBlocked,
+  outputNames,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -65,7 +66,8 @@ export default function OutputImages({
         return <div key={id} className={styles.imageCard} style={{ maxWidth }}>
           <OutputImage blob={result?.blob ?? file} filename={file.name} width={result?.widthAfter} height={result?.heightAfter}>
             {(url) => <div className={styles.imageInfo}>
-              <div className={styles.filename} title={file.name}>{file.name}</div>
+              <div className={styles.filename} title={outputNames.get(id)}>{outputNames.get(id)}</div>
+              {file.name !== outputNames.get(id) && <div className={styles.sourceName}>Source: {file.name}</div>}
               <div className={`${styles.fileInfo} numeric`}>
                 {result && <>
                   <span>{result.widthBefore}×{result.heightBefore} → {result.widthAfter}×{result.heightAfter}</span>

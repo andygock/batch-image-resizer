@@ -54,9 +54,14 @@ export function fitDimensions(width, height, bounds, disableUpscale) {
   };
 }
 
-export function nameOutputs(images, enableSuffix, suffix) {
-  const used = new Set();
+export function nameOutputs(images, enableSuffix, suffix, assignments = new Map()) {
+  const used = new Set([...assignments.values()].map(({ name }) => name.toLowerCase()));
   return images.map((image) => {
+    const identity = image.id ?? Symbol();
+    const signature = JSON.stringify([image.filename, image.outputExtension, enableSuffix ? suffix : ""]);
+    const previous = assignments.get(identity);
+    if (previous?.signature === signature) return { ...image, downloadFilename: previous.name };
+    if (previous) used.delete(previous.name.toLowerCase());
     const dot = image.filename.lastIndexOf(".");
     const stem = dot > 0 ? image.filename.slice(0, dot) : image.filename;
     // Portable, flat ZIP entries; normalise names before checking collisions.
@@ -76,6 +81,7 @@ export function nameOutputs(images, enableSuffix, suffix) {
     while (used.has(name.toLowerCase()))
       name = `${base} (${number++}).${image.outputExtension}`;
     used.add(name.toLowerCase());
+    assignments.set(identity, { signature, name });
     return { ...image, downloadFilename: name };
   });
 }

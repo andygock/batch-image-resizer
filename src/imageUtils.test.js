@@ -95,6 +95,17 @@ test("output names are flat, portable and nonempty", () => {
   );
 });
 
+test("collision filenames remain stable after removal and later additions", () => {
+  const assignments = new Map();
+  const a = { id: "a", filename: "photo.png", outputExtension: "jpg" };
+  const b = { id: "b", filename: "photo.webp", outputExtension: "jpg" };
+  const first = nameOutputs([a, b], true, "_small", assignments);
+  const next = nameOutputs([b, { ...a, id: "c" }], true, "_small", assignments);
+  assert.equal(next[0].downloadFilename, first[1].downloadFilename);
+  assert.equal(next[1].downloadFilename, "photo_small (3).jpg");
+  assert.equal(nameOutputs([b], true, "_new", assignments)[0].downloadFilename, "photo_new.jpg");
+});
+
 test("a late job cannot publish after replacement or reset", async () => {
   const owner = createJobOwner();
   const first = owner.start();

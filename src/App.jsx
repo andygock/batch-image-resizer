@@ -15,7 +15,7 @@ import OutputFormatSelect from "./OutputFormatSelect";
 import SizeSelect from "./SizeSelect";
 import { useDragAndDrop } from "./useDragAndDrop";
 import Errors from "./Errors";
-import { nameOutputs } from "./imageUtils.js";
+import { nameOutputs, outputFormats } from "./imageUtils.js";
 import { createZipExporter } from "./zipExporter.js";
 import useBatchProcessor from "./useBatchProcessor.js";
 import useImageImports from "./useImageImports.js";
@@ -33,6 +33,7 @@ function App() {
   const [retry, setRetry] = useState({ ids: [] });
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const [undoHistory, setUndoHistory] = useState([]);
+  const nameAssignments = useRef(new Map());
   const dropRef = useRef(null);
   const zipExporter = useRef(null);
   if (!zipExporter.current) zipExporter.current = createZipExporter(saveAs);
@@ -94,6 +95,7 @@ function App() {
     cancelImports();
     invalidate();
     processor.clear();
+    nameAssignments.current.clear();
     setCancelled(false);
     setImages([]);
   };
@@ -107,13 +109,16 @@ function App() {
     const selected = new Set(ids);
     const removed = images.flatMap((source, index) => selected.has(source.id) ? [{ source, index }] : []);
     if (!removed.length) return;
-    setUndoHistory((current) => appendUndo(current, { removed, outputs: processor.capture(ids), paused: cleared ? cancelled : null }));
+    setUndoHistory((current) => appendUndo(current, { removed, outputs: processor.capture(ids), names: ids.map((id) => [id, nameAssignments.current.get(id)]), paused: cleared ? cancelled : null }));
   };
   const undoRemoval = useCallback(() => {
     const entry = undoHistory.at(-1);
     if (!entry) return;
     invalidate();
     processor.restore(entry.outputs);
+    for (const [id, name] of entry.names) {
+      if (name && ![...nameAssignments.current.values()].some((existing) => existing.name.toLowerCase() === name.name.toLowerCase())) nameAssignments.current.set(id, name);
+    }
     setImages((current) => restoreRemovedSources(current, entry.removed));
     if (entry.paused !== null) setCancelled(entry.paused);
     setUndoHistory((current) => current.slice(0, -1));
@@ -129,10 +134,11 @@ function App() {
     return () => document.removeEventListener("keydown", handleUndo);
   }, [undoRemoval, undoHistory.length]);
 
-  const outputs = useMemo(
-    () => nameOutputs(resizedImages, enableSuffix, suffix),
-    [resizedImages, enableSuffix, suffix]
-  );
+  const namedSources = useMemo(() => nameOutputs(images.map(({ id, file, sourceFormat }) => ({
+    id, filename: file.name, outputExtension: outputFormats[outputFormat === "source" ? sourceFormat : outputFormat]?.extension,
+  })), enableSuffix, suffix, nameAssignments.current), [images, outputFormat, enableSuffix, suffix]);
+  const outputNames = useMemo(() => new Map(namedSources.map(({ id, downloadFilename }) => [id, downloadFilename])), [namedSources]);
+  const outputs = useMemo(() => resizedImages.map((image) => ({ ...image, downloadFilename: outputNames.get(image.id) })), [resizedImages, outputNames]);
 
   // Exports own their output snapshot so editing the next batch cannot cancel them.
   const downloadZip = async () => {
@@ -293,6 +299,7 @@ function App() {
         images={images}
         records={records}
         downloadsBlocked={sizeDraft.invalid}
+        outputNames={outputNames}
         resizedImages={outputs}
         loading={isProcessing}
         progress={progress}

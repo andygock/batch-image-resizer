@@ -96,6 +96,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sourceName {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
 
 .fileInfo {
   display: flex;
