@@ -24,6 +24,7 @@ export default function OutputImages({
   downloadsBlocked,
   outputNames,
   selected, onSelectImage, onSelectAll, onClearSelection, onRemoveSelected, onDownloadSelected, isZipping,
+  viewMode, onViewModeChange,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -57,8 +58,7 @@ export default function OutputImages({
         <progress value={progress} max={Math.max(1, total)} aria-label="Images processed" />
       </span>}
       {!loading && processingTime >= 0.01 && <span className="numeric">{processingTime}s</span>}
-    </div>
-    <div className={styles.selectionBar}>
+      <label>View <select value={viewMode} onChange={(event) => onViewModeChange(event.target.value)}><option value="grid">Grid</option><option value="list">List</option></select></label>
       <button onClick={onSelectAll} disabled={selected.size === total}>Select all</button>
       {selected.size > 0 && <>
         <span>{selected.size} selected · {selectedReady} ready</span>
@@ -68,7 +68,7 @@ export default function OutputImages({
       </>}
       <span>Shift-click to select a range.</span>
     </div>
-    <div className={styles.grid} role="group" aria-label="Image batch" tabIndex={0} onKeyDown={(event) => {
+    <div className={`${styles.grid} ${viewMode === "list" ? styles.list : ""}`} role="group" aria-label="Image batch" tabIndex={0} onKeyDown={(event) => {
       if (event.target.closest?.("input:not([type='checkbox']), textarea, [contenteditable='true']")) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); onSelectAll(); }
       if (event.key === "Delete" && selected.size) { event.preventDefault(); onRemoveSelected(); }
@@ -79,9 +79,8 @@ export default function OutputImages({
         const result = record?.result;
         const output = outputs.get(id);
         const status = record?.status ?? "pending";
-        const maxWidth = `calc(${Math.max(result?.widthAfter ?? 220, 220)}px + 2 * var(--image-card-padding) + 2px)`;
-        return <div key={id} id={`image-${id}`} className={styles.imageCard} style={{ maxWidth }}>
-          <label><input type="checkbox" checked={selected.has(id)} onClick={(event) => onSelectImage(id, event.shiftKey)} onChange={() => {}} />Select <span className="visuallyHidden">{file.name}</span></label>
+        return <div key={id} id={`image-${id}`} className={styles.imageCard}>
+          <label className={styles.selectImage}><input type="checkbox" checked={selected.has(id)} onClick={(event) => onSelectImage(id, event.shiftKey)} onChange={() => {}} /><span className="visuallyHidden">Select {file.name}</span></label>
           <OutputImage blob={result?.blob ?? file} filename={file.name} width={result?.widthAfter} height={result?.heightAfter}>
             {(url) => <div className={styles.imageInfo}>
               <div className={styles.filename} title={outputNames.get(id)}>{outputNames.get(id)}</div>

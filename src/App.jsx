@@ -331,6 +331,8 @@ function App() {
         onRemoveSelected={() => handleRemoveImages([...selected])}
         onDownloadSelected={() => downloadZip(selected)}
         isZipping={isZipping}
+        viewMode={preferences.viewMode}
+        onViewModeChange={(value) => { markChanged(); setPreference("viewMode", value); }}
         onRetryImage={(id) => retryImages([id])}
         onRetryFailed={() => retryImages(failedIds)}
       />
