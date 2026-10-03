@@ -19,10 +19,10 @@ import Errors from "./Errors";
 import { nameOutputs } from "./imageUtils.js";
 import { createJobOwner } from "./jobs.js";
 import useBatchProcessor from "./useBatchProcessor.js";
+import useImageImports from "./useImageImports.js";
 
 function App() {
   const [images, setImages] = useState([]);
-  const [uploadErrors, setUploadErrors] = useState([]);
   const [zipError, setZipError] = useState("");
   const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
   const [outputFormat, setOutputFormat] = useState("jpeg");
@@ -61,27 +61,10 @@ function App() {
     setZipError("");
   }, [processor]);
 
-  const handleImageUpload = useCallback(
-    (files) => {
-      const newErrors = [];
-      const newImages = [];
-      for (const file of files) {
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-          newErrors.push(
-            `File "${file.name}" is not a JPEG, PNG or WebP image.`
-          );
-          continue;
-        }
-        newImages.push({ id: String(imageIdRef.current++), file });
-      }
-      setUploadErrors(newErrors);
-      if (newImages.length) {
-        invalidate();
-        setImages((current) => [...current, ...newImages]);
-      }
-    },
-    [invalidate]
-  );
+  const { addFiles: handleImageUpload, cancelImports, isImporting, errors: uploadErrors, clearErrors } = useImageImports((accepted) => {
+    invalidate();
+    setImages((current) => [...current, ...accepted.map((source) => ({ ...source, id: String(imageIdRef.current++) }))]);
+  }, images);
 
   const handleFileInputChange = (event) => {
     if (event.target.files) {
@@ -104,10 +87,10 @@ function App() {
   };
 
   const handleReset = () => {
+    cancelImports();
     invalidate();
     processor.clear();
     setImages([]);
-    setUploadErrors([]);
   };
 
   const handleRemoveImage = (id) => {
@@ -253,12 +236,13 @@ function App() {
         </div>
       </div>
       <Errors
-        onDismiss={() => { setUploadErrors([]); setZipError(""); }}
+        onDismiss={() => { clearErrors(); setZipError(""); }}
         errors={[
           ...uploadErrors,
           ...(zipError ? [zipError] : []),
         ]}
       />
+      {isImporting && <p role="status">Checking image files…</p>}
       {cancelled && (
         <div className={styles.status} role="status">
           Cancelled.{" "}
