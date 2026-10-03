@@ -23,6 +23,15 @@ export function createBatchProcessor(resize = resizeImage) {
 
   return {
     cancel: () => owner.cancel(),
+    capture(ids) {
+      return ids.map((id) => ({ id, record: records[id], cached: cache.get(id) }));
+    },
+    restore(entries) {
+      for (const { id, record, cached } of entries) {
+        if (record) records[id] = record;
+        if (cached) cache.set(id, cached);
+      }
+    },
     clear() {
       owner.cancel();
       cache.clear();

@@ -79,3 +79,14 @@ test("paused batches accept edits without starting work until resumed", async ()
   await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, {}, publish);
   assert.deepEqual(calls, ["a"]);
 });
+
+test("undo restores cached results without encoding them again", async () => {
+  let calls = 0;
+  const processor = createBatchProcessor(async ({ id }) => { calls++; return { id }; });
+  await processor.run(sources, settings, {}, () => {});
+  const saved = processor.capture(["a", "b"]);
+  processor.clear();
+  processor.restore(saved);
+  await processor.run(sources, settings, {}, () => {});
+  assert.equal(calls, 2);
+});

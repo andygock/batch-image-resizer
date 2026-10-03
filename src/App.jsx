@@ -22,6 +22,7 @@ import useBatchProcessor from "./useBatchProcessor.js";
 import useImageImports from "./useImageImports.js";
 import usePreferences from "./usePreferences.js";
 import useBatchRecovery from "./useBatchRecovery.js";
+import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
 
 function App() {
   const [images, setImages] = useState([]);
@@ -32,6 +33,7 @@ function App() {
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
+  const [undoHistory, setUndoHistory] = useState([]);
   const dropRef = useRef(null);
   const zipOwner = useRef(createJobOwner());
   const settings = useMemo(() => ({
@@ -91,6 +93,7 @@ function App() {
   };
 
   const handleReset = () => {
+    rememberRemoval(images.map(({ id }) => id), true);
     cancelImports();
     invalidate();
     processor.clear();
@@ -99,9 +102,35 @@ function App() {
   };
 
   const handleRemoveImage = (id) => {
+    rememberRemoval([id]);
     invalidate();
     setImages((current) => current.filter((image) => image.id !== id));
   };
+  const rememberRemoval = (ids, cleared = false) => {
+    const selected = new Set(ids);
+    const removed = images.flatMap((source, index) => selected.has(source.id) ? [{ source, index }] : []);
+    if (!removed.length) return;
+    setUndoHistory((current) => appendUndo(current, { removed, outputs: processor.capture(ids), paused: cleared ? cancelled : null }));
+  };
+  const undoRemoval = useCallback(() => {
+    const entry = undoHistory.at(-1);
+    if (!entry) return;
+    invalidate();
+    processor.restore(entry.outputs);
+    setImages((current) => restoreRemovedSources(current, entry.removed));
+    if (entry.paused !== null) setCancelled(entry.paused);
+    setUndoHistory((current) => current.slice(0, -1));
+  }, [undoHistory, invalidate, processor]);
+  useEffect(() => {
+    const handleUndo = (event) => {
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z" && !event.target.closest?.("input, textarea, select, [contenteditable='true']") && undoHistory.length) {
+        event.preventDefault();
+        undoRemoval();
+      }
+    };
+    document.addEventListener("keydown", handleUndo);
+    return () => document.removeEventListener("keydown", handleUndo);
+  }, [undoRemoval, undoHistory.length]);
 
   const outputs = useMemo(
     () => nameOutputs(resizedImages, enableSuffix, suffix),
@@ -255,6 +284,11 @@ function App() {
         ]}
       />
       {isImporting && <p role="status">Checking image files…</p>}
+      {undoHistory.length > 0 && <div className={styles.undo} role="status">
+        <span>Removed {undoHistory.at(-1).removed.length} images.</span>
+        <button onClick={undoRemoval}>Undo removal</button>
+        <button onClick={() => setUndoHistory([])}>Dismiss</button>
+      </div>}
       {cancelled && (
         <div className={styles.status} role="status">
           Paused. Changes will wait until you resume.{" "}
