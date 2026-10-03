@@ -1,5 +1,4 @@
 import { saveAs } from "file-saver";
-import JSZip from "jszip";
 import { Download, Play, RotateCcw, Upload, X } from "lucide-preact";
 import {
   useCallback,
@@ -17,7 +16,7 @@ import SizeSelect from "./SizeSelect";
 import { useDragAndDrop } from "./useDragAndDrop";
 import Errors from "./Errors";
 import { nameOutputs } from "./imageUtils.js";
-import { createJobOwner } from "./jobs.js";
+import { createZipExporter } from "./zipExporter.js";
 import useBatchProcessor from "./useBatchProcessor.js";
 import useImageImports from "./useImageImports.js";
 import usePreferences from "./usePreferences.js";
@@ -26,16 +25,17 @@ import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
 
 function App() {
   const [images, setImages] = useState([]);
-  const [zipError, setZipError] = useState("");
+  const [zipState, setZipState] = useState({ isZipping: false, error: "", progress: 0 });
+  const { isZipping, error: zipError } = zipState;
   const { preferences, setPreference, restorePreferences, forgetPreferences, storageError } = usePreferences();
   const { boundingBox, outputFormat, qualityByFormat, pngColors, enableSuffix, suffix, disableUpscale, recentSizes } = preferences;
-  const [isZipping, setIsZipping] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const [undoHistory, setUndoHistory] = useState([]);
   const dropRef = useRef(null);
-  const zipOwner = useRef(createJobOwner());
+  const zipExporter = useRef(null);
+  if (!zipExporter.current) zipExporter.current = createZipExporter(saveAs);
   const settings = useMemo(() => ({
     bounds: boundingBox, format: outputFormat, qualityByFormat,
     colours: pngColors, disableUpscale,
@@ -79,8 +79,8 @@ function App() {
   useDragAndDrop(dropRef, handleImageUpload);
 
   useEffect(() => {
-    const owner = zipOwner.current;
-    return () => owner.cancel();
+    const exporter = zipExporter.current;
+    return () => exporter.cancel(false);
   }, []);
 
   const changeSetting = (key) => (value) => {
@@ -137,24 +137,7 @@ function App() {
   // Exports own their output snapshot so editing the next batch cannot cancel them.
   const downloadZip = async () => {
     if (isZipping || !outputs.length || sizeDraft.invalid) return;
-    const job = zipOwner.current.start();
-    const snapshot = [...outputs];
-    setIsZipping(true);
-    setZipError("");
-    try {
-      const zip = new JSZip();
-      for (const { downloadFilename, blob } of snapshot)
-        zip.file(downloadFilename, blob);
-      const blob = await zip.generateAsync({ type: "blob" }, () =>
-        job.signal.throwIfAborted()
-      );
-      if (job.isCurrent()) saveAs(blob, "resized_images.zip");
-    } catch (error) {
-      if (job.isCurrent())
-        setZipError(`Error creating ZIP file: ${error.message}`);
-    } finally {
-      if (job.isCurrent()) setIsZipping(false);
-    }
+    await zipExporter.current.start(outputs, "resized_images.zip", setZipState);
   };
 
   const cancelResize = () => {
@@ -230,7 +213,7 @@ function App() {
               className={outputs.length ? "buttonPrimary" : undefined}
             >
               <Download size={15} aria-hidden="true" />
-              {isZipping ? "Creating ZIP..." : `Download ${outputs.length || ""} ready as ZIP`}
+              {isZipping ? `Creating ZIP · ${zipState.progress}%` : `Download ${outputs.length || ""} ready as ZIP`}
             </button>
             <button
               className="buttonIcon"
@@ -272,9 +255,15 @@ function App() {
           </div>
         </div>
       </div>
+      {isZipping && <div className={styles.undo}>
+        <span role="status">Creating {zipState.filename} from {zipState.count} images · {zipState.progress}%</span>
+        <progress aria-label="ZIP creation" value={zipState.progress} max="100" />
+        <button onClick={() => zipExporter.current.cancel()}>Cancel export</button>
+      </div>}
+      {!isZipping && zipState.message && <p role="status">{zipState.message}</p>}
       {sizeDraft.invalid && <p role="status">Fix the custom size or press Escape in a dimension field to download the current {boundingBox.width}×{boundingBox.height}px outputs.</p>}
       <Errors
-        onDismiss={() => { clearErrors(); setZipError(""); }}
+        onDismiss={() => { clearErrors(); setZipState((current) => ({ ...current, error: "" })); }}
         errors={[
           ...uploadErrors,
           ...(zipError ? [zipError] : []),
