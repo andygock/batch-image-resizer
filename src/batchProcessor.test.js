@@ -31,3 +31,23 @@ test("superseded processing cannot replace a newer result", async () => {
   await old;
   assert.equal(state.records.a.result.quality, 0.7);
 });
+
+test("failed sources remain actionable and retry does not repeat ready work", async () => {
+  const calls = [];
+  let failing = true;
+  const processor = createBatchProcessor(async ({ id }) => {
+    calls.push(id);
+    if (id === "b" && failing) throw new Error("decode failed");
+    return { id };
+  });
+  let state;
+  const publish = (next) => { state = next; };
+  await processor.run(sources, settings, {}, publish);
+  assert.equal(state.records.b.status, "error");
+  await processor.run([...sources, { id: "c" }], settings, {}, publish);
+  assert.deepEqual(calls, ["a", "b", "c"]);
+  failing = false;
+  await processor.run(sources, settings, { retryIds: ["b"] }, publish);
+  assert.deepEqual(calls, ["a", "b", "c", "b"]);
+  assert.equal(state.records.b.status, "ready");
+});

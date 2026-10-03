@@ -109,6 +109,14 @@
   justify-content: flex-end;
   gap: var(--space-1);
 }
+.error {
+  grid-column: 1 / -1;
+  color: var(--destructive);
+  overflow-wrap: anywhere;
+}
+.error p + p {
+  margin-top: 6px;
+}
 
 @media (max-width: 768px) {
   .empty {

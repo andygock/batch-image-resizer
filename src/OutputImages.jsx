@@ -20,7 +20,7 @@ export function OutputImage({ blob, filename, width, height, children }) {
 
 export default function OutputImages({
   images, records, resizedImages, loading, progress, total, processingTime,
-  onFileInputChange, inputDisabled, onRemoveImage,
+  onFileInputChange, inputDisabled, onRemoveImage, onRetryImage, onRetryFailed,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -35,10 +35,14 @@ export default function OutputImages({
   const totalBefore = resizedImages.reduce((sum, image) => sum + image.filesizeBefore, 0);
   const totalAfter = resizedImages.reduce((sum, image) => sum + image.filesizeAfter, 0);
   const savedPercent = totalBefore > 0 ? Math.round((1 - totalAfter / totalBefore) * 100) : 0;
+  const failed = images.filter(({ id }) => records[id]?.status === "error").length;
+  const pending = total - resizedImages.length - failed;
 
   return <>
     <div className={styles.summary}>
       <span className="numeric">{resizedImages.length} of {total} ready</span>
+      {failed > 0 && <><span>{failed} failed</span><button onClick={onRetryFailed}>Retry failed</button></>}
+      {pending > 0 && <span>{pending} {loading ? "remaining" : "waiting"}</span>}
       {resizedImages.length > 0 && <>
         <span className="numeric">{formatKb(totalBefore)} → {formatKb(totalAfter)}</span>
         <span className={`numeric ${savedPercent >= 0 ? "positive" : "negative"}`}>
@@ -69,6 +73,7 @@ export default function OutputImages({
                 {status !== "ready" && <span>{status === "processing" ? "Processing…" : status === "error" ? "Could not process" : "Waiting"}{result ? " · showing previous output" : ""}</span>}
               </div>
               <div className={styles.imageActions}>
+                {status === "error" && <button onClick={() => onRetryImage(id)}>Retry</button>}
                 {output && <a href={url || undefined} download={output.downloadFilename} title={`Download "${output.downloadFilename}"`} className="button buttonIcon" aria-label={`Download ${output.downloadFilename}`}>
                   <Download size={14} aria-hidden="true" />
                 </a>}
@@ -76,6 +81,10 @@ export default function OutputImages({
                   <Trash2 size={14} aria-hidden="true" />
                 </button>
               </div>
+              {status === "error" && <div className={styles.error}>
+                <p>{record.error}</p>
+                <p>{record.error.includes("decode") ? "Try exporting this file again as JPG, PNG or WebP, then add the replacement." : "Try a smaller size or another output format, then retry."}</p>
+              </div>}
             </div>}
           </OutputImage>
         </div>;

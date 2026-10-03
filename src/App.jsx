@@ -46,7 +46,12 @@ function App() {
   const resizedImages = useMemo(() => images.flatMap(({ id }) =>
     records[id]?.status === "ready" ? [records[id].result] : []
   ), [images, records]);
-  const processingErrors = Object.values(records).filter(({ status }) => status === "error").map(({ error }) => error);
+  const failedIds = images.filter(({ id }) => records[id]?.status === "error").map(({ id }) => id);
+  const retryImages = (ids) => {
+    processor.cancel();
+    setCancelled(false);
+    setRetry({ ids });
+  };
 
   const invalidate = useCallback(() => {
     processor.cancel();
@@ -248,9 +253,9 @@ function App() {
         </div>
       </div>
       <Errors
+        onDismiss={() => { setUploadErrors([]); setZipError(""); }}
         errors={[
           ...uploadErrors,
-          ...processingErrors,
           ...(zipError ? [zipError] : []),
         ]}
       />
@@ -274,6 +279,8 @@ function App() {
         onFileInputChange={handleFileInputChange}
         inputDisabled={false}
         onRemoveImage={handleRemoveImage}
+        onRetryImage={(id) => retryImages([id])}
+        onRetryFailed={() => retryImages(failedIds)}
       />
       <div className={styles.footer}>
         <p>
