@@ -21,17 +21,17 @@ import { createJobOwner } from "./jobs.js";
 import useBatchProcessor from "./useBatchProcessor.js";
 import useImageImports from "./useImageImports.js";
 import usePreferences from "./usePreferences.js";
+import useBatchRecovery from "./useBatchRecovery.js";
 
 function App() {
   const [images, setImages] = useState([]);
   const [zipError, setZipError] = useState("");
-  const { preferences, setPreference, forgetPreferences, storageError } = usePreferences();
+  const { preferences, setPreference, restorePreferences, forgetPreferences, storageError } = usePreferences();
   const { boundingBox, outputFormat, qualityByFormat, pngColors, enableSuffix, suffix, disableUpscale, recentSizes } = preferences;
   const [isZipping, setIsZipping] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
   const dropRef = useRef(null);
-  const imageIdRef = useRef(0);
   const zipOwner = useRef(createJobOwner());
   const settings = useMemo(() => ({
     bounds: boundingBox, format: outputFormat, qualityByFormat,
@@ -48,18 +48,24 @@ function App() {
     setCancelled(false);
     setRetry({ ids });
   };
+  const recovery = useBatchRecovery(images, preferences, (saved) => {
+    restorePreferences({ ...saved.preferences, rememberPreferences: preferences.rememberPreferences, rememberBatch: preferences.rememberBatch });
+    setImages(saved.sources);
+  }, setPreference);
+  const { markChanged } = recovery;
 
   const invalidate = useCallback(() => {
+    markChanged();
     processor.cancel();
     zipOwner.current.cancel();
     setIsZipping(false);
     setCancelled(false);
     setZipError("");
-  }, [processor]);
+  }, [processor, markChanged]);
 
   const { addFiles: handleImageUpload, cancelImports, isImporting, errors: uploadErrors, clearErrors } = useImageImports((accepted) => {
     invalidate();
-    setImages((current) => [...current, ...accepted.map((source) => ({ ...source, id: String(imageIdRef.current++) }))]);
+    setImages((current) => [...current, ...accepted.map((source) => ({ ...source, id: crypto.randomUUID() }))]);
   }, images);
 
   const handleFileInputChange = (event) => {
@@ -172,14 +178,14 @@ function App() {
                 type="checkbox"
                 checked={enableSuffix}
                 disabled={isZipping}
-                onChange={() => setPreference("enableSuffix", !enableSuffix)}
+                onChange={() => { markChanged(); setPreference("enableSuffix", !enableSuffix); }}
               />
               Add suffix
             </label>
             <input
               type="text"
               value={suffix}
-              onChange={(e) => setPreference("suffix", e.target.value)}
+              onChange={(e) => { markChanged(); setPreference("suffix", e.target.value); }}
               aria-label="Filename suffix"
               placeholder="Suffix"
               maxLength={100}
@@ -272,6 +278,11 @@ function App() {
           <label><input type="checkbox" checked={preferences.rememberPreferences} onChange={(event) => event.target.checked ? setPreference("rememberPreferences", true) : forgetPreferences()} />Remember preferences on this device</label>
           <button onClick={forgetPreferences}>Clear saved preferences (Local Storage)</button>
           <p>Clearing keeps your current settings in this tab and stops saving them until you enable remembering again.</p>
+          <label><input type="checkbox" checked={preferences.rememberBatch} onChange={(event) => { markChanged(); if (event.target.checked) setPreference("rememberBatch", true); else void recovery.forgetBatch(); }} />Recover this batch after closing or reloading</label>
+          <button onClick={recovery.forgetBatch}>Clear saved batch (IndexedDB)</button>
+          <p>Recovery stores your source images and batch settings only on this device. Clearing deletes the app’s database and stops batch saving; current images remain available.</p>
+          <p role="status">{recovery.hydrated ? recovery.message : "Checking for a saved batch…"}</p>
+          {recovery.error && <p role="alert">{recovery.error}</p>}
           {storageError && <p role="alert">{storageError}</p>}
         </details>
         <p>
