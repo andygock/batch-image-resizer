@@ -1,0 +1,33 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createBatchProcessor } from "./batchProcessor.js";
+
+const settings = { bounds: { width: 512, height: 512 }, format: "jpeg", quality: 0.8, disableUpscale: true };
+const sources = [{ id: "a" }, { id: "b" }];
+
+test("ready images remain accessible while another image processes", async () => {
+  let complete;
+  const processor = createBatchProcessor(async ({ id }) => id === "a" ? { id } : new Promise((resolve) => { complete = resolve; }));
+  let state;
+  const publish = (next) => { state = next; };
+  await processor.run(sources.slice(0, 1), settings, {}, publish);
+  const work = processor.run(sources, settings, {}, publish);
+  assert.equal(state.records.a.status, "ready");
+  assert.equal(state.records.b.status, "processing");
+  complete({ id: "b" });
+  await work;
+  assert.equal(state.progress, 2);
+  assert.equal(state.isProcessing, false);
+});
+
+test("superseded processing cannot replace a newer result", async () => {
+  let complete;
+  const processor = createBatchProcessor(async (_, options) => options.quality === 0.8 ? new Promise((resolve) => { complete = resolve; }) : { quality: options.quality });
+  let state;
+  const publish = (next) => { state = next; };
+  const old = processor.run(sources.slice(0, 1), settings, {}, publish);
+  await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, {}, publish);
+  complete({ quality: 0.8 });
+  await old;
+  assert.equal(state.records.a.result.quality, 0.7);
+});
