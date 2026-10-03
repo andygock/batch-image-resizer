@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MAX_DIMENSION, validateSize } from "./imageUtils.js";
 import styles from "./SizeSelect.module.css";
 
@@ -21,17 +21,26 @@ export default function SizeSelect({
   recentSizes = [],
 }) {
   const [isCustom, setIsCustom] = useState(false);
+  const widthInput = useRef(null);
+  const focusRequested = useRef(false);
   const [draft, setDraft] = useState({
     width: String(selectedWidth),
     height: String(selectedHeight),
   });
   const [error, setError] = useState("");
   useEffect(() => {
+    if (isCustom && focusRequested.current) {
+      widthInput.current?.focus();
+      widthInput.current?.select();
+      focusRequested.current = false;
+    }
+  }, [isCustom]);
+  useEffect(() => {
     setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
     setError("");
   }, [selectedWidth, selectedHeight]);
   const selectedValue = `${selectedWidth}x${selectedHeight}`;
-  const isPreset = sizes.some(
+  const isPreset = [...sizes, ...recentSizes.map(({ width, height }) => [width, height])].some(
     ([optionWidth, optionHeight]) =>
       `${optionWidth}x${optionHeight}` === selectedValue
   );
@@ -48,6 +57,17 @@ export default function SizeSelect({
       setError(failure.message);
     }
   };
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitCustomSize();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
+      setError("");
+    }
+  };
 
   return (
     <div className={styles.control}>
@@ -58,6 +78,7 @@ export default function SizeSelect({
           className="numeric"
           onChange={(e) => {
             if (e.target.value === "custom") {
+              focusRequested.current = true;
               setIsCustom(true);
               return;
             }
@@ -83,12 +104,15 @@ export default function SizeSelect({
       </label>
 
       {value === "custom" && (
-        <div className={styles.custom}>
+        <div className={styles.custom} onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) commitCustomSize();
+        }} onKeyDown={handleKeyDown}>
           <label htmlFor="custom-width" className="visuallyHidden">
             Custom width
           </label>
           <input
             id="custom-width"
+            ref={widthInput}
             className="numeric"
             type="number"
             min="1"
@@ -96,10 +120,6 @@ export default function SizeSelect({
             step="1"
             value={draft.width}
             onChange={(e) => setDraft({ ...draft, width: e.target.value })}
-            onBlur={commitCustomSize}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitCustomSize();
-            }}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "size-error" : undefined}
             disabled={disabled === true}
@@ -117,16 +137,14 @@ export default function SizeSelect({
             step="1"
             value={draft.height}
             onChange={(e) => setDraft({ ...draft, height: e.target.value })}
-            onBlur={commitCustomSize}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitCustomSize();
-            }}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "size-error" : undefined}
             disabled={disabled === true}
           />
+          <span>px</span>
         </div>
       )}
+      <span className={styles.help}>Fits inside the size; keeps proportions without cropping.</span>
       {error && (
         <span id="size-error" className={styles.error} role="alert">
           {error}

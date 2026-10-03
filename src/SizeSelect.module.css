@@ -15,3 +15,8 @@
   color: var(--destructive);
   font-size: var(--font-size-sm);
 }
+.help {
+  flex-basis: 100%;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
