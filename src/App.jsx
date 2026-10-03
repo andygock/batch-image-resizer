@@ -23,6 +23,7 @@ import usePreferences from "./usePreferences.js";
 import useBatchRecovery from "./useBatchRecovery.js";
 import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
 import { updateSelection } from "./selection.js";
+import { archiveFilename, downloadRequestKey } from "./downloads.js";
 
 function App() {
   const [images, setImages] = useState([]);
@@ -36,6 +37,7 @@ function App() {
   const [undoHistory, setUndoHistory] = useState([]);
   const nameAssignments = useRef(new Map());
   const [selected, setSelected] = useState(new Set());
+  const [downloadRequests, setDownloadRequests] = useState(new Set());
   const selectionAnchor = useRef(null);
   const selectedIds = useMemo(() => [...selected], [selected]);
   const dropRef = useRef(null);
@@ -160,8 +162,10 @@ function App() {
   const downloadZip = async (selection) => {
     if (isZipping || !outputs.length || sizeDraft.invalid) return;
     const targets = selection ? outputs.filter(({ id }) => selection.has(id)) : outputs;
-    await zipExporter.current.start(targets, "resized_images.zip", setZipState);
+    const snapshot = await zipExporter.current.start(targets, archiveFilename(targets), setZipState);
+    if (snapshot) markDownloads(snapshot);
   };
+  const markDownloads = (items) => setDownloadRequests((current) => new Set([...current, ...items.map(downloadRequestKey)].slice(-2000)));
 
   const cancelResize = () => {
     markChanged();
@@ -317,6 +321,8 @@ function App() {
         records={records}
         downloadsBlocked={sizeDraft.invalid}
         outputNames={outputNames}
+        downloadRequests={downloadRequests}
+        onDownloadRequested={(output) => markDownloads([output])}
         resizedImages={outputs}
         loading={isProcessing}
         progress={progress}

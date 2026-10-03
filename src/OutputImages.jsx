@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download, ImagePlus, Trash2 } from "lucide-preact";
 import styles from "./OutputImages.module.css";
+import { downloadRequestKey } from "./downloads.js";
 
 export const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
 
@@ -25,6 +26,7 @@ export default function OutputImages({
   outputNames,
   selected, onSelectImage, onSelectAll, onClearSelection, onRemoveSelected, onDownloadSelected, isZipping,
   viewMode, onViewModeChange,
+  downloadRequests, onDownloadRequested,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -94,13 +96,14 @@ export default function OutputImages({
               </div>
               <div className={styles.imageActions}>
                 {status === "error" && <button onClick={() => onRetryImage(id)}>Retry</button>}
-                {output && <a href={!downloadsBlocked && url ? url : undefined} aria-disabled={downloadsBlocked || !url} onClick={(event) => { if (downloadsBlocked || !url) event.preventDefault(); }} download={output.downloadFilename} title={downloadsBlocked ? "Fix the custom dimensions before downloading" : `Download "${output.downloadFilename}"`} className="button buttonIcon" aria-label={`Download ${output.downloadFilename}`}>
+                {output && <a href={!downloadsBlocked && url ? url : undefined} aria-disabled={downloadsBlocked || !url} onClick={(event) => { if (downloadsBlocked || !url) event.preventDefault(); else onDownloadRequested(output); }} download={output.downloadFilename} title={downloadsBlocked ? "Fix the custom dimensions before downloading" : `Download "${output.downloadFilename}"`} className="button buttonIcon" aria-label={`Download ${output.downloadFilename}`}>
                   <Download size={14} aria-hidden="true" />
                 </a>}
                 <button type="button" className="buttonIcon buttonDanger" onClick={() => onRemoveImage(id)} title={`Remove "${file.name}"`} aria-label={`Remove ${file.name}`}>
                   <Trash2 size={14} aria-hidden="true" />
                 </button>
               </div>
+              {output && downloadRequests.has(downloadRequestKey(output)) && <span className={styles.sourceName}>Download requested</span>}
               {status === "error" && <div className={styles.error}>
                 <p>{record.error}</p>
                 <p>{record.error.includes("decode") ? "Try exporting this file again as JPG, PNG or WebP, then add the replacement." : "Try a smaller size or another output format, then retry."}</p>
