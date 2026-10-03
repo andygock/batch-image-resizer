@@ -20,17 +20,13 @@ import { nameOutputs } from "./imageUtils.js";
 import { createJobOwner } from "./jobs.js";
 import useBatchProcessor from "./useBatchProcessor.js";
 import useImageImports from "./useImageImports.js";
+import usePreferences from "./usePreferences.js";
 
 function App() {
   const [images, setImages] = useState([]);
   const [zipError, setZipError] = useState("");
-  const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
-  const [outputFormat, setOutputFormat] = useState("source");
-  const [qualityByFormat, setQualityByFormat] = useState({ jpeg: 0.8, webp: 0.8 });
-  const [pngColors, setPngColors] = useState(0);
-  const [enableSuffix, setEnableSuffix] = useState(true);
-  const [suffix, setSuffix] = useState("_small");
-  const [disableUpscale, setDisableUpscale] = useState(true);
+  const { preferences, setPreference, forgetPreferences, storageError } = usePreferences();
+  const { boundingBox, outputFormat, qualityByFormat, pngColors, enableSuffix, suffix, disableUpscale, recentSizes } = preferences;
   const [isZipping, setIsZipping] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
@@ -81,9 +77,10 @@ function App() {
     return () => owner.cancel();
   }, []);
 
-  const changeSetting = (setter) => (value) => {
+  const changeSetting = (key) => (value) => {
+    if (JSON.stringify(preferences[key]) === JSON.stringify(value)) return;
     invalidate();
-    setter(value);
+    setPreference(key, value);
   };
 
   const handleReset = () => {
@@ -138,7 +135,8 @@ function App() {
         <div className={styles.config}>
           <div className={styles.controlGroup}>
             <SizeSelect
-              onChange={changeSetting(setBoundingBox)}
+              onChange={changeSetting("boundingBox")}
+              recentSizes={recentSizes}
               width={boundingBox.width}
               height={boundingBox.height}
             />
@@ -147,7 +145,7 @@ function App() {
                 type="checkbox"
                 checked={disableUpscale}
                 onChange={() =>
-                  changeSetting(setDisableUpscale)(!disableUpscale)
+                  changeSetting("disableUpscale")(!disableUpscale)
                 }
               />
               Do not enlarge
@@ -155,16 +153,16 @@ function App() {
           </div>
           <div className={styles.controlGroup}>
             <OutputFormatSelect
-              onChange={changeSetting(setOutputFormat)}
+              onChange={changeSetting("outputFormat")}
               value={outputFormat}
             />
             <CompressionSelect
               format={outputFormat}
-              onQualityChange={(format, quality) => changeSetting(setQualityByFormat)({ ...qualityByFormat, [format]: quality })}
+              onQualityChange={(format, quality) => changeSetting("qualityByFormat")({ ...qualityByFormat, [format]: quality })}
               qualityByFormat={qualityByFormat}
               sourceFormats={images.map(({ sourceFormat }) => sourceFormat)}
               pngColors={pngColors}
-              onPngColorsChange={changeSetting(setPngColors)}
+              onPngColorsChange={changeSetting("pngColors")}
             />
             {outputFormat === "jpeg" && <span className={styles.hint}>Transparent areas become white in JPEG.</span>}
           </div>
@@ -174,14 +172,14 @@ function App() {
                 type="checkbox"
                 checked={enableSuffix}
                 disabled={isZipping}
-                onChange={() => setEnableSuffix(!enableSuffix)}
+                onChange={() => setPreference("enableSuffix", !enableSuffix)}
               />
               Add suffix
             </label>
             <input
               type="text"
               value={suffix}
-              onChange={(e) => setSuffix(e.target.value)}
+              onChange={(e) => setPreference("suffix", e.target.value)}
               aria-label="Filename suffix"
               placeholder="Suffix"
               maxLength={100}
@@ -269,6 +267,13 @@ function App() {
         onRetryFailed={() => retryImages(failedIds)}
       />
       <div className={styles.footer}>
+        <details className={styles.storage}>
+          <summary>Saved data and preferences</summary>
+          <label><input type="checkbox" checked={preferences.rememberPreferences} onChange={(event) => event.target.checked ? setPreference("rememberPreferences", true) : forgetPreferences()} />Remember preferences on this device</label>
+          <button onClick={forgetPreferences}>Clear saved preferences (Local Storage)</button>
+          <p>Clearing keeps your current settings in this tab and stops saving them until you enable remembering again.</p>
+          {storageError && <p role="alert">{storageError}</p>}
+        </details>
         <p>
           Your images are resized directly in your browser using the HTML5
           Canvas API and browser-side encoders, ensuring privacy and speed. No

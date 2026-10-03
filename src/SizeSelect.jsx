@@ -18,6 +18,7 @@ export default function SizeSelect({
   width: selectedWidth,
   height: selectedHeight,
   disabled,
+  recentSizes = [],
 }) {
   const [isCustom, setIsCustom] = useState(false);
   const [draft, setDraft] = useState({
@@ -76,6 +77,7 @@ export default function SizeSelect({
               {optionWidth}x{optionHeight}
             </option>
           ))}
+          {recentSizes.filter((size) => !sizes.some(([w, h]) => w === size.width && h === size.height)).map((size) => <option key={`${size.width}x${size.height}`} value={`${size.width}x${size.height}`}>Recent: {size.width}×{size.height}</option>)}
           <option value="custom">Custom</option>
         </select>
       </label>

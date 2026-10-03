@@ -103,6 +103,17 @@
   overflow-wrap: break-word;
   text-align: center;
 }
+.storage {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  margin-bottom: 16px;
+}
+.storage summary { cursor: pointer; }
+.storage[open] { display: grid; gap: 12px; }
+.storage label { white-space: normal; }
+.storage button { justify-self: start; white-space: normal; }
 
 @media (max-width: 768px) {
   .app {
