@@ -52,7 +52,9 @@
   scrollbar-width: thin;
   white-space: nowrap;
 }
-.summary > * { flex-shrink: 0; }
+.summary > * {
+  flex-shrink: 0;
+}
 
 .grid {
   display: grid;
@@ -80,11 +82,22 @@
   height: 160px;
   object-fit: contain;
   border-radius: 4px;
-  background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+  background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px
+    16px;
 }
-.previewButton { display: block; width: 100%; height: 160px; padding: 0; border: 0; }
-.list .previewButton { height: 64px; }
-.selectImage { z-index: 1; }
+.previewButton {
+  display: block;
+  width: 100%;
+  height: 160px;
+  padding: 0;
+  border: 0;
+}
+.list .previewButton {
+  height: 64px;
+}
+.selectImage {
+  z-index: 1;
+}
 .selectImage {
   position: absolute;
   top: 10px;
@@ -93,14 +106,20 @@
   background: var(--card);
   border-radius: var(--radius);
 }
-.list { grid-template-columns: minmax(0, 1fr); }
+.list {
+  grid-template-columns: minmax(0, 1fr);
+}
 .list .imageCard {
   display: grid;
   grid-template-columns: 28px 96px minmax(0, 1fr);
   align-items: center;
 }
-.list .selectImage { position: static; }
-.list .imageCard img { height: 64px; }
+.list .selectImage {
+  position: static;
+}
+.list .imageCard img {
+  height: 64px;
+}
 
 .imageInfo {
   display: grid;
@@ -137,10 +156,18 @@
   justify-content: flex-end;
   gap: 8px;
 }
-.selectImage { min-width: 32px; min-height: 32px; justify-content: center; }
+.selectImage {
+  min-width: 32px;
+  min-height: 32px;
+  justify-content: center;
+}
 @media (pointer: coarse) {
-  .selectImage { min-width: 44px; }
-  .list .imageCard { grid-template-columns: 44px 64px minmax(0, 1fr); }
+  .selectImage {
+    min-width: 44px;
+  }
+  .list .imageCard {
+    grid-template-columns: 44px 64px minmax(0, 1fr);
+  }
 }
 .error {
   grid-column: 1 / -1;
@@ -159,5 +186,7 @@
   .empty {
     min-height: 210px;
   }
-  .list .imageCard { grid-template-columns: 28px 64px minmax(0, 1fr); }
+  .list .imageCard {
+    grid-template-columns: 28px 64px minmax(0, 1fr);
+  }
 }

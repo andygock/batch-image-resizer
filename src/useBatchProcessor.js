@@ -1,10 +1,20 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createBatchProcessor } from "./batchProcessor.js";
 
-export default function useBatchProcessor(images, settings, paused = false, attempt = { ids: [] }) {
+export default function useBatchProcessor(
+  images,
+  settings,
+  paused = false,
+  attempt = { ids: [] },
+) {
   const processor = useRef(null);
   if (!processor.current) processor.current = createBatchProcessor();
-  const [state, setState] = useState({ records: {}, isProcessing: false, progress: 0, processingTime: 0 });
+  const [state, setState] = useState({
+    records: {},
+    isProcessing: false,
+    progress: 0,
+    processingTime: 0,
+  });
   const lastAttempt = useRef(null);
   useLayoutEffect(() => {
     const current = processor.current;

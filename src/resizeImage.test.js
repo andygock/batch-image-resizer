@@ -13,7 +13,7 @@ const settings = {
 
 function installCanvas(
   t,
-  encode = async () => new Blob(["jpeg"], { type: "image/jpeg" })
+  encode = async () => new Blob(["jpeg"], { type: "image/jpeg" }),
 ) {
   let closed = 0;
   let canvas;
@@ -70,7 +70,7 @@ globalThis.Worker = class {};
 test("truncated worker output falls back to native PNG encoding", async (t) => {
   const state = installCanvas(
     t,
-    async () => new Blob(["png"], { type: "image/png" })
+    async () => new Blob(["png"], { type: "image/png" }),
   );
   let terminated = false;
   t.mock.method(globalThis, "Worker", function () {
@@ -86,7 +86,7 @@ test("truncated worker output falls back to native PNG encoding", async (t) => {
   const result = await resizeImage(
     source,
     { ...settings, format: "png", colours: 64 },
-    new AbortController().signal
+    new AbortController().signal,
   );
   assert.equal(result.blob.type, "image/png");
   assert.equal(result.appliedColours, 0);
@@ -100,7 +100,7 @@ test("JPEG flattening precedes drawing and native allocations are released", asy
   const result = await resizeImage(
     source,
     settings,
-    new AbortController().signal
+    new AbortController().signal,
   );
   assert.deepEqual(state.calls, ["background", "image"]);
   assert.equal(result.outputExtension, "jpg");
@@ -112,11 +112,11 @@ test("JPEG flattening precedes drawing and native allocations are released", asy
 test("encoder fallback is rejected and resources are released", async (t) => {
   const state = installCanvas(
     t,
-    async () => new Blob(["png"], { type: "image/png" })
+    async () => new Blob(["png"], { type: "image/png" }),
   );
   await assert.rejects(
     resizeImage(source, settings, new AbortController().signal),
-    /Could not encode/
+    /Could not encode/,
   );
   assert.equal(state.closed, 1);
   assert.equal(state.canvas.width, 0);
@@ -152,7 +152,7 @@ test("cancelling PNG encoding terminates the worker", async (t) => {
   });
   await assert.rejects(
     resizeImage(source, { ...settings, format: "png" }, controller.signal),
-    { name: "AbortError" }
+    { name: "AbortError" },
   );
   assert.equal(terminated, true);
   assert.equal(state.closed, 1);
@@ -176,9 +176,9 @@ test("worker failures are reported and release both worker and bitmap", async (t
     resizeImage(
       source,
       { ...settings, format: "png" },
-      new AbortController().signal
+      new AbortController().signal,
     ),
-    /Could not encode.*PNG worker failed/
+    /Could not encode.*PNG worker failed/,
   );
   assert.equal(terminated, true);
   assert.equal(state.closed, 1);
@@ -195,7 +195,7 @@ test("cancellation while decoding closes the late bitmap without allocating canv
     () =>
       new Promise((resolve) => {
         release = resolve;
-      })
+      }),
   );
   const work = resizeImage(source, settings, controller.signal);
   controller.abort();

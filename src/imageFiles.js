@@ -38,7 +38,9 @@ export async function inspectImageFile(file) {
     file.size < 1 ||
     typeof file.slice !== "function"
   ) {
-    throw new Error(`"${filename}" is empty or cannot be read as an image file.`);
+    throw new Error(
+      `"${filename}" is empty or cannot be read as an image file.`,
+    );
   }
 
   let format;
@@ -50,7 +52,7 @@ export async function inspectImageFile(file) {
   if (!format) {
     const typeHint = file.type ? ` (declared as ${file.type})` : "";
     throw new Error(
-      `"${filename}"${typeHint} is not a supported JPEG, PNG or WebP image.`
+      `"${filename}"${typeHint} is not a supported JPEG, PNG or WebP image.`,
     );
   }
   return { file, sourceFormat: format };
@@ -87,7 +89,7 @@ function sourceFile(source) {
 export async function partitionImageFiles(
   files,
   existingSources = [],
-  options = {}
+  options = {},
 ) {
   const accepted = [];
   const duplicates = [];

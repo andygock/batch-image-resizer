@@ -6,15 +6,19 @@ const STORE_NAME = "snapshots";
 const SNAPSHOT_KEY = "current";
 
 function storageError(action, error) {
-  return new Error(`Could not ${action} saved batch: ${error?.message || "storage is unavailable"}`, {
-    cause: error,
-  });
+  return new Error(
+    `Could not ${action} saved batch: ${error?.message || "storage is unavailable"}`,
+    {
+      cause: error,
+    },
+  );
 }
 
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("IndexedDB request failed."));
+    request.onerror = () =>
+      reject(request.error || new Error("IndexedDB request failed."));
   });
 }
 
@@ -56,85 +60,118 @@ function openDatabase(indexedDB) {
 }
 
 function withDatabase(indexedDB, mode, run) {
-  return openDatabase(indexedDB).then((database) => new Promise((resolve, reject) => {
-    let result;
-    let settled = false;
-    let transaction;
-    try {
-      transaction = database.transaction(STORE_NAME, mode);
-      result = run(transaction.objectStore(STORE_NAME));
-      // A failed request can reject before the transaction's abort event arrives.
-      Promise.resolve(result).catch(() => {});
-    } catch (error) {
-      database.close();
-      reject(error);
-      return;
-    }
-    transaction.oncomplete = () => {
-      if (settled) return;
-      settled = true;
-      database.close();
-      Promise.resolve(result).then(resolve, reject);
-    };
-    transaction.onabort = transaction.onerror = () => {
-      if (settled) return;
-      settled = true;
-      database.close();
-      reject(transaction.error || new Error("IndexedDB transaction failed."));
-    };
-  }));
+  return openDatabase(indexedDB).then(
+    (database) =>
+      new Promise((resolve, reject) => {
+        let result;
+        let settled = false;
+        let transaction;
+        try {
+          transaction = database.transaction(STORE_NAME, mode);
+          result = run(transaction.objectStore(STORE_NAME));
+          // A failed request can reject before the transaction's abort event arrives.
+          Promise.resolve(result).catch(() => {});
+        } catch (error) {
+          database.close();
+          reject(error);
+          return;
+        }
+        transaction.oncomplete = () => {
+          if (settled) return;
+          settled = true;
+          database.close();
+          Promise.resolve(result).then(resolve, reject);
+        };
+        transaction.onabort = transaction.onerror = () => {
+          if (settled) return;
+          settled = true;
+          database.close();
+          reject(
+            transaction.error || new Error("IndexedDB transaction failed."),
+          );
+        };
+      }),
+  );
 }
 
 function createIndexedDbAdapter(indexedDB) {
   return {
     readSnapshot: async () => {
-      if (typeof indexedDB.databases === "function" && !(await indexedDB.databases()).some(({ name }) => name === BATCH_DATABASE_NAME)) return null;
-      return withDatabase(indexedDB, "readonly", (store) => requestPromise(store.get(SNAPSHOT_KEY)));
+      if (
+        typeof indexedDB.databases === "function" &&
+        !(await indexedDB.databases()).some(
+          ({ name }) => name === BATCH_DATABASE_NAME,
+        )
+      )
+        return null;
+      return withDatabase(indexedDB, "readonly", (store) =>
+        requestPromise(store.get(SNAPSHOT_KEY)),
+      );
     },
-    writeSnapshot: (snapshot) => withDatabase(indexedDB, "readwrite", (store) => requestPromise(store.put(snapshot, SNAPSHOT_KEY))),
-    deleteDatabase: () => new Promise((resolve, reject) => {
-      let request;
-      let settled = false;
-      try {
-        request = indexedDB.deleteDatabase(BATCH_DATABASE_NAME);
-      } catch (error) {
-        reject(error);
-        return;
-      }
-      request.onsuccess = () => {
-        if (settled) return;
-        settled = true;
-        resolve();
-      };
-      request.onerror = () => {
-        if (settled) return;
-        settled = true;
-        reject(request.error || new Error("IndexedDB database could not be deleted."));
-      };
-      request.onblocked = () => {
-        if (settled) return;
-        settled = true;
-        reject(new Error("IndexedDB deletion is blocked by another open connection."));
-      };
-    }),
+    writeSnapshot: (snapshot) =>
+      withDatabase(indexedDB, "readwrite", (store) =>
+        requestPromise(store.put(snapshot, SNAPSHOT_KEY)),
+      ),
+    deleteDatabase: () =>
+      new Promise((resolve, reject) => {
+        let request;
+        let settled = false;
+        try {
+          request = indexedDB.deleteDatabase(BATCH_DATABASE_NAME);
+        } catch (error) {
+          reject(error);
+          return;
+        }
+        request.onsuccess = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        request.onerror = () => {
+          if (settled) return;
+          settled = true;
+          reject(
+            request.error ||
+              new Error("IndexedDB database could not be deleted."),
+          );
+        };
+        request.onblocked = () => {
+          if (settled) return;
+          settled = true;
+          reject(
+            new Error(
+              "IndexedDB deletion is blocked by another open connection.",
+            ),
+          );
+        };
+      }),
   };
 }
 
 function validateAndPrepareSnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== "object" || !Array.isArray(snapshot.sources))
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    !Array.isArray(snapshot.sources)
+  )
     throw new TypeError("A batch snapshot must contain a sources array.");
   const sources = snapshot.sources.map((source) => {
     if (!source || typeof source !== "object" || typeof source.id !== "string")
       throw new TypeError("Each saved source must have a string id.");
     if (!(source.file instanceof Blob))
-      throw new TypeError(`Saved source ${source.id} must contain a File or Blob.`);
+      throw new TypeError(
+        `Saved source ${source.id} must contain a File or Blob.`,
+      );
     if (!["jpeg", "png", "webp"].includes(source.sourceFormat))
-      throw new TypeError(`Saved source ${source.id} has an unsupported format.`);
+      throw new TypeError(
+        `Saved source ${source.id} has an unsupported format.`,
+      );
     const file = source.file;
     return {
       id: source.id,
       file,
-      sourceFormat: typeof source.sourceFormat === "string" ? source.sourceFormat : "",
+      sourceFormat:
+        typeof source.sourceFormat === "string" ? source.sourceFormat : "",
       fileName: typeof file.name === "string" ? file.name : "",
       fileType: typeof file.type === "string" ? file.type : "",
       lastModified: Number.isFinite(file.lastModified) ? file.lastModified : 0,
@@ -143,31 +180,62 @@ function validateAndPrepareSnapshot(snapshot) {
   if (new Set(sources.map(({ id }) => id)).size !== sources.length)
     throw new TypeError("Saved sources must have unique ids.");
   const sourceIds = new Set(sources.map(({ id }) => id));
-  const selectedIds = Array.isArray(snapshot.selectedIds) ? snapshot.selectedIds.filter((id) => sourceIds.has(id)) : [];
+  const selectedIds = Array.isArray(snapshot.selectedIds)
+    ? snapshot.selectedIds.filter((id) => sourceIds.has(id))
+    : [];
   const names = [];
   const usedNames = new Set();
   const usedIds = new Set();
-  for (const entry of Array.isArray(snapshot.downloadContext?.names) ? snapshot.downloadContext.names : []) {
+  for (const entry of Array.isArray(snapshot.downloadContext?.names)
+    ? snapshot.downloadContext.names
+    : []) {
     if (!Array.isArray(entry)) continue;
     const [id, assignment] = entry;
     const name = assignment?.name;
-    if (!sourceIds.has(id) || usedIds.has(id) || typeof assignment?.signature !== "string" || assignment.signature.length > 2048 || typeof name !== "string" || !name || name.length > 200) continue;
+    if (
+      !sourceIds.has(id) ||
+      usedIds.has(id) ||
+      typeof assignment?.signature !== "string" ||
+      assignment.signature.length > 2048 ||
+      typeof name !== "string" ||
+      !name ||
+      name.length > 200
+    )
+      continue;
     // Stored names are untrusted and must remain portable, flat download names.
-    // eslint-disable-next-line no-control-regex
-    if (/[<>:"/\\|?*\u0000-\u001f]/.test(name) || /^[. ]|[. ]$/.test(name) || usedNames.has(name.toLowerCase())) continue;
+    if (
+      // eslint-disable-next-line no-control-regex
+      /[<>:"/\\|?*\u0000-\u001f]/.test(name) ||
+      /^[. ]|[. ]$/.test(name) ||
+      usedNames.has(name.toLowerCase())
+    )
+      continue;
     names.push([id, { signature: assignment.signature, name }]);
     usedIds.add(id);
     usedNames.add(name.toLowerCase());
   }
   const requests = Array.isArray(snapshot.downloadContext?.requests)
-    ? snapshot.downloadContext.requests.filter((key) => typeof key === "string" && key.length <= 4096).slice(-2000)
+    ? snapshot.downloadContext.requests
+        .filter((key) => typeof key === "string" && key.length <= 4096)
+        .slice(-2000)
     : [];
-  return { sources, preferences: sanitisePreferences(snapshot.preferences), paused: snapshot.paused === true, selectedIds, downloadContext: { names, requests } };
+  return {
+    sources,
+    preferences: sanitisePreferences(snapshot.preferences),
+    paused: snapshot.paused === true,
+    selectedIds,
+    downloadContext: { names, requests },
+  };
 }
 
 function restoreFile(source) {
   let file = source.file;
-  if (typeof File === "function" && typeof Blob === "function" && file instanceof Blob && !(file instanceof File)) {
+  if (
+    typeof File === "function" &&
+    typeof Blob === "function" &&
+    file instanceof Blob &&
+    !(file instanceof File)
+  ) {
     file = new File([file], source.fileName || "image", {
       type: source.fileType || file.type,
       lastModified: source.lastModified || 0,
@@ -245,5 +313,6 @@ const defaultStorage = createBatchStorage({
 });
 
 export const loadBatch = () => defaultStorage.loadBatch();
-export const saveBatch = (snapshot, shouldSave) => defaultStorage.saveBatch(snapshot, shouldSave);
+export const saveBatch = (snapshot, shouldSave) =>
+  defaultStorage.saveBatch(snapshot, shouldSave);
 export const clearBatch = () => defaultStorage.clearBatch();

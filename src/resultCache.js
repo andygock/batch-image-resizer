@@ -1,4 +1,7 @@
-export function createResultCache({ maxBytes = 96 * 1024 * 1024, maxEntries = 160 } = {}) {
+export function createResultCache({
+  maxBytes = 96 * 1024 * 1024,
+  maxEntries = 160,
+} = {}) {
   const entries = new Map();
   let bytes = 0;
   const token = (id, key) => JSON.stringify([id, key]);
@@ -12,7 +15,8 @@ export function createResultCache({ maxBytes = 96 * 1024 * 1024, maxEntries = 16
     remove(name);
     entries.set(name, { id, key, result });
     bytes += result.blob?.size ?? 0;
-    while (entries.size > maxEntries || bytes > maxBytes) remove(entries.keys().next().value);
+    while (entries.size > maxEntries || bytes > maxBytes)
+      remove(entries.keys().next().value);
   };
   return {
     set,
@@ -25,13 +29,20 @@ export function createResultCache({ maxBytes = 96 * 1024 * 1024, maxEntries = 16
       return entry.result;
     },
     previous(id, key) {
-      return [...entries.values()].reverse().find((entry) => entry.id === id && entry.key !== key)?.result;
+      return [...entries.values()]
+        .reverse()
+        .find((entry) => entry.id === id && entry.key !== key)?.result;
     },
     retain(ids) {
       for (const [name, entry] of entries) if (!ids.has(entry.id)) remove(name);
     },
     capture: (id) => [...entries.values()].filter((entry) => entry.id === id),
-    restore(id, saved) { for (const { key, result } of saved ?? []) set(id, key, result); },
-    clear() { entries.clear(); bytes = 0; },
+    restore(id, saved) {
+      for (const { key, result } of saved ?? []) set(id, key, result);
+    },
+    clear() {
+      entries.clear();
+      bytes = 0;
+    },
   };
 }

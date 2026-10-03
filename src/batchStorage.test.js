@@ -5,10 +5,18 @@ import { createBatchStorage } from "./batchStorage.js";
 function memoryAdapter(initial = null) {
   let record = initial;
   return {
-    get record() { return record; },
-    async readSnapshot() { return record; },
-    async writeSnapshot(snapshot) { record = snapshot; },
-    async deleteDatabase() { record = null; },
+    get record() {
+      return record;
+    },
+    async readSnapshot() {
+      return record;
+    },
+    async writeSnapshot(snapshot) {
+      record = snapshot;
+    },
+    async deleteDatabase() {
+      record = null;
+    },
   };
 }
 
@@ -18,14 +26,18 @@ test("batch storage saves a single snapshot and restores file metadata and setti
   const file = new Blob(["image"], { type: "image/png" });
   const snapshot = {
     sources: [{ id: "source-1", file, sourceFormat: "png" }],
-    preferences: { outputFormat: "webp", boundingBox: { width: 640, height: 480 } },
+    preferences: {
+      outputFormat: "webp",
+      boundingBox: { width: 640, height: 480 },
+    },
   };
 
   await storage.saveBatch(snapshot);
   const saved = await storage.loadBatch();
-  assert.deepEqual(saved.sources.map(({ id, sourceFormat }) => ({ id, sourceFormat })), [
-    { id: "source-1", sourceFormat: "png" },
-  ]);
+  assert.deepEqual(
+    saved.sources.map(({ id, sourceFormat }) => ({ id, sourceFormat })),
+    [{ id: "source-1", sourceFormat: "png" }],
+  );
   assert.equal(await saved.sources[0].file.text(), "image");
   assert.equal(saved.sources[0].file.type, "image/png");
   assert.equal(saved.sources[0].file.name, "image");
@@ -43,7 +55,9 @@ test("clear is queued after earlier saves and removes the database snapshot", as
     readSnapshot: async () => record,
     writeSnapshot: async (snapshot) => {
       order.push("save-start");
-      await new Promise((resolve) => { releaseSave = resolve; });
+      await new Promise((resolve) => {
+        releaseSave = resolve;
+      });
       record = snapshot;
       order.push("save-end");
     },
@@ -73,10 +87,15 @@ test("invalid snapshots and adapter errors reach callers with context", async ()
   );
 
   const broken = createBatchStorage({
-    readSnapshot: async () => { throw new Error("disk failure"); },
+    readSnapshot: async () => {
+      throw new Error("disk failure");
+    },
     writeSnapshot: async () => {},
     deleteDatabase: async () => {},
   });
-  await assert.rejects(broken.loadBatch(), /Could not load saved batch: disk failure/);
+  await assert.rejects(
+    broken.loadBatch(),
+    /Could not load saved batch: disk failure/,
+  );
   assert.equal(await broken.clearBatch(), undefined);
 });

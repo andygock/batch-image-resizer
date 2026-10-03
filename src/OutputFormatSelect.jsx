@@ -5,9 +5,21 @@ const outputFormats = [
   ["webp", "WebP"],
 ];
 
-export default function OutputFormatSelect({ onChange, value, disabled, id = "output-format" }) {
+export default function OutputFormatSelect({
+  onChange,
+  value,
+  disabled,
+  id = "output-format",
+}) {
   return (
-    <label htmlFor={id} title={value === "jpeg" ? "JPEG makes transparent areas white. PNG and WebP preserve transparency." : "Keep source format to resize without converting image types."}>
+    <label
+      htmlFor={id}
+      title={
+        value === "jpeg"
+          ? "JPEG makes transparent areas white. PNG and WebP preserve transparency."
+          : "Keep source format to resize without converting image types."
+      }
+    >
       Format
       <select
         id={id}

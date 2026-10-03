@@ -18,17 +18,22 @@ function encodePng(canvas, colours, signal) {
       if (data.fallback) {
         // Native lossless PNG remains client-side and avoids UPNG truncation.
         canvas.convertToBlob({ type: "image/png" }).then(
-          (blob) => finish(null, blob, {
-            appliedColours: 0,
-            encodingWarning: colours ? `The ${colours}-colour optimisation could not be completed. Saved a lossless PNG instead; palette reduction was skipped.` : "",
-          }),
-          (error) => finish(error)
+          (blob) =>
+            finish(null, blob, {
+              appliedColours: 0,
+              encodingWarning: colours
+                ? `The ${colours}-colour optimisation could not be completed. Saved a lossless PNG instead; palette reduction was skipped.`
+                : "",
+            }),
+          (error) => finish(error),
         );
         return;
       }
       finish(
         data.error ? new Error(data.error) : null,
-        data.buffer ? new Blob([data.buffer], { type: "image/png" }) : undefined
+        data.buffer
+          ? new Blob([data.buffer], { type: "image/png" })
+          : undefined,
       );
     };
     worker.onerror = () => finish(new Error("PNG worker failed."));
@@ -45,7 +50,7 @@ function encodePng(canvas, colours, signal) {
           height: canvas.height,
           colours,
         },
-        [data.buffer]
+        [data.buffer],
       );
     } catch (error) {
       finish(error);
@@ -66,7 +71,7 @@ export async function resizeImage({ id, file }, settings, signal) {
       bitmap.width,
       bitmap.height,
       settings.bounds,
-      settings.disableUpscale
+      settings.disableUpscale,
     );
     canvas = new OffscreenCanvas(size.width, size.height);
     const ctx = canvas.getContext("2d");
@@ -82,15 +87,17 @@ export async function resizeImage({ id, file }, settings, signal) {
     const encoded =
       settings.format === "png"
         ? await encodePng(canvas, settings.colours, signal)
-        : { blob: await canvas.convertToBlob({
-            type: mimeType,
-            quality: settings.quality,
-          }) };
+        : {
+            blob: await canvas.convertToBlob({
+              type: mimeType,
+              quality: settings.quality,
+            }),
+          };
     const { blob, encodingWarning, appliedColours } = encoded;
     signal.throwIfAborted();
     if (!blob?.size || blob.type !== mimeType)
       throw new Error(
-        `This browser could not encode ${settings.format.toUpperCase()}.`
+        `This browser could not encode ${settings.format.toUpperCase()}.`,
       );
     return {
       id,

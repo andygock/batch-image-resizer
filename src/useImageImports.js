@@ -16,24 +16,35 @@ export default function useImageImports(onImport, images) {
     const request = generation.current;
     pending.current++;
     setIsImporting(true);
-    queue.current = queue.current.then(async () => {
-      if (request !== generation.current) return;
-      const result = await partitionImageFiles(incoming, current.current.images, { allowDuplicates });
-      if (request !== generation.current) return;
-      setErrors(result.errors.map(({ message }) => message));
-      setDuplicates(result.duplicateFiles);
-      if (result.accepted.length) {
-        current.current.images = [...current.current.images, ...result.accepted];
-        current.current.onImport(result.accepted);
-      }
-    }).catch((error) => {
-      if (request === generation.current) setErrors([`Could not add images: ${error.message}`]);
-    }).finally(() => {
-      if (request === generation.current) {
-        pending.current--;
-        setIsImporting(pending.current > 0);
-      }
-    });
+    queue.current = queue.current
+      .then(async () => {
+        if (request !== generation.current) return;
+        const result = await partitionImageFiles(
+          incoming,
+          current.current.images,
+          { allowDuplicates },
+        );
+        if (request !== generation.current) return;
+        setErrors(result.errors.map(({ message }) => message));
+        setDuplicates(result.duplicateFiles);
+        if (result.accepted.length) {
+          current.current.images = [
+            ...current.current.images,
+            ...result.accepted,
+          ];
+          current.current.onImport(result.accepted);
+        }
+      })
+      .catch((error) => {
+        if (request === generation.current)
+          setErrors([`Could not add images: ${error.message}`]);
+      })
+      .finally(() => {
+        if (request === generation.current) {
+          pending.current--;
+          setIsImporting(pending.current > 0);
+        }
+      });
   }, []);
   const cancelImports = useCallback(() => {
     generation.current++;
@@ -42,5 +53,13 @@ export default function useImageImports(onImport, images) {
     setErrors([]);
     setDuplicates([]);
   }, []);
-  return { addFiles, cancelImports, isImporting, errors, duplicates, dismissDuplicates: () => setDuplicates([]), clearErrors: () => setErrors([]) };
+  return {
+    addFiles,
+    cancelImports,
+    isImporting,
+    errors,
+    duplicates,
+    dismissDuplicates: () => setDuplicates([]),
+    clearErrors: () => setErrors([]),
+  };
 }

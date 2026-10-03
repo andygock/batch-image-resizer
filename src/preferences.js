@@ -52,9 +52,10 @@ export function sanitisePreferences(value) {
   const boundingBox = isValidSize(input.boundingBox)
     ? { width: input.boundingBox.width, height: input.boundingBox.height }
     : { ...DEFAULT_PREFERENCES.boundingBox };
-  const quality = input.qualityByFormat && typeof input.qualityByFormat === "object"
-    ? input.qualityByFormat
-    : {};
+  const quality =
+    input.qualityByFormat && typeof input.qualityByFormat === "object"
+      ? input.qualityByFormat
+      : {};
 
   return {
     boundingBox,
@@ -94,7 +95,12 @@ export function sanitisePreferences(value) {
 }
 
 function validQuality(value) {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0.3 && value <= 1;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0.3 &&
+    value <= 1
+  );
 }
 
 export function loadPreferences() {
@@ -111,12 +117,18 @@ export function loadPreferences() {
 export function savePreferences(value) {
   const clean = sanitisePreferences(value);
   try {
-    globalThis.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(clean));
+    globalThis.localStorage.setItem(
+      PREFERENCES_STORAGE_KEY,
+      JSON.stringify(clean),
+    );
     return clean;
   } catch (error) {
-    throw new Error(`Could not save preferences: ${error?.message || "storage is unavailable"}`, {
-      cause: error,
-    });
+    throw new Error(
+      `Could not save preferences: ${error?.message || "storage is unavailable"}`,
+      {
+        cause: error,
+      },
+    );
   }
 }
 
@@ -124,8 +136,11 @@ export function clearPreferences() {
   try {
     globalThis.localStorage.removeItem(PREFERENCES_STORAGE_KEY);
   } catch (error) {
-    throw new Error(`Could not clear preferences: ${error?.message || "storage is unavailable"}`, {
-      cause: error,
-    });
+    throw new Error(
+      `Could not clear preferences: ${error?.message || "storage is unavailable"}`,
+      {
+        cause: error,
+      },
+    );
   }
 }

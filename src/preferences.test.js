@@ -35,7 +35,10 @@ test("preferences sanitisation validates sizes, options, and unique recents", ()
       { width: 300, height: 200 },
       { width: 300, height: 200 },
       { width: 0, height: 5 },
-      ...Array.from({ length: 7 }, (_, index) => ({ width: 400 + index, height: 300 })),
+      ...Array.from({ length: 7 }, (_, index) => ({
+        width: 400 + index,
+        height: 300,
+      })),
     ],
   });
 
@@ -56,34 +59,70 @@ test("preferences sanitisation validates sizes, options, and unique recents", ()
 });
 
 test("preferences read and write only the app's versioned storage key", async () => {
-  await withLocalStorage({
-    values: new Map([["other-app", "keep"]]),
-    getItem(key) { return this.values.get(key) ?? null; },
-    setItem(key, value) { this.values.set(key, value); },
-    removeItem(key) { this.values.delete(key); },
-  }, async () => {
-    const saved = savePreferences({ outputFormat: "webp", suffix: "_tiny" });
-    assert.equal(saved.outputFormat, "webp");
-    assert.equal(loadPreferences().suffix, "_tiny");
-    assert.ok(globalThis.localStorage.values.has(PREFERENCES_STORAGE_KEY));
-    clearPreferences();
-    assert.deepEqual([...globalThis.localStorage.values], [["other-app", "keep"]]);
-  });
+  await withLocalStorage(
+    {
+      values: new Map([["other-app", "keep"]]),
+      getItem(key) {
+        return this.values.get(key) ?? null;
+      },
+      setItem(key, value) {
+        this.values.set(key, value);
+      },
+      removeItem(key) {
+        this.values.delete(key);
+      },
+    },
+    async () => {
+      const saved = savePreferences({ outputFormat: "webp", suffix: "_tiny" });
+      assert.equal(saved.outputFormat, "webp");
+      assert.equal(loadPreferences().suffix, "_tiny");
+      assert.ok(globalThis.localStorage.values.has(PREFERENCES_STORAGE_KEY));
+      clearPreferences();
+      assert.deepEqual(
+        [...globalThis.localStorage.values],
+        [["other-app", "keep"]],
+      );
+    },
+  );
 });
 
 test("denied or malformed local storage loads defaults and write failures are exposed", async () => {
-  await withLocalStorage({
-    getItem() { throw new Error("denied"); },
-    setItem() { throw new Error("denied"); },
-    removeItem() { throw new Error("denied"); },
-  }, () => {
-    assert.deepEqual(loadPreferences(), sanitisePreferences(DEFAULT_PREFERENCES));
-    assert.throws(() => savePreferences(DEFAULT_PREFERENCES), /Could not save preferences: denied/);
-    assert.throws(() => clearPreferences(), /Could not clear preferences:/);
-  });
-  await withLocalStorage({
-    getItem() { return "{"; },
-    setItem() {},
-    removeItem() {},
-  }, () => assert.deepEqual(loadPreferences(), sanitisePreferences(DEFAULT_PREFERENCES)));
+  await withLocalStorage(
+    {
+      getItem() {
+        throw new Error("denied");
+      },
+      setItem() {
+        throw new Error("denied");
+      },
+      removeItem() {
+        throw new Error("denied");
+      },
+    },
+    () => {
+      assert.deepEqual(
+        loadPreferences(),
+        sanitisePreferences(DEFAULT_PREFERENCES),
+      );
+      assert.throws(
+        () => savePreferences(DEFAULT_PREFERENCES),
+        /Could not save preferences: denied/,
+      );
+      assert.throws(() => clearPreferences(), /Could not clear preferences:/);
+    },
+  );
+  await withLocalStorage(
+    {
+      getItem() {
+        return "{";
+      },
+      setItem() {},
+      removeItem() {},
+    },
+    () =>
+      assert.deepEqual(
+        loadPreferences(),
+        sanitisePreferences(DEFAULT_PREFERENCES),
+      ),
+  );
 });

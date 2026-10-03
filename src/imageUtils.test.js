@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { fitDimensions, nameOutputs, validateSize, describeSizeDraft } from "./imageUtils.js";
+import {
+  fitDimensions,
+  nameOutputs,
+  validateSize,
+  describeSizeDraft,
+} from "./imageUtils.js";
 import { createJobOwner } from "./jobs.js";
 
 test("thin images retain at least one pixel in both orientations", () => {
@@ -18,7 +23,7 @@ test("thin images retain at least one pixel in both orientations", () => {
 test("bounding boxes preserve aspect ratio and honour enlargement settings", () => {
   assert.deepEqual(
     fitDimensions(1200, 800, { width: 512, height: 512 }, true),
-    { width: 512, height: 341 }
+    { width: 512, height: 341 },
   );
   assert.deepEqual(fitDimensions(100, 50, { width: 512, height: 512 }, true), {
     width: 100,
@@ -43,8 +48,14 @@ test("invalid drafts explain a usable dimension without changing applied values"
   assert.equal(draft.invalid, true);
   assert.match(draft.message, /height of 2048 or less/);
   assert.deepEqual(applied, { width: 512, height: 512 });
-  assert.equal(describeSizeDraft({ width: "", height: "512" }, applied).invalid, true);
-  assert.equal(describeSizeDraft({ width: "512", height: "512" }, applied).dirty, false);
+  assert.equal(
+    describeSizeDraft({ width: "", height: "512" }, applied).invalid,
+    true,
+  );
+  assert.equal(
+    describeSizeDraft({ width: "512", height: "512" }, applied).dirty,
+    false,
+  );
 });
 
 test("colliding names preserve every file through a ZIP round trip", async () => {
@@ -58,20 +69,20 @@ test("colliding names preserve every file through a ZIP round trip", async () =>
   const outputs = nameOutputs(
     names.map((filename, id) => ({ filename, outputExtension: "jpg", id })),
     false,
-    ""
+    "",
   );
   const zip = new JSZip();
   outputs.forEach(({ downloadFilename, id }) =>
-    zip.file(downloadFilename, String(id))
+    zip.file(downloadFilename, String(id)),
   );
   const loaded = await JSZip.loadAsync(
-    await zip.generateAsync({ type: "uint8array" })
+    await zip.generateAsync({ type: "uint8array" }),
   );
   assert.equal(Object.keys(loaded.files).length, names.length);
   for (const { downloadFilename, id } of outputs)
     assert.equal(
       await loaded.file(downloadFilename).async("string"),
-      String(id)
+      String(id),
     );
 });
 
@@ -82,7 +93,7 @@ test("output names are flat, portable and nonempty", () => {
       outputExtension: "png",
     })),
     true,
-    "/../bad\\name:"
+    "/../bad\\name:",
   );
   for (const { downloadFilename } of outputs) {
     assert.doesNotMatch(downloadFilename, /[/\\:]/);
@@ -91,7 +102,7 @@ test("output names are flat, portable and nonempty", () => {
   assert.equal(
     nameOutputs([{ filename: "CON.png", outputExtension: "png" }], false, "")[0]
       .downloadFilename,
-    "_CON.png"
+    "_CON.png",
   );
 });
 
@@ -103,7 +114,10 @@ test("collision filenames remain stable after removal and later additions", () =
   const next = nameOutputs([b, { ...a, id: "c" }], true, "_small", assignments);
   assert.equal(next[0].downloadFilename, first[1].downloadFilename);
   assert.equal(next[1].downloadFilename, "photo_small (3).jpg");
-  assert.equal(nameOutputs([b], true, "_new", assignments)[0].downloadFilename, "photo_new.jpg");
+  assert.equal(
+    nameOutputs([b], true, "_new", assignments)[0].downloadFilename,
+    "photo_new.jpg",
+  );
 });
 
 test("a late job cannot publish after replacement or reset", async () => {

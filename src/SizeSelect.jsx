@@ -39,12 +39,18 @@ export default function SizeSelect({
     setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
   }, [selectedWidth, selectedHeight]);
   const selectedValue = `${selectedWidth}x${selectedHeight}`;
-  const isPreset = [...sizes, ...recentSizes.map(({ width, height }) => [width, height])].some(
+  const isPreset = [
+    ...sizes,
+    ...recentSizes.map(({ width, height }) => [width, height]),
+  ].some(
     ([optionWidth, optionHeight]) =>
-      `${optionWidth}x${optionHeight}` === selectedValue
+      `${optionWidth}x${optionHeight}` === selectedValue,
   );
   const value = isCustom || !isPreset ? "custom" : selectedValue;
-  const feedback = describeSizeDraft(draft, { width: selectedWidth, height: selectedHeight });
+  const feedback = describeSizeDraft(draft, {
+    width: selectedWidth,
+    height: selectedHeight,
+  });
   const invalid = value === "custom" && feedback.invalid;
   const dirty = value === "custom" && feedback.dirty;
   const message = invalid ? feedback.message : "";
@@ -63,13 +69,19 @@ export default function SizeSelect({
     }
     if (event.key === "Escape") {
       event.preventDefault();
-      setDraft({ width: String(selectedWidth), height: String(selectedHeight) });
+      setDraft({
+        width: String(selectedWidth),
+        height: String(selectedHeight),
+      });
     }
   };
 
   return (
     <div className={styles.control}>
-      <label htmlFor="size" title="Maximum bounding size in pixels. Keeps proportions without cropping.">
+      <label
+        htmlFor="size"
+        title="Maximum bounding size in pixels. Keeps proportions without cropping."
+      >
         Max size
         <select
           id="size"
@@ -95,15 +107,32 @@ export default function SizeSelect({
               {optionWidth}x{optionHeight}
             </option>
           ))}
-          {recentSizes.filter((size) => !sizes.some(([w, h]) => w === size.width && h === size.height)).map((size) => <option key={`${size.width}x${size.height}`} value={`${size.width}x${size.height}`}>Recent: {size.width}×{size.height}</option>)}
+          {recentSizes
+            .filter(
+              (size) =>
+                !sizes.some(([w, h]) => w === size.width && h === size.height),
+            )
+            .map((size) => (
+              <option
+                key={`${size.width}x${size.height}`}
+                value={`${size.width}x${size.height}`}
+              >
+                Recent: {size.width}×{size.height}
+              </option>
+            ))}
           <option value="custom">Custom</option>
         </select>
       </label>
 
       {value === "custom" && (
-        <div className={styles.custom} onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) commitCustomSize();
-        }} onKeyDown={handleKeyDown}>
+        <div
+          className={styles.custom}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget))
+              commitCustomSize();
+          }}
+          onKeyDown={handleKeyDown}
+        >
           <label htmlFor="custom-width" className="visuallyHidden">
             Custom width
           </label>
@@ -143,7 +172,8 @@ export default function SizeSelect({
       )}
       {invalid && (
         <span id="size-error" className="visuallyHidden">
-          {feedback.message} Applied size is {selectedWidth}×{selectedHeight}px. Escape restores it.
+          {feedback.message} Applied size is {selectedWidth}×{selectedHeight}px.
+          Escape restores it.
         </span>
       )}
     </div>

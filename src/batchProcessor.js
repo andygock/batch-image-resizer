@@ -3,8 +3,13 @@ import { resizeImage } from "./resizeImage.js";
 import { createResultCache } from "./resultCache.js";
 
 export function resolveSettings(source, settings) {
-  const format = settings.format === "source" ? source.sourceFormat : settings.format;
-  return { ...settings, format, quality: settings.qualityByFormat?.[format] ?? settings.quality };
+  const format =
+    settings.format === "source" ? source.sourceFormat : settings.format;
+  return {
+    ...settings,
+    format,
+    quality: settings.qualityByFormat?.[format] ?? settings.quality,
+  };
 }
 
 export function settingsKey(settings) {
@@ -26,7 +31,11 @@ export function createBatchProcessor(resize = resizeImage) {
   return {
     cancel: () => owner.cancel(),
     capture(ids) {
-      return ids.map((id) => ({ id, record: records[id], cached: cache.capture(id) }));
+      return ids.map((id) => ({
+        id,
+        record: records[id],
+        cached: cache.capture(id),
+      }));
     },
     restore(entries) {
       for (const { id, record, cached } of entries) {
@@ -48,34 +57,55 @@ export function createBatchProcessor(resize = resizeImage) {
       const cached = cache.get(source.id, key);
       signal.throwIfAborted();
       if (cached) return cached;
-      const result = { ...await resize(source, options, signal), settings: options };
+      const result = {
+        ...(await resize(source, options, signal)),
+        settings: options,
+      };
       signal.throwIfAborted();
       if (revision === generation) cache.set(source.id, key, result);
       return result;
     },
-    async run(images, settings, { paused = false, retryIds = [] } = {}, publish) {
+    async run(
+      images,
+      settings,
+      { paused = false, retryIds = [] } = {},
+      publish,
+    ) {
       const job = owner.start();
       const ids = new Set(images.map(({ id }) => id));
       cache.retain(ids);
       const retry = new Set(retryIds);
-      records = Object.fromEntries(images.map((source) => {
-        const { id } = source;
-        const key = settingsKey(resolveSettings(source, settings));
-        const previous = records[id];
-        if (previous?.key === key && previous.status === "ready") return [id, previous];
-        const cached = cache.get(id, key);
-        if (cached) return [id, { key, status: "ready", result: cached }];
-        if (previous?.key === key && previous.status === "error" && !retry.has(id))
-          return [id, previous];
-        return [id, { key, status: "pending", result: previous?.result }];
-      }));
+      records = Object.fromEntries(
+        images.map((source) => {
+          const { id } = source;
+          const key = settingsKey(resolveSettings(source, settings));
+          const previous = records[id];
+          if (previous?.key === key && previous.status === "ready")
+            return [id, previous];
+          const cached = cache.get(id, key);
+          if (cached) return [id, { key, status: "ready", result: cached }];
+          if (
+            previous?.key === key &&
+            previous.status === "error" &&
+            !retry.has(id)
+          )
+            return [id, previous];
+          return [id, { key, status: "pending", result: previous?.result }];
+        }),
+      );
       const started = performance.now();
-      const pending = images.filter(({ id }) => records[id].status === "pending");
+      const pending = images.filter(
+        ({ id }) => records[id].status === "pending",
+      );
       const snapshot = (isProcessing) => ({
         records: { ...records },
         isProcessing,
-        progress: Object.values(records).filter(({ status }) => status === "ready" || status === "error").length,
-        processingTime: Number(((performance.now() - started) / 1000).toFixed(2)),
+        progress: Object.values(records).filter(
+          ({ status }) => status === "ready" || status === "error",
+        ).length,
+        processingTime: Number(
+          ((performance.now() - started) / 1000).toFixed(2),
+        ),
       });
       publish(snapshot(!paused && pending.length > 0));
       if (paused) return;
@@ -86,14 +116,19 @@ export function createBatchProcessor(resize = resizeImage) {
         records[source.id] = { ...records[source.id], status: "processing" };
         publish(snapshot(true));
         try {
-          const result = { ...await resize(source, options, job.signal), settings: options };
+          const result = {
+            ...(await resize(source, options, job.signal)),
+            settings: options,
+          };
           if (!job.isCurrent()) return;
           cache.set(source.id, key, result);
           records[source.id] = { key, status: "ready", result };
         } catch (error) {
           if (!job.isCurrent()) return;
           records[source.id] = {
-            ...records[source.id], status: "error", error: error.message,
+            ...records[source.id],
+            status: "error",
+            error: error.message,
           };
         }
         publish(snapshot(true));

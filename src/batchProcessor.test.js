@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createBatchProcessor, resolveSettings } from "./batchProcessor.js";
 
-const settings = { bounds: { width: 512, height: 512 }, format: "jpeg", quality: 0.8, disableUpscale: true };
+const settings = {
+  bounds: { width: 512, height: 512 },
+  format: "jpeg",
+  quality: 0.8,
+  disableUpscale: true,
+};
 const sources = [{ id: "a" }, { id: "b" }];
 
 test("keep source format resolves each image independently", async () => {
@@ -11,19 +16,42 @@ test("keep source format resolves each image independently", async () => {
     seen.push(options.format);
     return { id: source.id };
   });
-  await processor.run([{ id: "a", sourceFormat: "png" }, { id: "b", sourceFormat: "webp" }], { ...settings, format: "source" }, {}, () => {});
+  await processor.run(
+    [
+      { id: "a", sourceFormat: "png" },
+      { id: "b", sourceFormat: "webp" },
+    ],
+    { ...settings, format: "source" },
+    {},
+    () => {},
+  );
   assert.deepEqual(seen, ["png", "webp"]);
-  assert.equal(resolveSettings({ sourceFormat: "png" }, settings).format, "jpeg");
-  const options = { ...settings, format: "source", qualityByFormat: { jpeg: 0.9, webp: 0.7 } };
+  assert.equal(
+    resolveSettings({ sourceFormat: "png" }, settings).format,
+    "jpeg",
+  );
+  const options = {
+    ...settings,
+    format: "source",
+    qualityByFormat: { jpeg: 0.9, webp: 0.7 },
+  };
   assert.equal(resolveSettings({ sourceFormat: "jpeg" }, options).quality, 0.9);
   assert.equal(resolveSettings({ sourceFormat: "webp" }, options).quality, 0.7);
 });
 
 test("ready images remain accessible while another image processes", async () => {
   let complete;
-  const processor = createBatchProcessor(async ({ id }) => id === "a" ? { id } : new Promise((resolve) => { complete = resolve; }));
+  const processor = createBatchProcessor(async ({ id }) =>
+    id === "a"
+      ? { id }
+      : new Promise((resolve) => {
+          complete = resolve;
+        }),
+  );
   let state;
-  const publish = (next) => { state = next; };
+  const publish = (next) => {
+    state = next;
+  };
   await processor.run(sources.slice(0, 1), settings, {}, publish);
   const work = processor.run(sources, settings, {}, publish);
   assert.equal(state.records.a.status, "ready");
@@ -36,11 +64,24 @@ test("ready images remain accessible while another image processes", async () =>
 
 test("superseded processing cannot replace a newer result", async () => {
   let complete;
-  const processor = createBatchProcessor(async (_, options) => options.quality === 0.8 ? new Promise((resolve) => { complete = resolve; }) : { quality: options.quality });
+  const processor = createBatchProcessor(async (_, options) =>
+    options.quality === 0.8
+      ? new Promise((resolve) => {
+          complete = resolve;
+        })
+      : { quality: options.quality },
+  );
   let state;
-  const publish = (next) => { state = next; };
+  const publish = (next) => {
+    state = next;
+  };
   const old = processor.run(sources.slice(0, 1), settings, {}, publish);
-  await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, {}, publish);
+  await processor.run(
+    sources.slice(0, 1),
+    { ...settings, quality: 0.7 },
+    {},
+    publish,
+  );
   complete({ quality: 0.8 });
   await old;
   assert.equal(state.records.a.result.quality, 0.7);
@@ -55,7 +96,9 @@ test("failed sources remain actionable and retry does not repeat ready work", as
     return { id };
   });
   let state;
-  const publish = (next) => { state = next; };
+  const publish = (next) => {
+    state = next;
+  };
   await processor.run(sources, settings, {}, publish);
   assert.equal(state.records.b.status, "error");
   await processor.run([...sources, { id: "c" }], settings, {}, publish);
@@ -68,21 +111,39 @@ test("failed sources remain actionable and retry does not repeat ready work", as
 
 test("paused batches accept edits without starting work until resumed", async () => {
   const calls = [];
-  const processor = createBatchProcessor(async ({ id }) => { calls.push(id); return { id }; });
+  const processor = createBatchProcessor(async ({ id }) => {
+    calls.push(id);
+    return { id };
+  });
   let state;
-  const publish = (next) => { state = next; };
+  const publish = (next) => {
+    state = next;
+  };
   await processor.run(sources, settings, { paused: true }, publish);
-  await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, { paused: true }, publish);
+  await processor.run(
+    sources.slice(0, 1),
+    { ...settings, quality: 0.7 },
+    { paused: true },
+    publish,
+  );
   assert.deepEqual(calls, []);
   assert.equal(state.isProcessing, false);
   assert.equal(state.records.a.status, "pending");
-  await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, {}, publish);
+  await processor.run(
+    sources.slice(0, 1),
+    { ...settings, quality: 0.7 },
+    {},
+    publish,
+  );
   assert.deepEqual(calls, ["a"]);
 });
 
 test("undo restores cached results without encoding them again", async () => {
   let calls = 0;
-  const processor = createBatchProcessor(async ({ id }) => { calls++; return { id }; });
+  const processor = createBatchProcessor(async ({ id }) => {
+    calls++;
+    return { id };
+  });
   await processor.run(sources, settings, {}, () => {});
   const saved = processor.capture(["a", "b"]);
   processor.clear();

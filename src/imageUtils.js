@@ -10,16 +10,16 @@ export const outputFormats = {
 export function validateSize({ width, height }) {
   if (
     ![width, height].every(
-      (n) => Number.isInteger(n) && n >= 1 && n <= MAX_DIMENSION
+      (n) => Number.isInteger(n) && n >= 1 && n <= MAX_DIMENSION,
     )
   ) {
     throw new Error(
-      `Dimensions must be whole numbers between 1 and ${MAX_DIMENSION}.`
+      `Dimensions must be whole numbers between 1 and ${MAX_DIMENSION}.`,
     );
   }
   if (width * height > MAX_PIXELS) {
     throw new Error(
-      `Maximum output area is ${MAX_PIXELS.toLocaleString("en-AU")} pixels.`
+      `Maximum output area is ${MAX_PIXELS.toLocaleString("en-AU")} pixels.`,
     );
   }
 }
@@ -31,9 +31,13 @@ export function describeSizeDraft(draft, applied) {
     validateSize(size);
     return { dirty, invalid: false, message: "" };
   } catch (error) {
-    const suggestion = Number.isInteger(size.width) && size.width >= 1 && size.width <= MAX_DIMENSION && size.width * size.height > MAX_PIXELS
-      ? ` At width ${size.width}, use a height of ${Math.floor(MAX_PIXELS / size.width)} or less.`
-      : "";
+    const suggestion =
+      Number.isInteger(size.width) &&
+      size.width >= 1 &&
+      size.width <= MAX_DIMENSION &&
+      size.width * size.height > MAX_PIXELS
+        ? ` At width ${size.width}, use a height of ${Math.floor(MAX_PIXELS / size.width)} or less.`
+        : "";
     return { dirty, invalid: true, message: `${error.message}${suggestion}` };
   }
 }
@@ -46,7 +50,7 @@ export function fitDimensions(width, height, bounds, disableUpscale) {
   const scale = Math.min(
     bounds.width / width,
     bounds.height / height,
-    disableUpscale ? 1 : Infinity
+    disableUpscale ? 1 : Infinity,
   );
   return {
     width: Math.max(1, Math.floor(width * scale)),
@@ -54,13 +58,25 @@ export function fitDimensions(width, height, bounds, disableUpscale) {
   };
 }
 
-export function nameOutputs(images, enableSuffix, suffix, assignments = new Map()) {
-  const used = new Set([...assignments.values()].map(({ name }) => name.toLowerCase()));
+export function nameOutputs(
+  images,
+  enableSuffix,
+  suffix,
+  assignments = new Map(),
+) {
+  const used = new Set(
+    [...assignments.values()].map(({ name }) => name.toLowerCase()),
+  );
   return images.map((image) => {
     const identity = image.id ?? Symbol();
-    const signature = JSON.stringify([image.filename, image.outputExtension, enableSuffix ? suffix : ""]);
+    const signature = JSON.stringify([
+      image.filename,
+      image.outputExtension,
+      enableSuffix ? suffix : "",
+    ]);
     const previous = assignments.get(identity);
-    if (previous?.signature === signature) return { ...image, downloadFilename: previous.name };
+    if (previous?.signature === signature)
+      return { ...image, downloadFilename: previous.name };
     if (previous) used.delete(previous.name.toLowerCase());
     const dot = image.filename.lastIndexOf(".");
     const stem = dot > 0 ? image.filename.slice(0, dot) : image.filename;

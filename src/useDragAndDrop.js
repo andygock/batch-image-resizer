@@ -10,7 +10,8 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
     }
 
     const el = dropRef.current;
-    const hasFiles = (event) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    const hasFiles = (event) =>
+      Array.from(event.dataTransfer?.types ?? []).includes("Files");
 
     const handleDragEnter = (e) => {
       if (!hasFiles(e)) return;
@@ -56,10 +57,12 @@ export const useDragAndDrop = (dropRef, handleImageUpload) => {
       handleImageUpload(newImages);
     };
     const handlePaste = (event) => {
-      if (event.target.closest?.("input, textarea, [contenteditable='true']")) return;
+      if (event.target.closest?.("input, textarea, [contenteditable='true']"))
+        return;
       const files = Array.from(event.clipboardData?.items ?? [])
         .filter((item) => item.kind === "file")
-        .map((item) => item.getAsFile()).filter(Boolean);
+        .map((item) => item.getAsFile())
+        .filter(Boolean);
       if (!files.length) return;
       event.preventDefault();
       handleImageUpload(files);

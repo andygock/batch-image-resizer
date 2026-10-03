@@ -3,7 +3,9 @@
   width: 100%;
   min-height: 100vh;
   padding: var(--space-4);
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .app:global(.is-dragging) {
@@ -86,8 +88,12 @@
   gap: 6px;
   justify-content: flex-end;
 }
-.pauseButton { width: 86px; }
-.clearButton { margin-inline: 2px; }
+.pauseButton {
+  width: 86px;
+}
+.clearButton {
+  margin-inline: 2px;
+}
 .suffix {
   width: 10ch;
 }
@@ -128,11 +134,22 @@
   overflow-wrap: break-word;
   text-align: center;
 }
-.workspace { min-width: 0; }
-.results { min-width: 0; }
-.inspecting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 45%); gap: 12px; }
+.workspace {
+  min-width: 0;
+}
+.results {
+  min-width: 0;
+}
+.inspecting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 45%);
+  gap: 12px;
+}
 @media (max-width: 900px) {
-  .inspecting { display: block; padding-bottom: 66dvh; }
+  .inspecting {
+    display: block;
+    padding-bottom: 66dvh;
+  }
 }
 .storage {
   padding: 12px;
@@ -141,24 +158,52 @@
   text-align: left;
   margin-bottom: 16px;
 }
-.storage summary { cursor: pointer; }
-.storage[open] { display: grid; gap: 12px; }
-.storage label { white-space: normal; }
-.storage button { justify-self: start; white-space: normal; }
-.dataActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.storage summary {
+  cursor: pointer;
+}
+.storage[open] {
+  display: grid;
+  gap: 12px;
+}
+.storage label {
+  white-space: normal;
+}
+.storage button {
+  justify-self: start;
+  white-space: normal;
+}
+.dataActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
 @media (max-width: 768px) {
   .app {
     padding: var(--space-3);
   }
-  .header { gap: 4px; padding: 4px; }
-  .actions { gap: 4px; }
-  .actions button, .actions > label { padding-inline: 6px; }
+  .header {
+    gap: 4px;
+    padding: 4px;
+  }
+  .actions {
+    gap: 4px;
+  }
+  .actions button,
+  .actions > label {
+    padding-inline: 6px;
+  }
 }
 @media (max-width: 1400px) {
-  .title { display: none; }
+  .title {
+    display: none;
+  }
 }
 @media (max-width: 640px) {
-  .compactText { display: none; }
-  .pauseButton { width: var(--control-height); }
+  .compactText {
+    display: none;
+  }
+  .pauseButton {
+    width: var(--control-height);
+  }
 }

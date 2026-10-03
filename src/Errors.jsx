@@ -12,9 +12,16 @@ export default function Errors({ errors, onDismiss }) {
           </li>
         ))}
       </ul>
-      {errors.length > 3 && <details><summary>{errors.length - 3} more warnings</summary><ul>
-        {errors.slice(3).map((error, index) => <li key={index}>{error}</li>)}
-      </ul></details>}
+      {errors.length > 3 && (
+        <details>
+          <summary>{errors.length - 3} more warnings</summary>
+          <ul>
+            {errors.slice(3).map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </details>
+      )}
       {onDismiss && <button onClick={onDismiss}>Dismiss warnings</button>}
     </div>
   );
