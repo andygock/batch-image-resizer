@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clearBatch, loadBatch, saveBatch } from "./batchStorage.js";
 
-export default function useBatchRecovery(images, preferences, onRestore, setPreference, paused = false) {
+export default function useBatchRecovery(images, preferences, onRestore, setPreference, paused = false, selectedIds = []) {
   const latest = useRef({ images, preferences, onRestore });
   latest.current = { images, preferences, onRestore };
   const activity = useRef(0);
@@ -40,7 +40,7 @@ export default function useBatchRecovery(images, preferences, onRestore, setPref
     timer.current = setTimeout(async () => {
       if (!saving.current || revision !== activity.current) return;
       try {
-        if (images.length) await saveBatch({ sources: images, preferences, paused });
+        if (images.length) await saveBatch({ sources: images, preferences, paused, selectedIds });
         else await clearBatch();
         if (saving.current && revision === activity.current) {
           setError("");
@@ -51,7 +51,7 @@ export default function useBatchRecovery(images, preferences, onRestore, setPref
       }
     }, 250);
     return () => clearTimeout(timer.current);
-  }, [images, preferences, hydrated, paused]);
+  }, [images, preferences, hydrated, paused, selectedIds]);
 
   const forgetBatch = useCallback(async () => {
     saving.current = false;

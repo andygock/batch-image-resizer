@@ -23,6 +23,7 @@ export default function OutputImages({
   onFileInputChange, inputDisabled, onRemoveImage, onRetryImage, onRetryFailed,
   downloadsBlocked,
   outputNames,
+  selected, onSelectImage, onSelectAll, onClearSelection, onRemoveSelected, onDownloadSelected, isZipping,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -39,6 +40,7 @@ export default function OutputImages({
   const savedPercent = totalBefore > 0 ? Math.round((1 - totalAfter / totalBefore) * 100) : 0;
   const failed = images.filter(({ id }) => records[id]?.status === "error").length;
   const pending = total - resizedImages.length - failed;
+  const selectedReady = resizedImages.filter(({ id }) => selected.has(id)).length;
 
   return <>
     <div className={styles.summary}>
@@ -56,14 +58,30 @@ export default function OutputImages({
       </span>}
       {!loading && processingTime >= 0.01 && <span className="numeric">{processingTime}s</span>}
     </div>
-    <div className={styles.grid}>
+    <div className={styles.selectionBar}>
+      <button onClick={onSelectAll} disabled={selected.size === total}>Select all</button>
+      {selected.size > 0 && <>
+        <span>{selected.size} selected · {selectedReady} ready</span>
+        <button onClick={onDownloadSelected} disabled={!selectedReady || downloadsBlocked || isZipping}>Download {selectedReady} selected as ZIP</button>
+        <button onClick={onRemoveSelected}>Remove selected</button>
+        <button onClick={onClearSelection}>Clear selection</button>
+      </>}
+      <span>Shift-click to select a range.</span>
+    </div>
+    <div className={styles.grid} role="group" aria-label="Image batch" tabIndex={0} onKeyDown={(event) => {
+      if (event.target.closest?.("input:not([type='checkbox']), textarea, [contenteditable='true']")) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); onSelectAll(); }
+      if (event.key === "Delete" && selected.size) { event.preventDefault(); onRemoveSelected(); }
+      if (event.key === "Escape") { event.preventDefault(); onClearSelection(); }
+    }}>
       {images.map(({ id, file }) => {
         const record = records[id];
         const result = record?.result;
         const output = outputs.get(id);
         const status = record?.status ?? "pending";
         const maxWidth = `calc(${Math.max(result?.widthAfter ?? 220, 220)}px + 2 * var(--image-card-padding) + 2px)`;
-        return <div key={id} className={styles.imageCard} style={{ maxWidth }}>
+        return <div key={id} id={`image-${id}`} className={styles.imageCard} style={{ maxWidth }}>
+          <label><input type="checkbox" checked={selected.has(id)} onClick={(event) => onSelectImage(id, event.shiftKey)} onChange={() => {}} />Select <span className="visuallyHidden">{file.name}</span></label>
           <OutputImage blob={result?.blob ?? file} filename={file.name} width={result?.widthAfter} height={result?.heightAfter}>
             {(url) => <div className={styles.imageInfo}>
               <div className={styles.filename} title={outputNames.get(id)}>{outputNames.get(id)}</div>

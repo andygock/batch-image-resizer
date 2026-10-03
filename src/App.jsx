@@ -22,6 +22,7 @@ import useImageImports from "./useImageImports.js";
 import usePreferences from "./usePreferences.js";
 import useBatchRecovery from "./useBatchRecovery.js";
 import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
+import { updateSelection } from "./selection.js";
 
 function App() {
   const [images, setImages] = useState([]);
@@ -34,6 +35,9 @@ function App() {
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const [undoHistory, setUndoHistory] = useState([]);
   const nameAssignments = useRef(new Map());
+  const [selected, setSelected] = useState(new Set());
+  const selectionAnchor = useRef(null);
+  const selectedIds = useMemo(() => [...selected], [selected]);
   const dropRef = useRef(null);
   const zipExporter = useRef(null);
   if (!zipExporter.current) zipExporter.current = createZipExporter(saveAs);
@@ -55,8 +59,9 @@ function App() {
   const recovery = useBatchRecovery(images, preferences, (saved) => {
     restorePreferences({ ...saved.preferences, rememberPreferences: preferences.rememberPreferences, rememberBatch: preferences.rememberBatch });
     setCancelled(saved.paused);
+    setSelected(new Set(saved.selectedIds));
     setImages(saved.sources);
-  }, setPreference, cancelled);
+  }, setPreference, cancelled, selectedIds);
   const { markChanged } = recovery;
 
   const invalidate = useCallback(() => {
@@ -98,18 +103,22 @@ function App() {
     nameAssignments.current.clear();
     setCancelled(false);
     setImages([]);
+    setSelected(new Set());
   };
 
-  const handleRemoveImage = (id) => {
-    rememberRemoval([id]);
+  const handleRemoveImages = (ids) => {
+    rememberRemoval(ids);
     invalidate();
-    setImages((current) => current.filter((image) => image.id !== id));
+    const removed = new Set(ids);
+    setImages((current) => current.filter((image) => !removed.has(image.id)));
+    setSelected((current) => new Set([...current].filter((id) => !removed.has(id))));
   };
   const rememberRemoval = (ids, cleared = false) => {
     const selected = new Set(ids);
     const removed = images.flatMap((source, index) => selected.has(source.id) ? [{ source, index }] : []);
     if (!removed.length) return;
-    setUndoHistory((current) => appendUndo(current, { removed, outputs: processor.capture(ids), names: ids.map((id) => [id, nameAssignments.current.get(id)]), paused: cleared ? cancelled : null }));
+    const entry = { removed, outputs: processor.capture(ids), names: ids.map((id) => [id, nameAssignments.current.get(id)]), selection: ids.filter((id) => selected.has(id)), paused: cleared ? cancelled : null };
+    setUndoHistory((current) => appendUndo(current, entry));
   };
   const undoRemoval = useCallback(() => {
     const entry = undoHistory.at(-1);
@@ -120,6 +129,7 @@ function App() {
       if (name && ![...nameAssignments.current.values()].some((existing) => existing.name.toLowerCase() === name.name.toLowerCase())) nameAssignments.current.set(id, name);
     }
     setImages((current) => restoreRemovedSources(current, entry.removed));
+    setSelected((current) => new Set([...current, ...entry.selection]));
     if (entry.paused !== null) setCancelled(entry.paused);
     setUndoHistory((current) => current.slice(0, -1));
   }, [undoHistory, invalidate, processor]);
@@ -141,9 +151,10 @@ function App() {
   const outputs = useMemo(() => resizedImages.map((image) => ({ ...image, downloadFilename: outputNames.get(image.id) })), [resizedImages, outputNames]);
 
   // Exports own their output snapshot so editing the next batch cannot cancel them.
-  const downloadZip = async () => {
+  const downloadZip = async (selection) => {
     if (isZipping || !outputs.length || sizeDraft.invalid) return;
-    await zipExporter.current.start(outputs, "resized_images.zip", setZipState);
+    const targets = selection ? outputs.filter(({ id }) => selection.has(id)) : outputs;
+    await zipExporter.current.start(targets, "resized_images.zip", setZipState);
   };
 
   const cancelResize = () => {
@@ -214,7 +225,7 @@ function App() {
           </div>
           <div className={`${styles.controlGroup} ${styles.actions}`}>
             <button
-              onClick={downloadZip}
+              onClick={() => downloadZip()}
               disabled={!outputs.length || isZipping || isEmpty || sizeDraft.invalid}
               className={outputs.length ? "buttonPrimary" : undefined}
             >
@@ -307,7 +318,18 @@ function App() {
         processingTime={processingTime}
         onFileInputChange={handleFileInputChange}
         inputDisabled={false}
-        onRemoveImage={handleRemoveImage}
+        onRemoveImage={(id) => handleRemoveImages([id])}
+        selected={selected}
+        onSelectImage={(id, extend) => {
+          markChanged();
+          setSelected((current) => updateSelection(current, images.map((image) => image.id), selectionAnchor.current, id, extend));
+          selectionAnchor.current = id;
+        }}
+        onSelectAll={() => { markChanged(); setSelected(new Set(images.map(({ id }) => id))); }}
+        onClearSelection={() => { markChanged(); setSelected(new Set()); }}
+        onRemoveSelected={() => handleRemoveImages([...selected])}
+        onDownloadSelected={() => downloadZip(selected)}
+        isZipping={isZipping}
         onRetryImage={(id) => retryImages([id])}
         onRetryFailed={() => retryImages(failedIds)}
       />

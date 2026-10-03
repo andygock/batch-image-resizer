@@ -142,7 +142,9 @@ function validateAndPrepareSnapshot(snapshot) {
   });
   if (new Set(sources.map(({ id }) => id)).size !== sources.length)
     throw new TypeError("Saved sources must have unique ids.");
-  return { sources, preferences: sanitisePreferences(snapshot.preferences), paused: snapshot.paused === true };
+  const sourceIds = new Set(sources.map(({ id }) => id));
+  const selectedIds = Array.isArray(snapshot.selectedIds) ? snapshot.selectedIds.filter((id) => sourceIds.has(id)) : [];
+  return { sources, preferences: sanitisePreferences(snapshot.preferences), paused: snapshot.paused === true, selectedIds };
 }
 
 function restoreFile(source) {
@@ -174,11 +176,12 @@ export function createBatchStorage(adapter) {
         try {
           const stored = await adapter.readSnapshot();
           if (!stored || !Array.isArray(stored.sources)) return null;
-          validateAndPrepareSnapshot(stored);
+          const clean = validateAndPrepareSnapshot(stored);
           return {
             sources: stored.sources.map(restoreFile),
             preferences: sanitisePreferences(stored.preferences),
             paused: stored.paused === true,
+            selectedIds: clean.selectedIds,
           };
         } catch (error) {
           throw storageError("load", error);
