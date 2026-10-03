@@ -40,7 +40,7 @@ export default function useBatchRecovery(images, preferences, onRestore, setPref
     timer.current = setTimeout(async () => {
       if (!saving.current || revision !== activity.current) return;
       try {
-        if (images.length) await saveBatch({ sources: images, preferences, paused, selectedIds });
+        if (images.length) await saveBatch({ sources: images, preferences, paused, selectedIds }, () => saving.current && revision === activity.current);
         else await clearBatch();
         if (saving.current && revision === activity.current) {
           setError("");
@@ -53,11 +53,14 @@ export default function useBatchRecovery(images, preferences, onRestore, setPref
     return () => clearTimeout(timer.current);
   }, [images, preferences, hydrated, paused, selectedIds]);
 
-  const forgetBatch = useCallback(async () => {
+  const pauseSaving = useCallback(() => {
     saving.current = false;
     activity.current++;
     clearTimeout(timer.current);
-    setPreference("rememberBatch", false);
+  }, []);
+  const forgetBatch = useCallback(async (updatePreference = true) => {
+    pauseSaving();
+    if (updatePreference) setPreference("rememberBatch", false);
     try {
       await clearBatch();
       setError("");
@@ -67,7 +70,7 @@ export default function useBatchRecovery(images, preferences, onRestore, setPref
       setError(failure.message);
       return false;
     }
-  }, [setPreference]);
+  }, [setPreference, pauseSaving]);
 
-  return { markChanged, forgetBatch, hydrated, message, error };
+  return { markChanged, forgetBatch, pauseSaving, hydrated, message, error };
 }

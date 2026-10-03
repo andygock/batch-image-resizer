@@ -145,6 +145,7 @@
 .storage[open] { display: grid; gap: 12px; }
 .storage label { white-space: normal; }
 .storage button { justify-self: start; white-space: normal; }
+.dataActions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 @media (max-width: 768px) {
   .app {

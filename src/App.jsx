@@ -1,4 +1,4 @@
-import { saveAs } from "file-saver";
+import saveAs from "file-saver";
 import { Download, Pause, Play, Trash2, Upload } from "lucide-preact";
 import {
   useCallback,
@@ -26,12 +26,15 @@ import { updateSelection } from "./selection.js";
 import { archiveFilename, downloadRequestKey } from "./downloads.js";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import ImageInspector from "./ImageInspector.jsx";
+import StorageSettings from "./StorageSettings.jsx";
+import { clearAppWebStorage, STORAGE_CHANNEL } from "./storagePrivacy.js";
+import { DEFAULT_PREFERENCES, sanitisePreferences } from "./preferences.js";
 
 function App() {
   const [images, setImages] = useState([]);
   const [zipState, setZipState] = useState({ isZipping: false, error: "", progress: 0 });
   const { isZipping, error: zipError } = zipState;
-  const { preferences, setPreference, restorePreferences, forgetPreferences, storageError } = usePreferences();
+  const { preferences, setPreference, restorePreferences, applyPreferences, forgetPreferences, pauseStorage, clearLocalData, storageError } = usePreferences();
   const { boundingBox, outputFormat, qualityByFormat, pngColors, enableSuffix, suffix, disableUpscale, recentSizes } = preferences;
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
@@ -41,6 +44,10 @@ function App() {
   const [selected, setSelected] = useState(new Set());
   const [downloadRequests, setDownloadRequests] = useState(new Set());
   const [inspectedId, setInspectedId] = useState(null);
+  const [dataMessage, setDataMessage] = useState("");
+  const [clearingData, setClearingData] = useState(false);
+  const [formResetKey, setFormResetKey] = useState(0);
+  const storageChannel = useRef(null);
   const inspectedSource = images.find(({ id }) => id === inspectedId);
   const selectionAnchor = useRef(null);
   const selectedIds = useMemo(() => [...selected], [selected]);
@@ -69,6 +76,21 @@ function App() {
     setImages(saved.sources);
   }, setPreference, cancelled, selectedIds);
   const { markChanged } = recovery;
+  const { pauseSaving } = recovery;
+  useEffect(() => {
+    if (typeof BroadcastChannel !== "function") return;
+    let channel;
+    try { channel = new BroadcastChannel(STORAGE_CHANNEL); }
+    catch { return; }
+    storageChannel.current = channel;
+    channel.onmessage = ({ data }) => {
+      if (!["preferences", "local", "batch", "all"].includes(data)) return;
+      pauseStorage(data);
+      if (data === "batch" || data === "all") pauseSaving();
+      setDataMessage("Saved data was cleared in another tab. Saving the affected data has been paused here too.");
+    };
+    return () => { channel.close(); storageChannel.current = null; };
+  }, [pauseStorage, pauseSaving]);
 
   const invalidate = useCallback(() => {
     markChanged();
@@ -177,6 +199,47 @@ function App() {
     setCancelled(true);
   };
   const isEmpty = images.length === 0;
+  const clearCachedResults = () => {
+    markChanged();
+    processor.clear();
+    zipExporter.current.cancel();
+    setCancelled(true);
+    setRetry({ ids: [] });
+    setUndoHistory([]);
+    setInspectedId(null);
+    setDataMessage("Cached outputs and undo history cleared. Source images remain; Resume rebuilds the outputs.");
+  };
+  const clearSessionData = () => {
+    try { clearAppWebStorage("session"); setDataMessage("App Session Storage cleared."); return true; }
+    catch (error) { setDataMessage(`Could not clear Session Storage: ${error.message}`); return false; }
+  };
+  const clearAllData = async () => {
+    setClearingData(true);
+    storageChannel.current?.postMessage("all");
+    pauseSaving();
+    pauseStorage("all");
+    cancelImports();
+    processor.clear();
+    zipExporter.current.cancel(false);
+    nameAssignments.current.clear();
+    setImages([]);
+    setSelected(new Set());
+    setDownloadRequests(new Set());
+    setUndoHistory([]);
+    setInspectedId(null);
+    setCancelled(false);
+    setRetry({ ids: [] });
+    setZipState({ isZipping: false, progress: 0, error: "" });
+    setFormResetKey((value) => value + 1);
+    applyPreferences({ ...sanitisePreferences(DEFAULT_PREFERENCES), rememberPreferences: false, rememberBatch: false });
+    const batchCleared = await recovery.forgetBatch(false);
+    const localCleared = clearLocalData();
+    const sessionCleared = clearSessionData();
+    setDataMessage(batchCleared && localCleared && sessionCleared
+      ? "All app data, current images, cached outputs and undo history cleared. Saving is off for this visit."
+      : "Some storage could not be cleared. Saving is off; retry the affected clear control below.");
+    setClearingData(false);
+  };
 
   return (
     <div ref={dropRef} className={styles.app}>
@@ -185,6 +248,7 @@ function App() {
         <div className={styles.config}>
           <div className={styles.controlGroup}>
             <SizeSelect
+              key={formResetKey}
               onChange={changeSetting("boundingBox")}
               recentSizes={recentSizes}
               onDraftStateChange={setSizeDraft}
@@ -208,6 +272,7 @@ function App() {
               value={outputFormat}
             />
             <CompressionSelect
+              key={formResetKey}
               format={outputFormat}
               onQualityChange={(format, quality) => changeSetting("qualityByFormat")({ ...qualityByFormat, [format]: quality })}
               qualityByFormat={qualityByFormat}
@@ -293,6 +358,7 @@ function App() {
       </div>}
       {!isZipping && zipState.message && <p role="status">{zipState.message}</p>}
       {sizeDraft.dirty && <p role="status">{sizeDraft.message || "Press Enter in a dimension field to apply the new size."} Current output: {boundingBox.width}×{boundingBox.height}px. Escape restores the applied dimensions.</p>}
+      {(storageError || recovery.error) && <p role="alert">Saved data needs attention. Current images remain usable. <a href="#saved-data" onClick={() => { const panel = document.getElementById("saved-data"); if (panel) panel.open = true; }}>Review storage options</a></p>}
       <Errors
         onDismiss={() => { clearErrors(); setZipState((current) => ({ ...current, error: "" })); }}
         errors={[
@@ -364,22 +430,17 @@ function App() {
         }}
         onApply={(options) => {
           invalidate();
-          restorePreferences((current) => ({ ...current, outputFormat: options.format, qualityByFormat: options.qualityByFormat, pngColors: options.colours }));
+          applyPreferences((current) => ({ ...current, outputFormat: options.format, qualityByFormat: options.qualityByFormat, pngColors: options.colours }));
         }} />}
       </div>
       <div className={styles.footer}>
-        <details className={styles.storage}>
-          <summary>Saved data and preferences</summary>
-          <label><input type="checkbox" checked={preferences.rememberPreferences} onChange={(event) => event.target.checked ? setPreference("rememberPreferences", true) : forgetPreferences()} />Remember preferences on this device</label>
-          <button onClick={forgetPreferences}>Clear saved preferences (Local Storage)</button>
-          <p>Clearing keeps your current settings in this tab and stops saving them until you enable remembering again.</p>
-          <label><input type="checkbox" checked={preferences.rememberBatch} onChange={(event) => { markChanged(); if (event.target.checked) setPreference("rememberBatch", true); else void recovery.forgetBatch(); }} />Recover this batch after closing or reloading</label>
-          <button onClick={recovery.forgetBatch}>Clear saved batch (IndexedDB)</button>
-          <p>Recovery stores your source images and batch settings only on this device. Clearing deletes the app’s database and stops batch saving; current images remain available.</p>
-          <p role="status">{recovery.hydrated ? recovery.message : "Checking for a saved batch…"}</p>
-          {recovery.error && <p role="alert">{recovery.error}</p>}
-          {storageError && <p role="alert">{storageError}</p>}
-        </details>
+        <StorageSettings preferences={preferences} busy={clearingData} message={dataMessage || recovery.message} error={[storageError, recovery.error].filter(Boolean).join(" ")}
+          onRememberPreferences={(enabled) => { if (enabled) setPreference("rememberPreferences", true); else { storageChannel.current?.postMessage("preferences"); forgetPreferences(); } }}
+          onRememberBatch={(enabled) => { markChanged(); if (enabled) setPreference("rememberBatch", true); else { storageChannel.current?.postMessage("batch"); void recovery.forgetBatch(); } }}
+          onClearPreferences={() => { storageChannel.current?.postMessage("preferences"); if (forgetPreferences()) setDataMessage("Saved preferences cleared. Current settings remain in this tab; preference saving is off."); }}
+          onClearBatch={async () => { storageChannel.current?.postMessage("batch"); setClearingData(true); const success = await recovery.forgetBatch(); setDataMessage(success ? "IndexedDB batch deleted. Current images remain in this tab; batch saving is off." : "Could not delete the batch database. Close other app tabs and try again."); setClearingData(false); }}
+          onClearLocal={() => { storageChannel.current?.postMessage("local"); if (clearLocalData()) setDataMessage("All app Local Storage entries cleared. Preference saving is off for this visit."); }}
+          onClearSession={clearSessionData} onClearCache={clearCachedResults} onClearAll={clearAllData} />
         <p>
           Your images are resized directly in your browser using the HTML5
           Canvas API and browser-side encoders, ensuring privacy and speed. No

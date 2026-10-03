@@ -188,9 +188,10 @@ export function createBatchStorage(adapter) {
         }
       });
     },
-    saveBatch(snapshot) {
+    saveBatch(snapshot, shouldSave = () => true) {
       return enqueue(async () => {
         try {
+          if (!shouldSave()) return;
           await adapter.writeSnapshot(validateAndPrepareSnapshot(snapshot));
         } catch (error) {
           throw storageError("save", error);
@@ -225,5 +226,5 @@ const defaultStorage = createBatchStorage({
 });
 
 export const loadBatch = () => defaultStorage.loadBatch();
-export const saveBatch = (snapshot) => defaultStorage.saveBatch(snapshot);
+export const saveBatch = (snapshot, shouldSave) => defaultStorage.saveBatch(snapshot, shouldSave);
 export const clearBatch = () => defaultStorage.clearBatch();
