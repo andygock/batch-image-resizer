@@ -51,8 +51,9 @@ function App() {
   };
   const recovery = useBatchRecovery(images, preferences, (saved) => {
     restorePreferences({ ...saved.preferences, rememberPreferences: preferences.rememberPreferences, rememberBatch: preferences.rememberBatch });
+    setCancelled(saved.paused);
     setImages(saved.sources);
-  }, setPreference);
+  }, setPreference, cancelled);
   const { markChanged } = recovery;
 
   const invalidate = useCallback(() => {
@@ -60,7 +61,6 @@ function App() {
     processor.cancel();
     zipOwner.current.cancel();
     setIsZipping(false);
-    setCancelled(false);
     setZipError("");
   }, [processor, markChanged]);
 
@@ -94,6 +94,7 @@ function App() {
     cancelImports();
     invalidate();
     processor.clear();
+    setCancelled(false);
     setImages([]);
   };
 
@@ -130,6 +131,7 @@ function App() {
   };
 
   const cancelResize = () => {
+    markChanged();
     processor.cancel();
     setCancelled(true);
   };
@@ -216,13 +218,14 @@ function App() {
             {isProcessing && (
               <button onClick={cancelResize}>
                 <X size={15} aria-hidden="true" />
-                Cancel
+                Pause
               </button>
             )}
             {cancelled && (
               <button
                 onClick={() => {
                   invalidate();
+                  setCancelled(false);
                   setRetry({ ids: [] });
                 }}
               >
@@ -254,7 +257,7 @@ function App() {
       {isImporting && <p role="status">Checking image files…</p>}
       {cancelled && (
         <div className={styles.status} role="status">
-          Cancelled.{" "}
+          Paused. Changes will wait until you resume.{" "}
           <span className="numeric">
             {progress} of {images.length}
           </span>{" "}

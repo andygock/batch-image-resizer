@@ -142,7 +142,7 @@ function validateAndPrepareSnapshot(snapshot) {
   });
   if (new Set(sources.map(({ id }) => id)).size !== sources.length)
     throw new TypeError("Saved sources must have unique ids.");
-  return { sources, preferences: sanitisePreferences(snapshot.preferences) };
+  return { sources, preferences: sanitisePreferences(snapshot.preferences), paused: snapshot.paused === true };
 }
 
 function restoreFile(source) {
@@ -178,6 +178,7 @@ export function createBatchStorage(adapter) {
           return {
             sources: stored.sources.map(restoreFile),
             preferences: sanitisePreferences(stored.preferences),
+            paused: stored.paused === true,
           };
         } catch (error) {
           throw storageError("load", error);

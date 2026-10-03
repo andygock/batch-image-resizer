@@ -65,3 +65,17 @@ test("failed sources remain actionable and retry does not repeat ready work", as
   assert.deepEqual(calls, ["a", "b", "c", "b"]);
   assert.equal(state.records.b.status, "ready");
 });
+
+test("paused batches accept edits without starting work until resumed", async () => {
+  const calls = [];
+  const processor = createBatchProcessor(async ({ id }) => { calls.push(id); return { id }; });
+  let state;
+  const publish = (next) => { state = next; };
+  await processor.run(sources, settings, { paused: true }, publish);
+  await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, { paused: true }, publish);
+  assert.deepEqual(calls, []);
+  assert.equal(state.isProcessing, false);
+  assert.equal(state.records.a.status, "pending");
+  await processor.run(sources.slice(0, 1), { ...settings, quality: 0.7 }, {}, publish);
+  assert.deepEqual(calls, ["a"]);
+});
