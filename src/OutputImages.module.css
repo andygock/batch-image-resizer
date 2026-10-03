@@ -117,6 +117,10 @@
 .error p + p {
   margin-top: 6px;
 }
+.encodingNotice {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
 
 @media (max-width: 768px) {
   .empty {

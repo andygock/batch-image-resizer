@@ -86,6 +86,7 @@ export default function OutputImages({
                 <p>{record.error}</p>
                 <p>{record.error.includes("decode") ? "Try exporting this file again as JPG, PNG or WebP, then add the replacement." : "Try a smaller size or another output format, then retry."}</p>
               </div>}
+              {result?.encodingWarning && <p className={styles.encodingNotice}>{result.encodingWarning}</p>}
             </div>}
           </OutputImage>
         </div>;

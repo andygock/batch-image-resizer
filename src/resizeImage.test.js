@@ -85,10 +85,12 @@ test("truncated worker output falls back to native PNG encoding", async (t) => {
   });
   const result = await resizeImage(
     source,
-    { ...settings, format: "png" },
+    { ...settings, format: "png", colours: 64 },
     new AbortController().signal
   );
   assert.equal(result.blob.type, "image/png");
+  assert.equal(result.appliedColours, 0);
+  assert.match(result.encodingWarning, /64-colour.*lossless PNG/);
   assert.equal(terminated, true);
   assert.equal(state.closed, 1);
 });
