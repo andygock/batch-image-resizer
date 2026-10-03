@@ -1,6 +1,11 @@
 import { createJobOwner } from "./jobs.js";
 import { resizeImage } from "./resizeImage.js";
 
+export function resolveSettings(source, settings) {
+  const format = settings.format === "source" ? source.sourceFormat : settings.format;
+  return { ...settings, format, quality: settings.qualityByFormat?.[format] ?? settings.quality };
+}
+
 export function settingsKey(settings) {
   return JSON.stringify({
     bounds: settings.bounds,
@@ -25,11 +30,12 @@ export function createBatchProcessor(resize = resizeImage) {
     },
     async run(images, settings, { paused = false, retryIds = [] } = {}, publish) {
       const job = owner.start();
-      const key = settingsKey(settings);
       const ids = new Set(images.map(({ id }) => id));
       for (const id of cache.keys()) if (!ids.has(id)) cache.delete(id);
       const retry = new Set(retryIds);
-      records = Object.fromEntries(images.map(({ id }) => {
+      records = Object.fromEntries(images.map((source) => {
+        const { id } = source;
+        const key = settingsKey(resolveSettings(source, settings));
         const previous = records[id];
         const cached = cache.get(id);
         if (cached?.key === key) return [id, { key, status: "ready", result: cached.result }];
@@ -49,10 +55,12 @@ export function createBatchProcessor(resize = resizeImage) {
       if (paused) return;
       for (const source of pending) {
         if (!job.isCurrent()) return;
+        const options = resolveSettings(source, settings);
+        const key = settingsKey(options);
         records[source.id] = { ...records[source.id], status: "processing" };
         publish(snapshot(true));
         try {
-          const result = await resize(source, settings, job.signal);
+          const result = { ...await resize(source, options, job.signal), settings: options };
           if (!job.isCurrent()) return;
           cache.set(source.id, { key, result });
           records[source.id] = { key, status: "ready", result };

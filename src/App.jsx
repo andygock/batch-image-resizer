@@ -25,7 +25,7 @@ function App() {
   const [images, setImages] = useState([]);
   const [zipError, setZipError] = useState("");
   const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
-  const [outputFormat, setOutputFormat] = useState("jpeg");
+  const [outputFormat, setOutputFormat] = useState("source");
   const [compressionLevel, setCompressionLevel] = useState(0.8); // Default compression level
   const [pngColors, setPngColors] = useState(0);
   const [enableSuffix, setEnableSuffix] = useState(true);
@@ -165,6 +165,7 @@ function App() {
               pngColors={pngColors}
               onPngColorsChange={changeSetting(setPngColors)}
             />
+            {outputFormat === "jpeg" && <span className={styles.hint}>Transparent areas become white in JPEG.</span>}
           </div>
           <div className={styles.controlGroup}>
             <label>

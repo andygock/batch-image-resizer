@@ -43,7 +43,7 @@ export default function CompressionSelect({
 
   return (
     <label htmlFor="compression">
-      {format === "webp" ? "WebP quality" : "JPEG quality"}
+      {format === "source" ? "JPEG/WebP quality" : format === "webp" ? "WebP quality" : "JPEG quality"}
       <select
         id="compression"
         className="numeric"

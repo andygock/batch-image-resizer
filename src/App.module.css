@@ -76,6 +76,11 @@
 .suffix {
   width: 10ch;
 }
+.hint {
+  flex-basis: 100%;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
 
 .status {
   margin-bottom: var(--space-2);

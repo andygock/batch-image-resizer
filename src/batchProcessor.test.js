@@ -1,9 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBatchProcessor } from "./batchProcessor.js";
+import { createBatchProcessor, resolveSettings } from "./batchProcessor.js";
 
 const settings = { bounds: { width: 512, height: 512 }, format: "jpeg", quality: 0.8, disableUpscale: true };
 const sources = [{ id: "a" }, { id: "b" }];
+
+test("keep source format resolves each image independently", async () => {
+  const seen = [];
+  const processor = createBatchProcessor(async (source, options) => {
+    seen.push(options.format);
+    return { id: source.id };
+  });
+  await processor.run([{ id: "a", sourceFormat: "png" }, { id: "b", sourceFormat: "webp" }], { ...settings, format: "source" }, {}, () => {});
+  assert.deepEqual(seen, ["png", "webp"]);
+  assert.equal(resolveSettings({ sourceFormat: "png" }, settings).format, "jpeg");
+});
 
 test("ready images remain accessible while another image processes", async () => {
   let complete;
