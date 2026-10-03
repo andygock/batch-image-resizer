@@ -24,6 +24,20 @@ export function validateSize({ width, height }) {
   }
 }
 
+export function describeSizeDraft(draft, applied) {
+  const size = { width: Number(draft.width), height: Number(draft.height) };
+  const dirty = size.width !== applied.width || size.height !== applied.height;
+  try {
+    validateSize(size);
+    return { dirty, invalid: false, message: "" };
+  } catch (error) {
+    const suggestion = Number.isInteger(size.width) && size.width >= 1 && size.width <= MAX_DIMENSION && size.width * size.height > MAX_PIXELS
+      ? ` At width ${size.width}, use a height of ${Math.floor(MAX_PIXELS / size.width)} or less.`
+      : "";
+    return { dirty, invalid: true, message: `${error.message}${suggestion}` };
+  }
+}
+
 export function fitDimensions(width, height, bounds, disableUpscale) {
   validateSize(bounds);
   if (![width, height].every((n) => Number.isInteger(n) && n > 0)) {

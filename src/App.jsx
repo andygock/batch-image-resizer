@@ -31,6 +31,7 @@ function App() {
   const [isZipping, setIsZipping] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
+  const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const dropRef = useRef(null);
   const zipOwner = useRef(createJobOwner());
   const settings = useMemo(() => ({
@@ -108,7 +109,7 @@ function App() {
 
   // ZIP work has independent ownership so reset cannot trigger a late download.
   const downloadZip = async () => {
-    if (isZipping || !outputs.length) return;
+    if (isZipping || !outputs.length || sizeDraft.invalid) return;
     const job = zipOwner.current.start();
     setIsZipping(true);
     setZipError("");
@@ -143,6 +144,7 @@ function App() {
             <SizeSelect
               onChange={changeSetting("boundingBox")}
               recentSizes={recentSizes}
+              onDraftStateChange={setSizeDraft}
               width={boundingBox.width}
               height={boundingBox.height}
             />
@@ -196,7 +198,7 @@ function App() {
           <div className={`${styles.controlGroup} ${styles.actions}`}>
             <button
               onClick={downloadZip}
-              disabled={!outputs.length || isZipping || isEmpty}
+              disabled={!outputs.length || isZipping || isEmpty || sizeDraft.invalid}
               className={outputs.length ? "buttonPrimary" : undefined}
             >
               <Download size={15} aria-hidden="true" />
@@ -241,6 +243,7 @@ function App() {
           </div>
         </div>
       </div>
+      {sizeDraft.invalid && <p role="status">Fix the custom size or press Escape in a dimension field to download the current {boundingBox.width}×{boundingBox.height}px outputs.</p>}
       <Errors
         onDismiss={() => { clearErrors(); setZipError(""); }}
         errors={[
@@ -261,6 +264,7 @@ function App() {
       <OutputImages
         images={images}
         records={records}
+        downloadsBlocked={sizeDraft.invalid}
         resizedImages={outputs}
         loading={isProcessing}
         progress={progress}

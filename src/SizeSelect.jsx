@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MAX_DIMENSION, validateSize } from "./imageUtils.js";
+import { MAX_DIMENSION, validateSize, describeSizeDraft } from "./imageUtils.js";
 import styles from "./SizeSelect.module.css";
 
 const sizes = [
@@ -19,6 +19,7 @@ export default function SizeSelect({
   height: selectedHeight,
   disabled,
   recentSizes = [],
+  onDraftStateChange,
 }) {
   const [isCustom, setIsCustom] = useState(false);
   const widthInput = useRef(null);
@@ -45,6 +46,12 @@ export default function SizeSelect({
       `${optionWidth}x${optionHeight}` === selectedValue
   );
   const value = isCustom || !isPreset ? "custom" : selectedValue;
+  const feedback = describeSizeDraft(draft, { width: selectedWidth, height: selectedHeight });
+  const invalid = value === "custom" && feedback.invalid;
+  const dirty = value === "custom" && feedback.dirty;
+  useEffect(() => {
+    onDraftStateChange?.({ invalid, dirty });
+  }, [invalid, dirty, onDraftStateChange]);
 
   const commitCustomSize = () => {
     const size = { width: Number(draft.width), height: Number(draft.height) };
@@ -120,8 +127,8 @@ export default function SizeSelect({
             step="1"
             value={draft.width}
             onChange={(e) => setDraft({ ...draft, width: e.target.value })}
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? "size-error" : undefined}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? "size-error" : undefined}
             disabled={disabled === true}
           />
           <span aria-hidden="true">x</span>
@@ -137,19 +144,20 @@ export default function SizeSelect({
             step="1"
             value={draft.height}
             onChange={(e) => setDraft({ ...draft, height: e.target.value })}
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? "size-error" : undefined}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? "size-error" : undefined}
             disabled={disabled === true}
           />
           <span>px</span>
         </div>
       )}
       <span className={styles.help}>Fits inside the size; keeps proportions without cropping.</span>
-      {error && (
-        <span id="size-error" className={styles.error} role="alert">
-          {error}
+      {invalid && (
+        <span id="size-error" className={styles.error} role="status">
+          {feedback.message} Applied size is {selectedWidth}×{selectedHeight}px. Escape restores it.
         </span>
       )}
+      {dirty && !invalid && <span className={styles.help}>Press Enter to apply. Current output: {selectedWidth}×{selectedHeight}px.</span>}
     </div>
   );
 }

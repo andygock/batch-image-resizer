@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { fitDimensions, nameOutputs, validateSize } from "./imageUtils.js";
+import { fitDimensions, nameOutputs, validateSize, describeSizeDraft } from "./imageUtils.js";
 import { createJobOwner } from "./jobs.js";
 
 test("thin images retain at least one pixel in both orientations", () => {
@@ -35,6 +35,16 @@ test("invalid dimensions and oversized allocations are rejected", () => {
     assert.throws(() => validateSize({ width, height: 1 }));
   assert.throws(() => validateSize({ width: 8192, height: 8192 }));
   assert.doesNotThrow(() => validateSize({ width: 4096, height: 4096 }));
+});
+
+test("invalid drafts explain a usable dimension without changing applied values", () => {
+  const applied = { width: 512, height: 512 };
+  const draft = describeSizeDraft({ width: "8192", height: "8192" }, applied);
+  assert.equal(draft.invalid, true);
+  assert.match(draft.message, /height of 2048 or less/);
+  assert.deepEqual(applied, { width: 512, height: 512 });
+  assert.equal(describeSizeDraft({ width: "", height: "512" }, applied).invalid, true);
+  assert.equal(describeSizeDraft({ width: "512", height: "512" }, applied).dirty, false);
 });
 
 test("colliding names preserve every file through a ZIP round trip", async () => {

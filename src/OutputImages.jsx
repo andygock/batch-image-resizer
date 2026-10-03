@@ -21,6 +21,7 @@ export function OutputImage({ blob, filename, width, height, children }) {
 export default function OutputImages({
   images, records, resizedImages, loading, progress, total, processingTime,
   onFileInputChange, inputDisabled, onRemoveImage, onRetryImage, onRetryFailed,
+  downloadsBlocked,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -74,7 +75,7 @@ export default function OutputImages({
               </div>
               <div className={styles.imageActions}>
                 {status === "error" && <button onClick={() => onRetryImage(id)}>Retry</button>}
-                {output && <a href={url || undefined} download={output.downloadFilename} title={`Download "${output.downloadFilename}"`} className="button buttonIcon" aria-label={`Download ${output.downloadFilename}`}>
+                {output && <a href={!downloadsBlocked && url ? url : undefined} aria-disabled={downloadsBlocked || !url} onClick={(event) => { if (downloadsBlocked || !url) event.preventDefault(); }} download={output.downloadFilename} title={downloadsBlocked ? "Fix the custom dimensions before downloading" : `Download "${output.downloadFilename}"`} className="button buttonIcon" aria-label={`Download ${output.downloadFilename}`}>
                   <Download size={14} aria-hidden="true" />
                 </a>}
                 <button type="button" className="buttonIcon buttonDanger" onClick={() => onRemoveImage(id)} title={`Remove "${file.name}"`} aria-label={`Remove ${file.name}`}>
