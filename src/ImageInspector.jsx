@@ -5,6 +5,7 @@ import OutputFormatSelect from "./OutputFormatSelect.jsx";
 import { OutputImage, formatKb } from "./OutputImages.jsx";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import styles from "./ImageInspector.module.css";
+import useSyncedImagePan from "./useSyncedImagePan.js";
 
 export default function ImageInspector({
   source,
@@ -25,6 +26,7 @@ export default function ImageInspector({
   });
   const [compareWith, setCompareWith] = useState("original");
   const [actualSize, setActualSize] = useState(false);
+  const [beforeRef, afterRef] = useSyncedImagePan(actualSize, source.id);
   const panel = useRef(null);
   const title = useRef(null);
   useEffect(() => setDraft(settings), [settings]);
@@ -152,7 +154,10 @@ export default function ImageInspector({
             {before ? "Previous" : "Original"} ·{" "}
             {formatKb(before?.filesizeAfter ?? source.file.size)}
           </figcaption>
-          <div>
+          <div
+            ref={beforeRef}
+            title={actualSize ? "Drag to pan both images" : undefined}
+          >
             <OutputImage
               blob={before?.blob ?? source.file}
               filename={`Original ${source.file.name}`}
@@ -168,7 +173,10 @@ export default function ImageInspector({
               ? ` · ${formatKb(result.filesizeAfter)} · ${result.widthAfter}×${result.heightAfter}px`
               : ""}
           </figcaption>
-          <div>
+          <div
+            ref={afterRef}
+            title={actualSize ? "Drag to pan both images" : undefined}
+          >
             {result ? (
               <OutputImage
                 blob={result.blob}

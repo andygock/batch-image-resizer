@@ -56,6 +56,15 @@
   height: auto;
   max-width: none;
 }
+.actualSize figure > div {
+  cursor: grab;
+  user-select: none;
+  scroll-behavior: auto;
+  overflow-anchor: none;
+}
+.actualSize figure > div[data-panning] {
+  cursor: grabbing;
+}
 .feedback {
   margin-top: 8px;
   color: var(--muted-foreground);

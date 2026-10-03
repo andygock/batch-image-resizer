@@ -50,7 +50,7 @@ Pause retains completed outputs and remains paused while you edit the batch. Res
 
 ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Individual files and archives indicate that a download was requested; the app cannot verify where the browser saved them.
 
-Choose an image preview to compare it with the original or an available previous output. Trial format and quality changes affect that image only until you choose Apply to batch. Previous variants use a bounded memory cache and may be evicted as you work.
+Choose an image preview to compare it with the original or an available previous output. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch. Previous variants use a bounded memory cache and may be evicted as you work.
 
 If the PNG optimiser produces incomplete output, the browser's lossless PNG encoder is used instead. The image card explains that the selected palette reduction was skipped.
 
