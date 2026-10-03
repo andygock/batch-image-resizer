@@ -135,8 +135,25 @@ test("ready cards remain usable and paused edits stay paused with undo", async (
   assert.equal(root.querySelectorAll(".imageCard").length, 2);
   assert.equal(root.querySelectorAll(".imageCard a[download]").length, 1);
   assert.ok(root.querySelector("button[aria-label='Resume processing']"));
+  assert.equal(root.querySelector(".imageCard input[type=checkbox]").checked, false);
   release({ width: 1200, height: 800, close() {} });
   await settle();
+});
+
+test("range selection and keyboard removal retain the nearest context", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([1, 2, 3].map((number) => new File([new Uint8Array([255, 216, 255, number])], `${number}.jpg`)));
+  const checkboxes = [...root.querySelectorAll(".imageCard input[type=checkbox]")];
+  await click(checkboxes[0]);
+  await act(() => checkboxes[2].dispatchEvent(new window.MouseEvent("click", { shiftKey: true, bubbles: true })));
+  assert.equal(root.querySelectorAll(".imageCard input:checked").length, 3);
+  await click(button("Clear selection"));
+  const remove = root.querySelector("button[aria-label='Remove 2.jpg']");
+  remove.focus();
+  await click(remove);
+  await settle();
+  assert.ok(document.activeElement.closest(".imageCard").textContent.includes("3.jpg"));
 });
 
 test("overlapping uploads skip duplicates and intentional duplication remains available", async () => {

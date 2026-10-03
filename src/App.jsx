@@ -65,6 +65,7 @@ function App() {
   ), [images, records, settings]);
   const failedIds = images.filter(({ id }) => records[id]?.status === "error").map(({ id }) => id);
   const retryImages = (ids) => {
+    markChanged();
     processor.cancel();
     setCancelled(false);
     setRetry({ ids });
@@ -139,7 +140,9 @@ function App() {
     invalidate();
     const removed = new Set(ids);
     const restoreFocus = ids.some((id) => document.getElementById(`image-${id}`)?.contains(document.activeElement));
-    const nextId = images.find(({ id }) => !removed.has(id))?.id;
+    const focusedIndex = images.findIndex(({ id }) => document.getElementById(`image-${id}`)?.contains(document.activeElement));
+    const nextId = images.slice(focusedIndex + 1).find(({ id }) => !removed.has(id))?.id
+      ?? images.slice(0, focusedIndex).reverse().find(({ id }) => !removed.has(id))?.id;
     setImages((current) => current.filter((image) => !removed.has(image.id)));
     setSelected((current) => new Set([...current].filter((id) => !removed.has(id))));
     if (restoreFocus) requestAnimationFrame(() => {
@@ -148,8 +151,8 @@ function App() {
     });
   };
   const rememberRemoval = (ids, cleared = false) => {
-    const selected = new Set(ids);
-    const removed = images.flatMap((source, index) => selected.has(source.id) ? [{ source, index }] : []);
+    const removedIds = new Set(ids);
+    const removed = images.flatMap((source, index) => removedIds.has(source.id) ? [{ source, index }] : []);
     if (!removed.length) return;
     const entry = { removed, outputs: processor.capture(ids), names: ids.map((id) => [id, nameAssignments.current.get(id)]), selection: ids.filter((id) => selected.has(id)), paused: cleared ? cancelled : null };
     setUndoHistory((current) => appendUndo(current, entry));
@@ -407,7 +410,8 @@ function App() {
         selected={selected}
         onSelectImage={(id, extend) => {
           markChanged();
-          setSelected((current) => updateSelection(current, images.map((image) => image.id), selectionAnchor.current, id, extend));
+          const anchor = selectionAnchor.current;
+          setSelected((current) => updateSelection(current, images.map((image) => image.id), anchor, id, extend));
           selectionAnchor.current = id;
         }}
         onSelectAll={() => { markChanged(); setSelected(new Set(images.map(({ id }) => id))); }}
