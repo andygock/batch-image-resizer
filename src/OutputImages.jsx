@@ -5,7 +5,7 @@ import { downloadRequestKey } from "./downloads.js";
 
 export const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
 
-export function OutputImage({ blob, filename, width, height, children }) {
+export function OutputImage({ blob, filename, width, height, children, onInspect }) {
   const [preview, setPreview] = useState(null);
   useEffect(() => {
     const nextUrl = URL.createObjectURL(blob);
@@ -13,8 +13,9 @@ export function OutputImage({ blob, filename, width, height, children }) {
     return () => URL.revokeObjectURL(nextUrl);
   }, [blob]);
   const url = preview?.blob === blob ? preview.url : "";
+  const img = url && <img src={url} alt={filename} width={width} height={height} loading="lazy" draggable={false} />;
   return <>
-    {url && <img src={url} alt={filename} width={width} height={height} loading="lazy" draggable={false} />}
+    {onInspect ? <button className={styles.previewButton} onClick={onInspect} title="Compare original and output" aria-label={`Compare ${filename}`}>{img}</button> : img}
     {children?.(url)}
   </>;
 }
@@ -27,6 +28,7 @@ export default function OutputImages({
   selected, onSelectImage, onSelectAll, onClearSelection, onRemoveSelected, onDownloadSelected, isZipping,
   viewMode, onViewModeChange,
   downloadRequests, onDownloadRequested,
+  onInspect,
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
@@ -83,7 +85,7 @@ export default function OutputImages({
         const status = record?.status ?? "pending";
         return <div key={id} id={`image-${id}`} className={styles.imageCard}>
           <label className={styles.selectImage}><input type="checkbox" checked={selected.has(id)} onClick={(event) => onSelectImage(id, event.shiftKey)} onChange={() => {}} /><span className="visuallyHidden">Select {file.name}</span></label>
-          <OutputImage blob={result?.blob ?? file} filename={file.name} width={result?.widthAfter} height={result?.heightAfter}>
+          <OutputImage blob={result?.blob ?? file} filename={file.name} width={result?.widthAfter} height={result?.heightAfter} onInspect={() => onInspect(id)}>
             {(url) => <div className={styles.imageInfo}>
               <div className={styles.filename} title={outputNames.get(id)}>{outputNames.get(id)}</div>
               {file.name !== outputNames.get(id) && <div className={styles.sourceName}>Source: {file.name}</div>}

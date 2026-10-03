@@ -1,0 +1,26 @@
+.inspector {
+  position: sticky;
+  top: 76px;
+  align-self: start;
+  min-width: 0;
+  max-height: calc(100dvh - 92px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.inspector h2 { font-size: 14px; margin: 8px 0; overflow-wrap: anywhere; }
+.controls { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 4px; white-space: nowrap; scrollbar-width: thin; }
+.controls > * { flex-shrink: 0; }
+.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.comparison figure { min-width: 0; }
+.comparison figcaption { min-height: 36px; font-size: var(--font-size-sm); }
+.comparison figure > div { height: 260px; overflow: auto; background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px 16px; }
+.comparison img { width: 100%; height: 100%; object-fit: contain; }
+.actualSize img { width: auto; height: auto; max-width: none; }
+.feedback { margin-top: 8px; color: var(--muted-foreground); }
+@media (max-width: 900px) {
+  .inspector { position: fixed; z-index: 15; inset: auto 10px 10px; max-height: 65dvh; }
+  .comparison figure > div { height: 180px; }
+}

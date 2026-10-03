@@ -82,6 +82,9 @@
   border-radius: 4px;
   background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px 16px;
 }
+.previewButton { display: block; width: 100%; height: 160px; padding: 0; border: 0; }
+.list .previewButton { height: 64px; }
+.selectImage { z-index: 1; }
 .selectImage {
   position: absolute;
   top: 10px;

@@ -12,8 +12,11 @@ export function restoreRemovedSources(current, removed) {
 
 export function appendUndo(history, entry) {
   const next = [...history, entry];
-  const bytes = (item) => item.removed.reduce((sum, { source }) => sum + source.file.size, 0)
-    + item.outputs.reduce((sum, { record }) => sum + (record?.result?.blob?.size ?? 0), 0);
+  const bytes = (item) => {
+    const blobs = new Set(item.outputs.flatMap(({ record, cached }) => [record?.result?.blob, ...(cached ?? []).map(({ result }) => result.blob)]).filter(Boolean));
+    return item.removed.reduce((sum, { source }) => sum + source.file.size, 0)
+      + [...blobs].reduce((sum, blob) => sum + blob.size, 0);
+  };
   let total = next.reduce((sum, item) => sum + bytes(item), 0);
   // Keep the latest action undoable even when a single batch exceeds the budget.
   while (next.length > 1 && (next.length > 20 || total > 128 * 1024 * 1024)) total -= bytes(next.shift());

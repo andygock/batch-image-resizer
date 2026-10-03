@@ -24,6 +24,8 @@ import useBatchRecovery from "./useBatchRecovery.js";
 import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
 import { updateSelection } from "./selection.js";
 import { archiveFilename, downloadRequestKey } from "./downloads.js";
+import { resolveSettings, settingsKey } from "./batchProcessor.js";
+import ImageInspector from "./ImageInspector.jsx";
 
 function App() {
   const [images, setImages] = useState([]);
@@ -38,6 +40,8 @@ function App() {
   const nameAssignments = useRef(new Map());
   const [selected, setSelected] = useState(new Set());
   const [downloadRequests, setDownloadRequests] = useState(new Set());
+  const [inspectedId, setInspectedId] = useState(null);
+  const inspectedSource = images.find(({ id }) => id === inspectedId);
   const selectionAnchor = useRef(null);
   const selectedIds = useMemo(() => [...selected], [selected]);
   const dropRef = useRef(null);
@@ -49,9 +53,9 @@ function App() {
   }), [boundingBox, outputFormat, qualityByFormat, pngColors, disableUpscale]);
   const { records, isProcessing, progress, processingTime, processor } =
     useBatchProcessor(images, settings, cancelled, retry);
-  const resizedImages = useMemo(() => images.flatMap(({ id }) =>
-    records[id]?.status === "ready" ? [records[id].result] : []
-  ), [images, records]);
+  const resizedImages = useMemo(() => images.flatMap((source) =>
+    records[source.id]?.status === "ready" && records[source.id].key === settingsKey(resolveSettings(source, settings)) ? [records[source.id].result] : []
+  ), [images, records, settings]);
   const failedIds = images.filter(({ id }) => records[id]?.status === "error").map(({ id }) => id);
   const retryImages = (ids) => {
     processor.cancel();
@@ -316,6 +320,8 @@ function App() {
           images processed.
         </div>
       )}
+      <div className={`${styles.workspace} ${inspectedSource ? styles.inspecting : ""}`}>
+      <section className={styles.results}>
       <OutputImages
         images={images}
         records={records}
@@ -323,6 +329,7 @@ function App() {
         outputNames={outputNames}
         downloadRequests={downloadRequests}
         onDownloadRequested={(output) => markDownloads([output])}
+        onInspect={setInspectedId}
         resizedImages={outputs}
         loading={isProcessing}
         progress={progress}
@@ -347,6 +354,19 @@ function App() {
         onRetryImage={(id) => retryImages([id])}
         onRetryFailed={() => retryImages(failedIds)}
       />
+      </section>
+      {inspectedSource && <ImageInspector source={inspectedSource} batchResult={records[inspectedId]?.result} settings={settings} processor={processor}
+        index={images.indexOf(inspectedSource)} total={images.length}
+        onNavigate={(direction) => setInspectedId(images[images.indexOf(inspectedSource) + direction]?.id ?? inspectedId)}
+        onClose={() => {
+          setInspectedId(null);
+          requestAnimationFrame(() => document.getElementById(`image-${inspectedId}`)?.querySelector("button")?.focus({ preventScroll: true }));
+        }}
+        onApply={(options) => {
+          invalidate();
+          restorePreferences((current) => ({ ...current, outputFormat: options.format, qualityByFormat: options.qualityByFormat, pngColors: options.colours }));
+        }} />}
+      </div>
       <div className={styles.footer}>
         <details className={styles.storage}>
           <summary>Saved data and preferences</summary>
