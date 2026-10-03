@@ -14,6 +14,9 @@ test("keep source format resolves each image independently", async () => {
   await processor.run([{ id: "a", sourceFormat: "png" }, { id: "b", sourceFormat: "webp" }], { ...settings, format: "source" }, {}, () => {});
   assert.deepEqual(seen, ["png", "webp"]);
   assert.equal(resolveSettings({ sourceFormat: "png" }, settings).format, "jpeg");
+  const options = { ...settings, format: "source", qualityByFormat: { jpeg: 0.9, webp: 0.7 } };
+  assert.equal(resolveSettings({ sourceFormat: "jpeg" }, options).quality, 0.9);
+  assert.equal(resolveSettings({ sourceFormat: "webp" }, options).quality, 0.7);
 });
 
 test("ready images remain accessible while another image processes", async () => {

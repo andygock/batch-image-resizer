@@ -190,6 +190,19 @@ a:hover {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
+.qualityControl {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.qualityControl input[type="range"] {
+  width: 96px;
+  accent-color: var(--primary);
+}
+.qualityNumber {
+  width: 7ch;
+}
 
 .positive {
   color: var(--success);

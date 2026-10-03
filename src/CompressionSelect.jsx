@@ -1,70 +1,43 @@
-const pngColorOptions = [
-  [0, "Lossless"],
-  [256, "256 colours"],
-  [128, "128 colours"],
-  [64, "64 colours"],
-  [32, "32 colours"],
-];
+import { useEffect, useState } from "react";
 
-export default function CompressionSelect({
-  format,
-  onChange,
-  value,
-  pngColors,
-  onPngColorsChange,
-  disabled,
-}) {
-  // select list of values from 0.3 to 1.0 at 0.1 intervals
-  // round level to 0.1 to avoid floating point errors, and always show 0.1 value
-  const levels = Array.from({ length: 8 }, (_, index) => 0.3 + index * 0.1).map(
-    (level) => Math.round(level * 10) / 10
-  );
+const pngColorOptions = [[0, "Lossless"], [256, "256 colours"], [128, "128 colours"], [64, "64 colours"], [32, "32 colours"]];
 
-  if (format === "png") {
-    return (
-      <label htmlFor="png-colors">
-        PNG colours
-        <select
-          id="png-colors"
-          className="numeric"
-          onChange={(e) => onPngColorsChange(Number(e.target.value))}
-          value={pngColors}
-          disabled={disabled === true}
-        >
-          {pngColorOptions.map(([colors, label]) => (
-            <option key={colors} value={colors}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
-  }
+function QualityControl({ format, value, onChange }) {
+  const [draft, setDraft] = useState(String(Math.round(value * 100)));
+  useEffect(() => setDraft(String(Math.round(value * 100))), [value]);
+  const percent = Number(draft);
+  const valid = draft !== "" && Number.isInteger(percent) && percent >= 30 && percent <= 100;
+  const commit = () => {
+    if (valid && percent / 100 !== value) onChange(percent / 100);
+  };
+  const cancel = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setDraft(String(Math.round(value * 100)));
+    }
+  };
+  const title = `${format === "jpeg" ? "JPEG" : "WebP"} quality`;
+  return <div className="qualityControl">
+    <label htmlFor={`${format}-quality-number`}>{title}</label>
+    <input type="range" min="30" max="100" step="1" value={valid ? percent : Math.round(value * 100)} aria-label={title}
+      onInput={(event) => setDraft(event.target.value)} onPointerUp={commit} onBlur={commit}
+      onKeyDown={cancel} onKeyUp={(event) => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key)) commit(); }} />
+    <input id={`${format}-quality-number`} className="numeric qualityNumber" type="number" min="30" max="100" step="1" value={draft}
+      onChange={(event) => setDraft(event.target.value)} onBlur={commit} aria-invalid={!valid}
+      onKeyDown={(event) => { cancel(event); if (event.key === "Enter") commit(); }} />
+    <span>%</span>
+    {!valid && <span role="status">Enter 30–100%. Applied: {Math.round(value * 100)}%.</span>}
+  </div>;
+}
 
-  return (
-    <label htmlFor="compression">
-      {format === "source" ? "JPEG/WebP quality" : format === "webp" ? "WebP quality" : "JPEG quality"}
-      <select
-        id="compression"
-        className="numeric"
-        onChange={(e) => {
-          onChange(Number(e.target.value));
-        }}
-        value={value}
-        disabled={disabled === true}
-      >
-        {levels.map((level, index) => {
-          level = Math.round(level * 10) / 10;
-          return (
-            <option key={index} value={level}>
-              {
-                // always show 1 as 1.0
-                level === 1 ? `${level}.0` : level
-              }
-            </option>
-          );
-        })}
+export default function CompressionSelect({ format, qualityByFormat, onQualityChange, pngColors, onPngColorsChange, sourceFormats = [] }) {
+  const formats = format === "source" ? [...new Set(sourceFormats)] : [format];
+  return <>
+    {["jpeg", "webp"].filter((type) => formats.includes(type)).map((type) => <QualityControl key={type} format={type} value={qualityByFormat[type]} onChange={(quality) => onQualityChange(type, quality)} />)}
+    {formats.includes("png") && <label htmlFor="png-colors">PNG colours
+      <select id="png-colors" onChange={(event) => onPngColorsChange(Number(event.target.value))} value={pngColors}>
+        {pngColorOptions.map(([colours, label]) => <option key={colours} value={colours}>{label}</option>)}
       </select>
-    </label>
-  );
+    </label>}
+  </>;
 }

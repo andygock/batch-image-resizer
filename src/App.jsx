@@ -26,7 +26,7 @@ function App() {
   const [zipError, setZipError] = useState("");
   const [boundingBox, setBoundingBox] = useState({ width: 512, height: 512 });
   const [outputFormat, setOutputFormat] = useState("source");
-  const [compressionLevel, setCompressionLevel] = useState(0.8); // Default compression level
+  const [qualityByFormat, setQualityByFormat] = useState({ jpeg: 0.8, webp: 0.8 });
   const [pngColors, setPngColors] = useState(0);
   const [enableSuffix, setEnableSuffix] = useState(true);
   const [suffix, setSuffix] = useState("_small");
@@ -38,9 +38,9 @@ function App() {
   const imageIdRef = useRef(0);
   const zipOwner = useRef(createJobOwner());
   const settings = useMemo(() => ({
-    bounds: boundingBox, format: outputFormat, quality: compressionLevel,
+    bounds: boundingBox, format: outputFormat, qualityByFormat,
     colours: pngColors, disableUpscale,
-  }), [boundingBox, outputFormat, compressionLevel, pngColors, disableUpscale]);
+  }), [boundingBox, outputFormat, qualityByFormat, pngColors, disableUpscale]);
   const { records, isProcessing, progress, processingTime, processor } =
     useBatchProcessor(images, settings, cancelled, retry);
   const resizedImages = useMemo(() => images.flatMap(({ id }) =>
@@ -160,8 +160,9 @@ function App() {
             />
             <CompressionSelect
               format={outputFormat}
-              onChange={changeSetting(setCompressionLevel)}
-              value={compressionLevel}
+              onQualityChange={(format, quality) => changeSetting(setQualityByFormat)({ ...qualityByFormat, [format]: quality })}
+              qualityByFormat={qualityByFormat}
+              sourceFormats={images.map(({ sourceFormat }) => sourceFormat)}
               pngColors={pngColors}
               onPngColorsChange={changeSetting(setPngColors)}
             />
