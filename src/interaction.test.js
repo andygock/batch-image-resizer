@@ -185,6 +185,26 @@ test("reload restores files, selection and committed settings", async () => {
   assert.equal(root.querySelector("#size").value, "1024x1024");
 });
 
+test("reload preserves collision filenames and download request markers", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([jpeg(), new File([new Uint8Array([255, 216, 255, 4])], "photo.jpg")]);
+  const cards = [...root.querySelectorAll(".imageCard")];
+  await click(cards[0].querySelector("button[aria-label='Remove photo.jpg']"));
+  await settle();
+  const download = root.querySelector(".imageCard a[download]");
+  const filename = download.download;
+  assert.match(filename, /\(2\)/);
+  download.addEventListener("click", (event) => event.preventDefault());
+  await click(download);
+  await waitForSave();
+  await act(() => render(null, root));
+  await act(() => render(h(App), root));
+  for (let attempt = 0; attempt < 20 && !root.querySelector(".imageCard a[download]"); attempt++) await settle();
+  assert.equal(root.querySelector(".imageCard a[download]").download, filename);
+  assert.match(root.querySelector(".imageCard").textContent, /Download requested/);
+});
+
 test("single-image quality trials do not change the batch until applied", async () => {
   await act(() => render(h(App), root));
   await settle();

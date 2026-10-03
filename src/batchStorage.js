@@ -144,7 +144,25 @@ function validateAndPrepareSnapshot(snapshot) {
     throw new TypeError("Saved sources must have unique ids.");
   const sourceIds = new Set(sources.map(({ id }) => id));
   const selectedIds = Array.isArray(snapshot.selectedIds) ? snapshot.selectedIds.filter((id) => sourceIds.has(id)) : [];
-  return { sources, preferences: sanitisePreferences(snapshot.preferences), paused: snapshot.paused === true, selectedIds };
+  const names = [];
+  const usedNames = new Set();
+  const usedIds = new Set();
+  for (const entry of Array.isArray(snapshot.downloadContext?.names) ? snapshot.downloadContext.names : []) {
+    if (!Array.isArray(entry)) continue;
+    const [id, assignment] = entry;
+    const name = assignment?.name;
+    if (!sourceIds.has(id) || usedIds.has(id) || typeof assignment?.signature !== "string" || assignment.signature.length > 2048 || typeof name !== "string" || !name || name.length > 200) continue;
+    // Stored names are untrusted and must remain portable, flat download names.
+    // eslint-disable-next-line no-control-regex
+    if (/[<>:"/\\|?*\u0000-\u001f]/.test(name) || /^[. ]|[. ]$/.test(name) || usedNames.has(name.toLowerCase())) continue;
+    names.push([id, { signature: assignment.signature, name }]);
+    usedIds.add(id);
+    usedNames.add(name.toLowerCase());
+  }
+  const requests = Array.isArray(snapshot.downloadContext?.requests)
+    ? snapshot.downloadContext.requests.filter((key) => typeof key === "string" && key.length <= 4096).slice(-2000)
+    : [];
+  return { sources, preferences: sanitisePreferences(snapshot.preferences), paused: snapshot.paused === true, selectedIds, downloadContext: { names, requests } };
 }
 
 function restoreFile(source) {
@@ -182,6 +200,7 @@ export function createBatchStorage(adapter) {
             preferences: sanitisePreferences(stored.preferences),
             paused: stored.paused === true,
             selectedIds: clean.selectedIds,
+            downloadContext: clean.downloadContext,
           };
         } catch (error) {
           throw storageError("load", error);

@@ -70,12 +70,21 @@ function App() {
     setCancelled(false);
     setRetry({ ids });
   };
+  const namedSources = useMemo(() => nameOutputs(images.map(({ id, file, sourceFormat }) => ({
+    id, filename: file.name, outputExtension: outputFormats[outputFormat === "source" ? sourceFormat : outputFormat]?.extension,
+  })), enableSuffix, suffix, nameAssignments.current), [images, outputFormat, enableSuffix, suffix]);
+  const downloadContext = useMemo(() => ({
+    names: namedSources.map(({ id }) => [id, nameAssignments.current.get(id)]),
+    requests: [...downloadRequests],
+  }), [namedSources, downloadRequests]);
   const recovery = useBatchRecovery(images, preferences, (saved) => {
     restorePreferences({ ...saved.preferences, rememberPreferences: preferences.rememberPreferences, rememberBatch: preferences.rememberBatch });
     setCancelled(saved.paused);
     setSelected(new Set(saved.selectedIds));
+    nameAssignments.current = new Map(saved.downloadContext.names);
+    setDownloadRequests(new Set(saved.downloadContext.requests));
     setImages(saved.sources);
-  }, setPreference, cancelled, selectedIds);
+  }, setPreference, cancelled, selectedIds, downloadContext);
   const { markChanged } = recovery;
   const { pauseSaving } = recovery;
   useEffect(() => {
@@ -181,9 +190,6 @@ function App() {
     return () => document.removeEventListener("keydown", handleUndo);
   }, [undoRemoval, undoHistory.length]);
 
-  const namedSources = useMemo(() => nameOutputs(images.map(({ id, file, sourceFormat }) => ({
-    id, filename: file.name, outputExtension: outputFormats[outputFormat === "source" ? sourceFormat : outputFormat]?.extension,
-  })), enableSuffix, suffix, nameAssignments.current), [images, outputFormat, enableSuffix, suffix]);
   const outputNames = useMemo(() => new Map(namedSources.map(({ id, downloadFilename }) => [id, downloadFilename])), [namedSources]);
   const outputs = useMemo(() => resizedImages.map((image) => ({ ...image, downloadFilename: outputNames.get(image.id) })), [resizedImages, outputNames]);
 
@@ -194,7 +200,10 @@ function App() {
     const snapshot = await zipExporter.current.start(targets, archiveFilename(targets), setZipState);
     if (snapshot) markDownloads(snapshot);
   };
-  const markDownloads = (items) => setDownloadRequests((current) => new Set([...current, ...items.map(downloadRequestKey)].slice(-2000)));
+  const markDownloads = (items) => {
+    markChanged();
+    setDownloadRequests((current) => new Set([...current, ...items.map(downloadRequestKey)].slice(-2000)));
+  };
 
   const cancelResize = () => {
     markChanged();
