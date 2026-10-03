@@ -132,7 +132,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-1);
+  gap: 8px;
+}
+.selectImage { min-width: 32px; min-height: 32px; justify-content: center; }
+@media (pointer: coarse) {
+  .selectImage { min-width: 44px; }
+  .list .imageCard { grid-template-columns: 44px 64px minmax(0, 1fr); }
 }
 .error {
   grid-column: 1 / -1;

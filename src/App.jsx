@@ -1,5 +1,5 @@
 import { saveAs } from "file-saver";
-import { Download, Play, RotateCcw, Upload, X } from "lucide-preact";
+import { Download, Pause, Play, Trash2, Upload } from "lucide-preact";
 import {
   useCallback,
   useEffect,
@@ -110,8 +110,14 @@ function App() {
     rememberRemoval(ids);
     invalidate();
     const removed = new Set(ids);
+    const restoreFocus = ids.some((id) => document.getElementById(`image-${id}`)?.contains(document.activeElement));
+    const nextId = images.find(({ id }) => !removed.has(id))?.id;
     setImages((current) => current.filter((image) => !removed.has(image.id)));
     setSelected((current) => new Set([...current].filter((id) => !removed.has(id))));
+    if (restoreFocus) requestAnimationFrame(() => {
+      const target = nextId ? document.getElementById(`image-${nextId}`)?.querySelector("input") : document.getElementById("add-images");
+      target?.focus({ preventScroll: true });
+    });
   };
   const rememberRemoval = (ids, cleared = false) => {
     const selected = new Set(ids);
@@ -235,41 +241,40 @@ function App() {
               {isZipping ? `ZIP ${zipState.progress}%` : `ZIP (${outputs.length})`}
             </button>
             <button
-              className="buttonIcon"
+              className={styles.clearButton}
               onClick={handleReset}
               disabled={isEmpty}
-              aria-label="Reset batch"
-              title="Reset batch"
+              aria-label="Clear batch"
+              title="Clear batch (can be undone)"
             >
-              <RotateCcw size={15} aria-hidden="true" />
+              <Trash2 size={15} aria-hidden="true" /><span className={styles.compactText}>Clear</span>
             </button>
-            {isProcessing && (
-              <button onClick={cancelResize}>
-                <X size={15} aria-hidden="true" />
-                Pause
-              </button>
-            )}
-            {cancelled && (
               <button
+                className={styles.pauseButton}
+                disabled={!isProcessing && !cancelled}
+                aria-label={cancelled ? "Resume processing" : "Pause processing"}
+                title={!isProcessing && !cancelled ? "No images are waiting to be processed" : cancelled ? "Resume processing" : "Pause processing"}
                 onClick={() => {
+                  if (!cancelled) { cancelResize(); return; }
                   invalidate();
                   setCancelled(false);
                   setRetry({ ids: [] });
                 }}
               >
-                <Play size={15} aria-hidden="true" />
-                Resume
+                {cancelled ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
+                <span className={styles.compactText}>{cancelled ? "Resume" : "Pause"}</span>
               </button>
-            )}
-            <label className="button">
+            <label className="button" title={isEmpty ? "Load images" : "Add images"}>
               <input
                 type="file"
+                id="add-images"
+                aria-label={isEmpty ? "Load images" : "Add images"}
                 accept="image/jpeg, image/png, image/webp"
                 multiple
                 onChange={handleFileInputChange}
               />
               <Upload size={15} aria-hidden="true" />
-              {isEmpty ? "Load" : "Add"}
+              <span className={styles.compactText}>{isEmpty ? "Load" : "Add"}</span>
             </label>
           </div>
       </div>

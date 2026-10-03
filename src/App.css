@@ -36,7 +36,7 @@
   --space-3: 12px;
   --space-4: 16px;
   --control-height: 32px;
-  --button-height-sm: 28px;
+  --button-height-sm: 32px;
   --image-card-padding: 6px;
   --font-size: 13px;
   --font-size-sm: 12px;
@@ -143,6 +143,7 @@ select:disabled,
   cursor: not-allowed;
   opacity: 0.5;
 }
+a[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 
 button:focus-visible,
 input:focus-visible,
@@ -229,4 +230,9 @@ a:hover {
     --space-2: 6px;
     --space-3: 10px;
   }
+}
+@media (pointer: coarse) {
+  :root { --control-height: 44px; --button-height-sm: 44px; }
+  input[type="checkbox"] { width: 20px; height: 20px; }
+  label:has(input[type="checkbox"]) { min-height: 44px; }
 }
