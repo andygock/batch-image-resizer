@@ -13,7 +13,7 @@ export function OutputImage({ blob, filename, width, height, children }) {
   }, [blob]);
   const url = preview?.blob === blob ? preview.url : "";
   return <>
-    {url && <img src={url} alt={filename} width={width} height={height} loading="lazy" />}
+    {url && <img src={url} alt={filename} width={width} height={height} loading="lazy" draggable={false} />}
     {children?.(url)}
   </>;
 }
@@ -25,7 +25,7 @@ export default function OutputImages({
 }) {
   if (!images.length) return <div className={styles.empty}>
     <ImagePlus className={styles.emptyIcon} size={24} strokeWidth={1.5} aria-hidden="true" />
-    <p>Drop JPG, PNG or WebP files here.</p>
+    <p>Drop JPG, PNG or WebP files here, or paste an image.</p>
     <label className="button buttonPrimary">
       <input type="file" accept="image/jpeg, image/png, image/webp" multiple onChange={onFileInputChange} disabled={inputDisabled} />
       <ImagePlus size={15} aria-hidden="true" /> Choose images
