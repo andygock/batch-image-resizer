@@ -1,13 +1,14 @@
 import { sanitisePreferences } from "./preferences.js";
 
 export const BATCH_DATABASE_NAME = "batch-image-resizer:batch:v1";
-export const BATCH_DATABASE_VERSION = 1;
+export const BATCH_DATABASE_VERSION = 2;
 const STORE_NAME = "snapshots";
+const SOURCES_STORE_NAME = "sources";
 const SNAPSHOT_KEY = "current";
 
 function storageError(action, error) {
   return new Error(
-    `Could not ${action} saved batch: ${error?.message || "storage is unavailable"}`,
+    `Could not ${action} saved batch: ${error?.name && error.name !== "Error" ? `${error.name}: ` : ""}${(error?.message || "storage is unavailable").replace(/[.\s]+$/, "")}`,
     {
       cause: error,
     },
@@ -15,11 +16,14 @@ function storageError(action, error) {
 }
 
 function requestPromise(request) {
-  return new Promise((resolve, reject) => {
+  const result = new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () =>
       reject(request.error || new Error("IndexedDB request failed."));
   });
+  // Later request creation can throw before queued promises reach Promise.all.
+  result.catch(() => {});
+  return result;
 }
 
 function openDatabase(indexedDB) {
@@ -36,6 +40,8 @@ function openDatabase(indexedDB) {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME))
         database.createObjectStore(STORE_NAME);
+      if (!database.objectStoreNames.contains(SOURCES_STORE_NAME))
+        database.createObjectStore(SOURCES_STORE_NAME);
     };
     request.onsuccess = () => {
       if (settled) {
@@ -66,12 +72,27 @@ function withDatabase(indexedDB, mode, run) {
         let result;
         let settled = false;
         let transaction;
+        let failure;
         try {
-          transaction = database.transaction(STORE_NAME, mode);
-          result = run(transaction.objectStore(STORE_NAME));
-          // A failed request can reject before the transaction's abort event arrives.
-          Promise.resolve(result).catch(() => {});
+          transaction = database.transaction(
+            [STORE_NAME, SOURCES_STORE_NAME],
+            mode,
+          );
+          result = run(
+            transaction.objectStore(STORE_NAME),
+            transaction.objectStore(SOURCES_STORE_NAME),
+          );
+          // Abort on preparation failures too, so partial writes cannot commit.
+          Promise.resolve(result).catch((error) => {
+            failure ||= error;
+            try {
+              transaction.abort();
+            } catch {
+              // The request may already have aborted the transaction.
+            }
+          });
         } catch (error) {
+          transaction?.abort();
           database.close();
           reject(error);
           return;
@@ -82,19 +103,25 @@ function withDatabase(indexedDB, mode, run) {
           database.close();
           Promise.resolve(result).then(resolve, reject);
         };
-        transaction.onabort = transaction.onerror = () => {
+        transaction.onerror = (event) => {
+          failure ||= event.target?.error;
+        };
+        // Request errors bubble before transaction.error is populated.
+        transaction.onabort = () => {
           if (settled) return;
           settled = true;
           database.close();
           reject(
-            transaction.error || new Error("IndexedDB transaction failed."),
+            failure ||
+              transaction.error ||
+              new DOMException("IndexedDB transaction aborted", "AbortError"),
           );
         };
       }),
   );
 }
 
-function createIndexedDbAdapter(indexedDB) {
+export function createIndexedDbAdapter(indexedDB) {
   return {
     readSnapshot: async () => {
       if (
@@ -104,14 +131,77 @@ function createIndexedDbAdapter(indexedDB) {
         )
       )
         return null;
-      return withDatabase(indexedDB, "readonly", (store) =>
-        requestPromise(store.get(SNAPSHOT_KEY)),
-      );
+      return withDatabase(indexedDB, "readonly", async (store, sources) => {
+        const snapshot = await requestPromise(store.get(SNAPSHOT_KEY));
+        if (snapshot?.storageVersion !== 2) return snapshot;
+        const restored = await Promise.all(
+          snapshot.sources.map(async (source) => {
+            const bytes = await requestPromise(sources.get(source.id));
+            if (!(bytes instanceof ArrayBuffer))
+              throw new Error(`Saved image "${source.fileName}" is missing.`);
+            return {
+              ...source,
+              file: new Blob([bytes], { type: source.fileType }),
+            };
+          }),
+        );
+        return { ...snapshot, sources: restored };
+      });
     },
-    writeSnapshot: (snapshot) =>
-      withDatabase(indexedDB, "readwrite", (store) =>
-        requestPromise(store.put(snapshot, SNAPSHOT_KEY)),
-      ),
+    writeSnapshot: async (snapshot, shouldSave = () => true) => {
+      if (!shouldSave()) return;
+      const savedIds = new Set(
+        await withDatabase(indexedDB, "readonly", (_, sources) =>
+          requestPromise(sources.getAllKeys()),
+        ),
+      );
+      const bytes = new Map();
+      // Read outside the transaction; file reads can outlive its active window.
+      // Raw bytes also avoid browser-specific Blob persistence failures.
+      // Source ids identify immutable imports; settings saves reuse their bytes.
+      for (const source of snapshot.sources) {
+        if (!savedIds.has(source.id))
+          bytes.set(source.id, await source.file.arrayBuffer());
+      }
+      if (!shouldSave()) return;
+      await withDatabase(indexedDB, "readwrite", async (store, sources) => {
+        const currentIds = await requestPromise(sources.getAllKeys());
+        if (!shouldSave()) return;
+        const current = new Set(currentIds);
+        const retained = new Set(snapshot.sources.map(({ id }) => id));
+        const writes = [];
+        for (const source of snapshot.sources) {
+          if (!current.has(source.id) && !bytes.has(source.id))
+            throw new DOMException(
+              "Saved images changed in another tab; retrying the batch save",
+              "AbortError",
+            );
+        }
+        for (const source of snapshot.sources) {
+          if (current.has(source.id)) continue;
+          writes.push(
+            requestPromise(sources.put(bytes.get(source.id), source.id)),
+          );
+        }
+        for (const id of currentIds) {
+          if (!retained.has(id))
+            writes.push(requestPromise(sources.delete(id)));
+        }
+        writes.push(
+          requestPromise(
+            store.put(
+              {
+                ...snapshot,
+                storageVersion: 2,
+                sources: snapshot.sources.map(({ file, ...source }) => source),
+              },
+              SNAPSHOT_KEY,
+            ),
+          ),
+        );
+        await Promise.all(writes);
+      });
+    },
     deleteDatabase: () =>
       new Promise((resolve, reject) => {
         let request;
@@ -279,7 +369,15 @@ export function createBatchStorage(adapter) {
       return enqueue(async () => {
         try {
           if (!shouldSave()) return;
-          await adapter.writeSnapshot(validateAndPrepareSnapshot(snapshot));
+          const prepared = validateAndPrepareSnapshot(snapshot);
+          try {
+            await adapter.writeSnapshot(prepared, shouldSave);
+          } catch (error) {
+            if (!["AbortError", "UnknownError"].includes(error?.name))
+              throw error;
+            if (!shouldSave()) return;
+            await adapter.writeSnapshot(prepared, shouldSave);
+          }
         } catch (error) {
           throw storageError("save", error);
         }
@@ -302,9 +400,12 @@ const defaultStorage = createBatchStorage({
     if (!globalThis.indexedDB) throw new Error("IndexedDB is unavailable.");
     return createIndexedDbAdapter(globalThis.indexedDB).readSnapshot();
   },
-  writeSnapshot: (snapshot) => {
+  writeSnapshot: (snapshot, shouldSave) => {
     if (!globalThis.indexedDB) throw new Error("IndexedDB is unavailable.");
-    return createIndexedDbAdapter(globalThis.indexedDB).writeSnapshot(snapshot);
+    return createIndexedDbAdapter(globalThis.indexedDB).writeSnapshot(
+      snapshot,
+      shouldSave,
+    );
   },
   deleteDatabase: () => {
     if (!globalThis.indexedDB) throw new Error("IndexedDB is unavailable.");

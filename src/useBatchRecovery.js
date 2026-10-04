@@ -78,7 +78,7 @@ export default function useBatchRecovery(
           );
         }
       } catch (failure) {
-        if (saving.current)
+        if (saving.current && revision === activity.current)
           setError(
             `${failure.message}. Keep this tab open to retain the current batch.`,
           );
