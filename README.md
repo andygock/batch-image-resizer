@@ -130,3 +130,7 @@ Run regression tests with `pnpm test`. These use Node's test runner, mocked imag
 - Canvas and `OffscreenCanvas`
 - `upng-js` for PNG encoding
 - `jszip` and `file-saver` for ZIP downloads
+
+## Favicon
+
+Favicon is from Fluent UI Emoji artwork © Microsoft Corporation: https://github.com/microsoft/fluentui-emoji · Licence: MIT https://github.com/microsoft/fluentui-emoji/blob/main/LICENSE
