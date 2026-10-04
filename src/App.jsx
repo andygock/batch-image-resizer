@@ -584,6 +584,7 @@ function App() {
       {(storageError || recovery.error) && (
         <p role="alert">
           Saved data needs attention. Current images remain usable.{" "}
+          {[storageError, recovery.error].filter(Boolean).join(" ")}{" "}
           <button onClick={() => setStorageOpen(true)}>
             Review storage options
           </button>

@@ -4,7 +4,12 @@ import { IDBFactory } from "fake-indexeddb";
 import { Window } from "happy-dom";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { BATCH_DATABASE_NAME, clearBatch, saveBatch } from "./batchStorage.js";
+import {
+  BATCH_DATABASE_NAME,
+  clearBatch,
+  loadBatch,
+  saveBatch,
+} from "./batchStorage.js";
 import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
 import {
   clearAppLocalStorage,
@@ -392,6 +397,77 @@ test("reload restores files, selection and committed settings", async () => {
     true,
   );
   assert.equal(root.querySelector("#size").value, "1024x1024");
+});
+
+test("format changes and recovery use imported bytes after the temporary file disappears", async (t) => {
+  const original = jpeg("ComfyUI_temp.jpg");
+  const expected = new Uint8Array(await original.arrayBuffer());
+  let decodes = 0;
+  const decode = globalThis.createImageBitmap;
+  t.mock.method(globalThis, "createImageBitmap", async (file) => {
+    assert.notEqual(file, original);
+    assert.deepEqual(new Uint8Array(await file.arrayBuffer()), expected);
+    decodes++;
+    return decode(file);
+  });
+  const worker = globalThis.Worker;
+  globalThis.Worker = class {
+    postMessage() {
+      this.onmessage({ data: { fallback: true } });
+    }
+    terminate() {}
+  };
+  t.after(() => {
+    if (worker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = worker;
+  });
+  t.mock.method(globalThis.OffscreenCanvas.prototype, "getContext", () => ({
+    fillRect() {},
+    drawImage() {},
+    getImageData() {
+      return { data: new Uint8ClampedArray(4) };
+    },
+  }));
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([original]);
+  original.slice = () => {
+    throw new DOMException("Temporary file removed", "NotReadableError");
+  };
+  for (const format of ["webp", "png", "jpeg", "webp", "png", "source"]) {
+    await change(root.querySelector("#output-format"), format);
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await settle();
+      const extension =
+        format === "source" || format === "jpeg" ? "jpg" : format;
+      if (root.querySelector("a[download]")?.download.endsWith(`.${extension}`))
+        break;
+    }
+    const extension = format === "source" || format === "jpeg" ? "jpg" : format;
+    assert.ok(root.querySelector(`a[download$='.${extension}']`));
+    assert.doesNotMatch(root.textContent, /Could not decode/);
+  }
+  assert.ok(decodes >= 3);
+  await waitForSave();
+  assert.doesNotMatch(root.textContent, /Saved data needs attention/);
+  const saved = await loadBatch();
+  assert.deepEqual(
+    new Uint8Array(await saved.sources[0].file.arrayBuffer()),
+    expected,
+  );
+  await act(() => render(null, root));
+  await act(() => render(h(App), root));
+  for (
+    let attempt = 0;
+    attempt < 20 && !root.querySelector("a[download]");
+    attempt++
+  )
+    await settle();
+  assert.ok(root.querySelector("a[download$='.jpg']"));
+  assert.doesNotMatch(
+    root.textContent,
+    /Could not decode|Saved data needs attention/,
+  );
 });
 
 for (const [format, extension] of [

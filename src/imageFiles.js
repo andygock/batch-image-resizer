@@ -55,7 +55,27 @@ export async function inspectImageFile(file) {
       `"${filename}"${typeHint} is not a supported JPEG, PNG or WebP image.`,
     );
   }
-  return { file, sourceFormat: format };
+  try {
+    // Copy bytes, not Blob references: temporary files can change on disk after import.
+    const chunks = [];
+    for (let start = 0; start < file.size; start += CHUNK_SIZE) {
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const bytes = await readRange(file, start, end);
+      if (bytes.length !== end - start)
+        throw new Error("the file changed while it was being imported");
+      chunks.push(bytes);
+    }
+    const copiedFormat = identifyFormat(chunks[0]);
+    if (copiedFormat !== format)
+      throw new Error("the file changed while it was being imported");
+    const copy = new File(chunks, filename, {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
+    return { file: copy, sourceFormat: copiedFormat };
+  } catch (error) {
+    throw new Error(`Could not read "${filename}": ${error.message}`);
+  }
 }
 
 async function sameContent(left, right) {
@@ -107,8 +127,8 @@ export async function partitionImageFiles(
         for (const previous of previousFiles) {
           if (
             Number.isSafeInteger(previous?.size) &&
-            previous.size === file.size &&
-            (await sameContent(file, previous))
+            previous.size === inspected.file.size &&
+            (await sameContent(inspected.file, previous))
           ) {
             duplicate = true;
             break;
@@ -116,12 +136,12 @@ export async function partitionImageFiles(
         }
         if (duplicate) {
           duplicates.push(filename);
-          duplicateFiles.push(file);
+          duplicateFiles.push(inspected.file);
           continue;
         }
       }
       accepted.push(inspected);
-      previousFiles.push(file);
+      previousFiles.push(inspected.file);
     } catch (error) {
       errors.push({ filename, message: error.message });
     }
