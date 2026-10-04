@@ -6,7 +6,7 @@ import {
   sanitisePreferences,
 } from "./preferences.js";
 import {
-  clearAppWebStorage,
+  clearAppLocalStorage,
   readStoragePolicy,
   writeStoragePolicy,
 } from "./storagePrivacy.js";
@@ -91,7 +91,7 @@ export default function usePreferences() {
   const clearLocalData = useCallback(() => {
     pauseStorage("local");
     try {
-      clearAppWebStorage("local");
+      clearAppLocalStorage();
       setStorageError("");
       return true;
     } catch (error) {

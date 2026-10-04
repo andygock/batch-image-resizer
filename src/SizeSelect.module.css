@@ -2,11 +2,12 @@
 .custom {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 6px;
 }
 .control {
-  flex-wrap: nowrap;
-  flex-shrink: 0;
+  min-width: 0;
 }
 .custom input {
   width: 8ch;

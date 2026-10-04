@@ -38,7 +38,7 @@ export default function useBatchRecovery(
       } catch (failure) {
         if (mounted)
           setError(
-            `${failure.message}. You can keep working or clear saved batch data below.`,
+            `${failure.message}. You can keep working or clear saved batch data in Saved data and preferences.`,
           );
       } finally {
         if (mounted) setHydrated(true);

@@ -1,3 +1,5 @@
+import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
+
 const PREFIX = "batch-image-resizer:";
 export const STORAGE_POLICY_KEY = `${PREFIX}storage-policy:v1`;
 export const STORAGE_CHANNEL = `${PREFIX}storage-events`;
@@ -26,11 +28,8 @@ export function writeStoragePolicy(policy) {
   );
 }
 
-export function clearAppWebStorage(kind) {
-  const storage =
-    kind === "session" ? globalThis.sessionStorage : globalThis.localStorage;
-  const keys = Array.from({ length: storage.length }, (_, index) =>
-    storage.key(index),
-  );
-  for (const key of keys) if (key?.startsWith(PREFIX)) storage.removeItem(key);
+export function clearAppLocalStorage() {
+  // Same-origin applications share storage; remove only keys we own explicitly.
+  for (const key of [PREFERENCES_STORAGE_KEY, STORAGE_POLICY_KEY])
+    globalThis.localStorage.removeItem(key);
 }

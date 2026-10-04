@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  clearAppWebStorage,
+  clearAppLocalStorage,
   readStoragePolicy,
   writeStoragePolicy,
 } from "./storagePrivacy.js";
 
-test("storage clearing removes app data across versions without touching other apps", (t) => {
+test("storage clearing removes only known app keys and preserves unrecognised keys", (t) => {
   const values = new Map([
     ["batch-image-resizer:old:v0", "old"],
     ["batch-image-resizer:preferences:v1", "settings"],
@@ -35,6 +35,9 @@ test("storage clearing removes app data across versions without touching other a
     rememberPreferences: false,
     rememberBatch: false,
   });
-  clearAppWebStorage("local");
-  assert.deepEqual([...values], [["another-app", "keep"]]);
+  clearAppLocalStorage();
+  assert.deepEqual([...values], [
+    ["batch-image-resizer:old:v0", "old"],
+    ["another-app", "keep"],
+  ]);
 });

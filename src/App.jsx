@@ -1,5 +1,5 @@
 import saveAs from "file-saver";
-import { Download, Pause, Play, Trash2, Upload } from "lucide-preact";
+import { Download, Pause, Play, Settings, Trash2, Upload } from "lucide-preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import styles from "./App.module.css";
@@ -21,7 +21,7 @@ import { archiveFilename, downloadRequestKey } from "./downloads.js";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import ImageInspector from "./ImageInspector.jsx";
 import StorageSettings from "./StorageSettings.jsx";
-import { clearAppWebStorage, STORAGE_CHANNEL } from "./storagePrivacy.js";
+import { STORAGE_CHANNEL } from "./storagePrivacy.js";
 import { DEFAULT_PREFERENCES, sanitisePreferences } from "./preferences.js";
 
 function App() {
@@ -62,6 +62,7 @@ function App() {
   const [inspectedId, setInspectedId] = useState(null);
   const [dataMessage, setDataMessage] = useState("");
   const [clearingData, setClearingData] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
   const [formResetKey, setFormResetKey] = useState(0);
   const storageChannel = useRef(null);
   const inspectedSource = images.find(({ id }) => id === inspectedId);
@@ -366,16 +367,6 @@ function App() {
       "Cached outputs and undo history cleared. Source images remain; Resume rebuilds the outputs.",
     );
   };
-  const clearSessionData = () => {
-    try {
-      clearAppWebStorage("session");
-      setDataMessage("App Session Storage cleared.");
-      return true;
-    } catch (error) {
-      setDataMessage(`Could not clear Session Storage: ${error.message}`);
-      return false;
-    }
-  };
   const clearAllData = async () => {
     setClearingData(true);
     storageChannel.current?.postMessage("all");
@@ -401,9 +392,8 @@ function App() {
     });
     const batchCleared = await recovery.forgetBatch(false);
     const localCleared = clearLocalData();
-    const sessionCleared = clearSessionData();
     setDataMessage(
-      batchCleared && localCleared && sessionCleared
+      batchCleared && localCleared
         ? "All app data, current images, cached outputs and undo history cleared. Saving is off for this visit."
         : "Some storage could not be cleared. Saving is off; retry the affected clear control below.",
     );
@@ -554,6 +544,15 @@ function App() {
               {isEmpty ? "Load" : "Add"}
             </span>
           </label>
+          <button
+            className="buttonIcon"
+            aria-label="Saved data and preferences"
+            title="Saved data and preferences"
+            aria-haspopup="dialog"
+            onClick={() => setStorageOpen(true)}
+          >
+            <Settings size={17} aria-hidden="true" />
+          </button>
         </div>
       </div>
       {isZipping && (
@@ -586,15 +585,9 @@ function App() {
       {(storageError || recovery.error) && (
         <p role="alert">
           Saved data needs attention. Current images remain usable.{" "}
-          <a
-            href="#saved-data"
-            onClick={() => {
-              const panel = document.getElementById("saved-data");
-              if (panel) panel.open = true;
-            }}
-          >
+          <button onClick={() => setStorageOpen(true)}>
             Review storage options
-          </a>
+          </button>
         </p>
       )}
       <Errors
@@ -728,8 +721,9 @@ function App() {
           />
         )}
       </div>
-      <div className={styles.footer}>
+      {storageOpen && (
         <StorageSettings
+          onClose={() => setStorageOpen(false)}
           preferences={preferences}
           busy={clearingData}
           message={dataMessage || recovery.message}
@@ -771,13 +765,14 @@ function App() {
             storageChannel.current?.postMessage("local");
             if (clearLocalData())
               setDataMessage(
-                "All app Local Storage entries cleared. Preference saving is off for this visit.",
+                "App preferences and storage choices cleared from Local Storage. Preference saving is off for this visit.",
               );
           }}
-          onClearSession={clearSessionData}
           onClearCache={clearCachedResults}
           onClearAll={clearAllData}
         />
+      )}
+      <div className={styles.footer}>
         <p>
           Your images are resized directly in your browser using the HTML5
           Canvas API and browser-side encoders, ensuring privacy and speed. No

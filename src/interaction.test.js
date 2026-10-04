@@ -8,7 +8,7 @@ import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
 import {
   STORAGE_POLICY_KEY,
   STORAGE_CHANNEL,
-  clearAppWebStorage,
+  clearAppLocalStorage,
 } from "./storagePrivacy.js";
 import { BATCH_DATABASE_NAME, clearBatch } from "./batchStorage.js";
 
@@ -194,6 +194,40 @@ test("storage choices can be disabled, re-enabled and cleared without reappearin
   assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
 });
 
+test("the menu gear opens storage controls in a dismissible modal", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  const gear = root.querySelector(
+    "button[aria-label='Saved data and preferences']",
+  );
+  assert.equal(root.querySelector("dialog"), null);
+  gear.focus();
+  await click(gear);
+  const dialog = root.querySelector("dialog");
+  assert.equal(dialog.open, true);
+  assert.equal(
+    document.getElementById(dialog.getAttribute("aria-labelledby")).textContent,
+    "Saved data and preferences",
+  );
+  assert.ok(button("Clear app Local Storage"));
+  assert.ok(button("Clear IndexedDB batch"));
+  assert.equal(button("Clear app Session Storage"), undefined);
+  await click(
+    root.querySelector("button[aria-label='Close saved data and preferences']"),
+  );
+  assert.equal(root.querySelector("dialog"), null);
+  assert.equal(document.activeElement, gear);
+
+  await click(gear);
+  await act(() =>
+    root.querySelector("dialog").dispatchEvent(
+      new window.Event("cancel", { cancelable: true }),
+    ),
+  );
+  assert.equal(root.querySelector("dialog"), null);
+  assert.equal(document.activeElement, gear);
+});
+
 test("clear all removes database, web storage, pending work and undo without re-saving", async () => {
   await act(() => render(h(App), root));
   await settle();
@@ -216,8 +250,24 @@ test("clear all removes database, web storage, pending work and undo without re-
     ),
   );
   localStorage.setItem("unrelated", "keep");
-  sessionStorage.setItem("batch-image-resizer:old-session", "remove");
+  localStorage.setItem("batch-image-resizer:unrecognised", "keep");
+  sessionStorage.setItem(PREFERENCES_STORAGE_KEY, "keep");
   sessionStorage.setItem("unrelated", "keep");
+  const otherDatabaseName = "batch-image-resizer:unrecognised";
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.open(otherDatabaseName);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("important").put("keep", "data");
+    };
+    request.onsuccess = () => {
+      request.result.close();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+  await click(
+    root.querySelector("button[aria-label='Saved data and preferences']"),
+  );
   await click(button("Clear all app data and current batch"));
   await settle();
   await act(async () => {
@@ -225,10 +275,27 @@ test("clear all removes database, web storage, pending work and undo without re-
   });
   assert.equal(root.querySelectorAll(".imageCard").length, 0);
   assert.equal(button("Undo removal"), undefined);
-  assert.deepEqual(await indexedDB.databases(), []);
+  assert.deepEqual(
+    (await indexedDB.databases()).map(({ name }) => name),
+    [otherDatabaseName],
+  );
+  const otherData = await new Promise((resolve, reject) => {
+    const request = indexedDB.open(otherDatabaseName);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction("important", "readonly");
+      const read = transaction.objectStore("important").get("data");
+      read.onsuccess = () => resolve(read.result);
+      read.onerror = () => reject(read.error);
+      transaction.oncomplete = () => database.close();
+    };
+    request.onerror = () => reject(request.error);
+  });
+  assert.equal(otherData, "keep");
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
   assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
-  assert.equal(sessionStorage.getItem("batch-image-resizer:old-session"), null);
+  assert.equal(localStorage.getItem("batch-image-resizer:unrecognised"), "keep");
+  assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), "keep");
   assert.equal(localStorage.getItem("unrelated"), "keep");
   assert.equal(sessionStorage.getItem("unrelated"), "keep");
 });
@@ -493,7 +560,7 @@ test("a clear-data message pauses saving in another open tab", async () => {
       await new Promise((resolve) => setTimeout(resolve, 25));
     });
     await clearBatch();
-    clearAppWebStorage("local");
+    clearAppLocalStorage();
     await change(
       root.querySelector("input[aria-label='Filename suffix']"),
       "_new",
