@@ -36,6 +36,7 @@ test("exports retain their snapshot and reject duplicate starts", async () => {
   assert.equal(snapshot[0].downloadFilename, "before.jpg");
   assert.equal(saved.length, 1);
   assert.equal(state.isZipping, false);
+  assert.equal(state.message, "");
 });
 
 test("cancelling an archive suppresses its late download", async () => {

@@ -10,7 +10,7 @@ import {
   STORAGE_CHANNEL,
   clearAppLocalStorage,
 } from "./storagePrivacy.js";
-import { BATCH_DATABASE_NAME, clearBatch } from "./batchStorage.js";
+import { BATCH_DATABASE_NAME, clearBatch, saveBatch } from "./batchStorage.js";
 
 const window = new Window({
   url: "http://localhost/",
@@ -391,7 +391,47 @@ test("reload restores files, selection and committed settings", async () => {
   assert.equal(root.querySelector("#size").value, "1024x1024");
 });
 
-test("reload preserves collision filenames and download request markers", async () => {
+for (const [format, extension] of [["jpeg", "jpg"], ["webp", "webp"]]) {
+  test(`recovered ${format} downloads repair stale filenames without clearing the batch`, async (t) => {
+    const blobs = new Map();
+    const createObjectURL = URL.createObjectURL;
+    t.mock.method(URL, "createObjectURL", (blob) => {
+      const url = createObjectURL(blob);
+      blobs.set(url, blob);
+      return url;
+    });
+    await saveBatch({
+      sources: [{ id: "restored", file: jpeg(), sourceFormat: "jpeg" }],
+      preferences: { outputFormat: format },
+      downloadContext: {
+        names: [["restored", {
+          signature: JSON.stringify(["photo.jpg", extension, "_small"]),
+          name: "photo_small.html",
+        }]],
+      },
+    });
+    await act(() => render(h(App), root));
+    for (let attempt = 0; attempt < 20 && !root.querySelector("a[download]"); attempt++)
+      await settle();
+    const link = root.querySelector(".imageCard a[download]");
+    assert.ok(link, "Recovered output has a download link");
+    assert.equal(link.download, `photo_small.${extension}`);
+    assert.equal(blobs.get(link.href).type, `image/${format}`);
+    assert.equal(link.href, root.querySelector(".imageCard img").src);
+    assert.equal(link.target, "");
+    assert.equal(link.getAttribute("aria-disabled"), "false");
+    await waitForSave();
+    await act(() => render(null, root));
+    await act(() => render(h(App), root));
+    for (let attempt = 0; attempt < 20 && !root.querySelector("a[download]"); attempt++)
+      await settle();
+    const reloaded = root.querySelector(".imageCard a[download]");
+    assert.equal(reloaded.download, `photo_small.${extension}`);
+    assert.equal(blobs.get(reloaded.href).type, `image/${format}`);
+  });
+}
+
+test("native downloads preserve card content and collision filenames after reload", async () => {
   await act(() => render(h(App), root));
   await settle();
   await upload([
@@ -404,8 +444,27 @@ test("reload preserves collision filenames and download request markers", async 
   const download = root.querySelector(".imageCard a[download]");
   const filename = download.download;
   assert.match(filename, /\(2\)/);
-  download.addEventListener("click", (event) => event.preventDefault());
+  const content = root.querySelector(".imageCard").textContent;
+  const url = download.href;
+  assert.match(url, /^blob:/);
+  assert.equal(url, root.querySelector(".imageCard img").src);
+  assert.equal(download.target, "");
+  let prevented;
+  document.addEventListener(
+    "click",
+    (event) => {
+      prevented = event.defaultPrevented;
+      // Suppress navigation only in the simulated DOM, after app handlers run.
+      event.preventDefault();
+    },
+    { once: true },
+  );
   await click(download);
+  await settle();
+  assert.equal(root.querySelector(".imageCard").textContent, content);
+  assert.equal(prevented, false);
+  assert.equal(download.href, url);
+  assert.doesNotMatch(content, /Download requested/);
   await waitForSave();
   await act(() => render(null, root));
   await act(() => render(h(App), root));
@@ -416,7 +475,7 @@ test("reload preserves collision filenames and download request markers", async 
   )
     await settle();
   assert.equal(root.querySelector(".imageCard a[download]").download, filename);
-  assert.match(
+  assert.doesNotMatch(
     root.querySelector(".imageCard").textContent,
     /Download requested/,
   );

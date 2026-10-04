@@ -48,7 +48,7 @@ Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding 
 
 Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch; Undo removal restores it, including cached results while they remain in the bounded undo history. Removing an image or a selection can also be undone.
 
-ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Individual files and archives indicate that a download was requested; the app cannot verify where the browser saved them.
+ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Individual images use native download links to their output blobs; ZIPs use FileSaver. Downloads do not add a success message to the page, and the app cannot verify where the browser saved them.
 
 Choose an image preview to compare it with the original or an available previous output. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch. Previous variants use a bounded memory cache and may be evicted as you work.
 

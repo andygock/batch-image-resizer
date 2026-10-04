@@ -48,7 +48,6 @@ export function createZipExporter(save, createZip = () => new JSZip()) {
         state = {
           ...state,
           progress: 100,
-          message: `Download requested: ${filename}`,
         };
         return snapshot;
       } catch (error) {

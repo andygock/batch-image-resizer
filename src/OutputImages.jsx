@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, ImagePlus, Trash2 } from "lucide-preact";
 import styles from "./OutputImages.module.css";
-import { downloadRequestKey } from "./downloads.js";
 
 export const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
 
@@ -73,8 +72,6 @@ export default function OutputImages({
   isZipping,
   viewMode,
   onViewModeChange,
-  downloadRequests,
-  onDownloadRequested,
   onInspect,
 }) {
   if (!images.length)
@@ -288,13 +285,8 @@ export default function OutputImages({
                       {output && (
                         <a
                           href={!downloadsBlocked && url ? url : undefined}
-                          aria-disabled={downloadsBlocked || !url}
-                          onClick={(event) => {
-                            if (downloadsBlocked || !url)
-                              event.preventDefault();
-                            else onDownloadRequested(output);
-                          }}
                           download={output.downloadFilename}
+                          aria-disabled={downloadsBlocked || !url}
                           title={
                             downloadsBlocked
                               ? "Fix the custom dimensions before downloading"
@@ -316,12 +308,6 @@ export default function OutputImages({
                         <Trash2 size={14} aria-hidden="true" />
                       </button>
                     </div>
-                    {output &&
-                      downloadRequests.has(downloadRequestKey(output)) && (
-                        <span className={styles.sourceName}>
-                          Download requested
-                        </span>
-                      )}
                     {status === "error" && (
                       <div className={styles.error}>
                         <p>{record.error}</p>

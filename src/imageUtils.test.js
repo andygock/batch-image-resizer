@@ -120,6 +120,20 @@ test("collision filenames remain stable after removal and later additions", () =
   );
 });
 
+test("stale recovered filename extensions are repaired without renaming valid outputs", () => {
+  const sources = [
+    { id: "a", filename: "photo.jpg", outputExtension: "jpg" },
+    { id: "b", filename: "photo.jpg", outputExtension: "jpg" },
+  ];
+  const assignments = new Map();
+  nameOutputs(sources, true, "_small", assignments);
+  assignments.get("a").name = "photo_small.webp";
+  const outputs = nameOutputs(sources, true, "_small", assignments);
+  assert.equal(outputs[0].downloadFilename, "photo_small.jpg");
+  assert.equal(outputs[1].downloadFilename, "photo_small (2).jpg");
+  assert.equal(assignments.get("a").name, "photo_small.jpg");
+});
+
 test("a late job cannot publish after replacement or reset", async () => {
   const owner = createJobOwner();
   const first = owner.start();

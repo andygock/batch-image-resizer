@@ -636,8 +636,6 @@ function App() {
             records={records}
             downloadsBlocked={sizeDraft.invalid}
             outputNames={outputNames}
-            downloadRequests={downloadRequests}
-            onDownloadRequested={(output) => markDownloads([output])}
             onInspect={setInspectedId}
             resizedImages={outputs}
             loading={isProcessing}
