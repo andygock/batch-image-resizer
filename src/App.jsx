@@ -383,7 +383,7 @@ function App() {
               type="file"
               id="add-images"
               aria-label={isEmpty ? "Load images" : "Add images"}
-              accept="image/jpeg, image/png, image/webp"
+              accept="image/jpeg, image/png, image/webp, image/avif"
               multiple
               onChange={handleFileInputChange}
             />

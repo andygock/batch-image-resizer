@@ -10,7 +10,7 @@ export const PREFERENCES_STORAGE_KEY = "batch-image-resizer:preferences:v1";
 export const DEFAULT_PREFERENCES = Object.freeze({
   boundingBox: Object.freeze({ width: 512, height: 512 }),
   outputFormat: "source",
-  qualityByFormat: Object.freeze({ jpeg: 0.8, webp: 0.8 }),
+  qualityByFormat: Object.freeze({ jpeg: 0.8, webp: 0.8, avif: 0.5 }),
   pngColors: 0,
   advanced: DEFAULT_ADVANCED,
   processing: DEFAULT_PROCESSING,
@@ -22,7 +22,7 @@ export const DEFAULT_PREFERENCES = Object.freeze({
   rememberPreferences: true,
 });
 
-const OUTPUT_FORMATS = new Set(["source", "jpeg", "png", "webp"]);
+const OUTPUT_FORMATS = new Set(["source", "jpeg", "png", "webp", "avif"]);
 const VIEW_MODES = new Set(["grid", "list"]);
 const PNG_COLOURS = new Set([0, 256, 128, 64, 32, 16, 8, 4, 2]);
 const MAX_SUFFIX_LENGTH = 100;
@@ -73,6 +73,7 @@ export function sanitisePreferences(value) {
     qualityByFormat: {
       jpeg: validQuality(quality.jpeg) ? quality.jpeg : 0.8,
       webp: validQuality(quality.webp) ? quality.webp : 0.8,
+      avif: validQuality(quality.avif, 0) ? quality.avif : 0.5,
     },
     pngColors: PNG_COLOURS.has(input.pngColors) ? input.pngColors : 0,
     enableSuffix:
@@ -98,11 +99,11 @@ export function sanitisePreferences(value) {
   };
 }
 
-function validQuality(value) {
+function validQuality(value, min = 0.3) {
   return (
     typeof value === "number" &&
     Number.isFinite(value) &&
-    value >= 0.3 &&
+    value >= min &&
     value <= 1
   );
 }

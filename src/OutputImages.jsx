@@ -1,6 +1,6 @@
 import { Download, ImagePlus, Trash2 } from "lucide-preact";
-import { useEffect, useState } from "react";
 import styles from "./OutputImages.module.css";
+import useImageUrl from "./useImageUrl.js";
 
 export const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
 
@@ -12,16 +12,11 @@ export function OutputImage({
   children,
   onInspect,
 }) {
-  const [preview, setPreview] = useState(null);
-  useEffect(() => {
-    const nextUrl = URL.createObjectURL(blob);
-    setPreview({ blob, url: nextUrl });
-    return () => URL.revokeObjectURL(nextUrl);
-  }, [blob]);
-  const url = preview?.blob === blob ? preview.url : "";
+  const { url, previewUrl, onError, error } = useImageUrl(blob);
   const img = url && (
     <img
-      src={url}
+      src={previewUrl}
+      onError={onError}
       alt={filename}
       width={width}
       height={height}
@@ -44,6 +39,7 @@ export function OutputImage({
         img
       )}
       {children?.(url)}
+      {error && <small role="status">{error}</small>}
     </>
   );
 }
@@ -83,11 +79,11 @@ export default function OutputImages({
           strokeWidth={1.5}
           aria-hidden="true"
         />
-        <p>Drop JPG, PNG or WebP files here, or paste an image.</p>
+        <p>Drop JPG, PNG, WebP or AVIF files here, or paste an image.</p>
         <label className="button buttonPrimary">
           <input
             type="file"
-            accept="image/jpeg, image/png, image/webp"
+            accept="image/jpeg, image/png, image/webp, image/avif"
             multiple
             onChange={onFileInputChange}
             disabled={inputDisabled}

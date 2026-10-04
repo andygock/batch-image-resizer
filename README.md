@@ -1,6 +1,6 @@
 # Batch Image Resizer
 
-A minimalist browser app for resizing batches of JPG, PNG and WebP images. Drop images into the page, choose a maximum bounding size and output format, then download the resized files individually or as a ZIP.
+A minimalist browser app for resizing batches of JPG, PNG, WebP and AVIF images. Drop images into the page, choose a maximum bounding size and output format, then download the resized files individually or as a ZIP.
 
 All processing happens locally in the browser using Canvas and browser-side encoders. Images are not uploaded to a server.
 
@@ -18,6 +18,7 @@ Live app hosted on Vercel:
 - Resize into a bounding box while preserving aspect ratio.
 - Optional setting to avoid enlarging smaller source images.
 - Keep each source format by default, or convert to JPEG, PNG or WebP.
+- Import and export still AVIF images with independent quality, speed and transparency settings.
 - Independent JPEG/WebP quality sliders and percentage fields.
 - PNG colour optimisation options.
 - Advanced output modal with per-format settings, presets, Apply/Cancel and reset controls.
@@ -57,6 +58,8 @@ If standard PNG encoding produces incomplete output, the browser's lossless PNG 
 
 ## Advanced output settings
 
+AVIF uses a local worker encoder with quality from 0–100%, speed from 0–10, independent alpha quality, chroma subsampling, quality tuning, denoising and codec sharpness. Lower speed values spend longer compressing. Its encoder and decoder load only when needed. If native AVIF decoding or display fails, a local decoder supplies pixels and a PNG preview while downloads retain the original AVIF bytes. The processing pipeline uses 8-bit RGBA; it does not preserve HDR or higher-bit-depth source data.
+
 Open **Advanced → Image processing** for resize quality controls. Auto uses the browser's high-quality resizer; nearest-neighbour keeps pixel-art edges hard. Lanczos3 favours sharp detail and Mitchell gives softer edges. Both advanced methods support optional linear-light and alpha-aware filtering in a cancellable local worker, with a 33.5-megapixel source limit. Settings are saved with preferences and can be trialled in the comparison panel. Changes remain staged until the parent settings are applied.
 
 Choose **Advanced** next to the format controls. The modal keeps separate settings for WebP, JPEG and PNG. Changing the modal's format section does not change the batch output format. Edits take effect together with **Apply settings**; Cancel, Escape and closing the modal discard them. Each format has a reset button. Less common encoder controls are under **Fine tuning**.
@@ -65,6 +68,7 @@ JPEG and WebP use the browser encoder by default. Select **Advanced** in the for
 
 | Format | Available advanced controls |
 | --- | --- |
+| AVIF | Independent quality and transparency quality; speed; chroma subsampling; quality tuning; denoising; codec sharpness and sharper colour conversion. |
 | WebP | Lossy, lossless and near-lossless modes; encoding effort; lossless compression effort; near-lossless fidelity; image hints; transparency quality and filtering; preservation of invisible RGB; sharper colour conversion; spatial noise shaping; deblocking strength, sharpness and automatic filtering; analysis passes; target file size; lower-memory encoding; photo, drawing and text starting presets. |
 | JPEG | Background colour with either encoder; progressive or sequential output; entropy coding optimisation for sequential output; greyscale; automatic, 4:4:4 or 4:2:0 chroma subsampling; separate chroma quality; input smoothing; quantisation tables; trellis optimisation controls; fast, balanced and best-compression starting presets. |
 | PNG | Lossless colours or palettes from 2 to 256 colours; Riemersma dithering strength for reduced palettes; OxiPNG compression effort; Adam7 interlacing; optional optimisation of RGB values beneath fully transparent pixels. |

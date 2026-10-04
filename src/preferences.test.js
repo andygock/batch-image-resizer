@@ -44,7 +44,11 @@ test("preferences sanitisation validates sizes, options, and unique recents", ()
 
   assert.deepEqual(preferences.boundingBox, DEFAULT_PREFERENCES.boundingBox);
   assert.equal(preferences.outputFormat, "source");
-  assert.deepEqual(preferences.qualityByFormat, { jpeg: 0.8, webp: 0.5 });
+  assert.deepEqual(preferences.qualityByFormat, {
+    jpeg: 0.8,
+    webp: 0.5,
+    avif: 0.5,
+  });
   assert.equal(preferences.pngColors, 0);
   assert.equal(preferences.suffix.length, 100);
   assert.equal(preferences.viewMode, "grid");

@@ -3,6 +3,7 @@ const outputFormats = [
   ["jpeg", "JPEG"],
   ["png", "PNG"],
   ["webp", "WebP"],
+  ["avif", "AVIF"],
 ];
 
 export default function OutputFormatSelect({
@@ -16,7 +17,7 @@ export default function OutputFormatSelect({
       htmlFor={id}
       title={
         value === "jpeg"
-          ? "JPEG makes transparent areas white. PNG and WebP preserve transparency."
+          ? "JPEG uses the selected background colour. PNG, WebP and AVIF preserve transparency."
           : "Keep source format to resize without converting image types."
       }
     >

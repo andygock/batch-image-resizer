@@ -13,6 +13,28 @@ const webp = [
   0x52, 0x49, 0x46, 0x46, 0x01, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
 ];
 
+test("AVIF brands are detected in bounded file-type boxes and MIME is normalised", async () => {
+  const bytes = new Uint8Array(24);
+  new DataView(bytes.buffer).setUint32(0, 24);
+  bytes.set(new TextEncoder().encode("ftypmif1"), 4);
+  bytes.set(new TextEncoder().encode("avifmif1"), 16);
+  const source = await inspectImageFile(
+    new File([bytes], "photo.bin", { type: "application/octet-stream" }),
+  );
+  assert.equal(source.sourceFormat, "avif");
+  assert.equal(source.file.type, "image/avif");
+  new DataView(bytes.buffer).setUint32(0, 16);
+  await assert.rejects(
+    inspectImageFile(new File([bytes], "not-avif.bin")),
+    /not a supported/,
+  );
+  new DataView(bytes.buffer).setUint32(0, 100);
+  await assert.rejects(
+    inspectImageFile(new File([bytes], "truncated.avif")),
+    /not a supported/,
+  );
+});
+
 test("imported bytes survive loss of the original file", async () => {
   const bytes = new Uint8Array(128 * 1024 + 7);
   bytes.set(png);
@@ -75,7 +97,7 @@ test("invalid bytes are rejected with the filename even when MIME is supported",
   const file = imageFile("broken.webp", [0, 1, 2, 3], "image/webp");
   await assert.rejects(
     inspectImageFile(file),
-    /broken\.webp.*not a supported JPEG, PNG or WebP/,
+    /broken\.webp.*not a supported JPEG, PNG, WebP or AVIF/,
   );
   const result = await partitionImageFiles([file]);
   assert.deepEqual(result.accepted, []);

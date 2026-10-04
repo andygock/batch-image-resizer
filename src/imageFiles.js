@@ -12,6 +12,19 @@ function hasBytes(bytes, signature, offset = 0) {
 }
 
 function identifyFormat(bytes) {
+  if (hasBytes(bytes, [0x66, 0x74, 0x79, 0x70], 4) && bytes.length >= 16) {
+    const size = new DataView(
+      bytes.buffer,
+      bytes.byteOffset,
+      bytes.byteLength,
+    ).getUint32(0);
+    if (size >= 16 && size <= bytes.length && size % 4 === 0) {
+      for (let offset = 8; offset < size; offset += 4) {
+        if (offset !== 12 && hasBytes(bytes, [0x61, 0x76, 0x69, 0x66], offset))
+          return "avif";
+      }
+    }
+  }
   if (hasBytes(bytes, [0xff, 0xd8, 0xff])) return "jpeg";
   if (hasBytes(bytes, PNG_SIGNATURE)) return "png";
   if (
@@ -45,14 +58,16 @@ export async function inspectImageFile(file) {
 
   let format;
   try {
-    format = identifyFormat(await readRange(file, 0, 12));
+    format = identifyFormat(
+      await readRange(file, 0, Math.min(file.size, CHUNK_SIZE)),
+    );
   } catch (error) {
     throw new Error(`Could not read "${filename}": ${error.message}`);
   }
   if (!format) {
     const typeHint = file.type ? ` (declared as ${file.type})` : "";
     throw new Error(
-      `"${filename}"${typeHint} is not a supported JPEG, PNG or WebP image.`,
+      `"${filename}"${typeHint} is not a supported JPEG, PNG, WebP or AVIF image.`,
     );
   }
   try {
@@ -69,7 +84,7 @@ export async function inspectImageFile(file) {
     if (copiedFormat !== format)
       throw new Error("the file changed while it was being imported");
     const copy = new File(chunks, filename, {
-      type: file.type,
+      type: format === "avif" ? "image/avif" : file.type,
       lastModified: file.lastModified,
     });
     return { file: copy, sourceFormat: copiedFormat };

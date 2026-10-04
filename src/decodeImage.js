@@ -1,3 +1,5 @@
+import { decodeAvifImage } from "./decodeAvifImage.js";
+
 function loadImage(file, signal) {
   return new Promise((resolve, reject) => {
     signal.throwIfAborted();
@@ -74,6 +76,7 @@ export async function decodeImage(file, signal) {
     return await loadImage(file, signal);
   } catch (error) {
     signal.throwIfAborted();
+    if (file.type === "image/avif") return decodeAvifImage(file, signal);
     throw new Error(
       `Automatic decoding recovery failed: ${failure.message} ${error.message}`,
       { cause: error },

@@ -11,7 +11,7 @@ import Modal from "./Modal.jsx";
 import ProcessingSettings from "./ProcessingSettings.jsx";
 import { DEFAULT_PREFERENCES } from "./preferences.js";
 
-const names = { webp: "WebP", jpeg: "JPEG", png: "PNG" };
+const names = { webp: "WebP", jpeg: "JPEG", png: "PNG", avif: "AVIF" };
 const primary = new Set([
   "encoder",
   "background",
@@ -25,6 +25,8 @@ const primary = new Set([
   "level",
   "interlace",
   "optimiseAlpha",
+  "speed",
+  "alphaQuality",
 ]);
 
 function Field({ field, value, onChange, disabled }) {
@@ -284,7 +286,7 @@ export default function AdvancedSettings({
               loads locally on demand and can take longer than browser encoding.
             </p>
           )}
-          {options.encoder === "advanced" && (
+          {(options.encoder === "advanced" || format === "avif") && (
             <>
               {(format === "jpeg" || options.mode === "lossy") && (
                 <label className={styles.preset}>

@@ -5,6 +5,7 @@ export const outputFormats = {
   jpeg: { mimeType: "image/jpeg", extension: "jpg" },
   png: { mimeType: "image/png", extension: "png" },
   webp: { mimeType: "image/webp", extension: "webp" },
+  avif: { mimeType: "image/avif", extension: "avif" },
 };
 
 export function validateSize({ width, height }) {

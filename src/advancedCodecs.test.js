@@ -82,6 +82,26 @@ test("real MozJPEG outputs honour progressive, chroma sampling and greyscale", a
   );
 });
 
+test("real AVIF encoder and decoder preserve dimensions and lossless alpha", async () => {
+  const { decodeAvif } = await import("./avifCodec.js");
+  const input = pixels();
+  const encoded = await encodeAdvanced(input, {
+    format: "avif",
+    quality: 0.5,
+    advanced: sanitiseAdvanced({ avif: { speed: 8, alphaQuality: 100 } }),
+  });
+  const decoded = await decodeAvif(encoded);
+  assert.equal(decoded.width, input.width);
+  assert.equal(decoded.height, input.height);
+  for (let i = 3; i < input.data.length; i += 4)
+    assert.equal(decoded.data[i], input.data[i]);
+  const { inspectImageFile } = await import("./imageFiles.js");
+  assert.equal(
+    (await inspectImageFile(new File([encoded], "output.avif"))).sourceFormat,
+    "avif",
+  );
+});
+
 test("real lossless WebP round-trips resized RGBA pixels including hidden RGB", async () => {
   const { default: decode, init } = await import("@jsquash/webp/decode.js");
   const module = await WebAssembly.compile(

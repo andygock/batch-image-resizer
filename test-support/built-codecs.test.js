@@ -105,10 +105,21 @@ test("built JPEG and WebP worker loads bundled encoder assets", async () => {
         }),
       },
     },
+    {
+      settings: {
+        format: "avif",
+        quality: 0.5,
+        advanced: sanitiseAdvanced({ avif: { speed: 8 } }),
+      },
+    },
   ]);
   assert.deepEqual([...new Uint8Array(buffers[0]).slice(0, 2)], [255, 216]);
   assert.equal(
     new TextDecoder().decode(new Uint8Array(buffers[1]).slice(0, 4)),
     "RIFF",
   );
+  const [decoded] = await runWorker("avifDecode.worker", [
+    { buffer: buffers[2] },
+  ]);
+  assert.equal(decoded.byteLength, 32 * 32 * 4);
 });

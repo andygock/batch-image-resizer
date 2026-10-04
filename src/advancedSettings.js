@@ -27,6 +27,47 @@ const lossy = (s) => s.mode === "lossy";
 const colourJpeg = (s) => !s.greyscale;
 
 export const ADVANCED_FIELDS = {
+  avif: {
+    speed: number(
+      "Encoding speed",
+      6,
+      0,
+      10,
+      "0 is slowest and most thorough; 10 is fastest. AVIF can take substantially longer to encode.",
+    ),
+    alphaQuality: number(
+      "Transparency quality",
+      100,
+      0,
+      100,
+      "100 preserves transparency values.",
+    ),
+    subsampling: select("Chroma subsampling", 1, [
+      [1, "4:2:0 · smaller files"],
+      [2, "4:2:2"],
+      [3, "4:4:4 · full colour detail"],
+    ]),
+    tune: select("Quality tuning", 0, [
+      [0, "Automatic"],
+      [1, "PSNR"],
+      [2, "SSIM"],
+    ]),
+    denoise: number(
+      "Denoising strength",
+      0,
+      0,
+      50,
+      "0 disables noise removal; higher settings can remove fine detail.",
+    ),
+    sharpness: number(
+      "Codec sharpness",
+      0,
+      0,
+      7,
+      "Controls the encoder's filtering, independently of image sharpening.",
+    ),
+    sharpYuv: toggle("Sharper colour conversion", false),
+  },
   webp: {
     encoder: select("Encoder", "browser", [
       ["browser", "Browser · fast"],

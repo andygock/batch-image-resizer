@@ -150,8 +150,9 @@ export async function resizeImage({ id, file }, settings, signal) {
     const encoded =
       settings.format === "png"
         ? await encodePng(canvas, settings.colours, signal, settings.advanced)
-        : sanitiseAdvanced(settings.advanced)[settings.format]?.encoder ===
-            "advanced"
+        : settings.format === "avif" ||
+            sanitiseAdvanced(settings.advanced)[settings.format]?.encoder ===
+              "advanced"
           ? await encodeWithWorker(canvas, settings, signal)
           : {
               blob: await canvas.convertToBlob({

@@ -2,6 +2,10 @@ import { jpegOptions, webpOptions } from "./advancedSettings.js";
 
 // Explicit asset URLs let Vite serve and bundle WASM without a CDN or runtime paths.
 export async function encodeAdvanced(pixels, settings) {
+  if (settings.format === "avif") {
+    const { encodeAvif } = await import("./avifCodec.js");
+    return encodeAvif(pixels, settings);
+  }
   if (settings.format === "webp") {
     const { default: encode, init } = await import("@jsquash/webp/encode.js");
     const [{ default: scalar }, { default: simd }] = await Promise.all([

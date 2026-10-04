@@ -22,10 +22,11 @@ function QualityControl({
   const [draft, setDraft] = useState(String(Math.round(value * 100)));
   useEffect(() => setDraft(String(Math.round(value * 100))), [value]);
   const percent = Number(draft);
+  const minimum = format === "avif" ? 0 : 30;
   const valid =
     draft !== "" &&
     Number.isInteger(percent) &&
-    percent >= 30 &&
+    percent >= minimum &&
     percent <= 100;
   const commit = () => {
     if (valid && percent / 100 !== value) onChange(percent / 100);
@@ -36,16 +37,17 @@ function QualityControl({
       setDraft(String(Math.round(value * 100)));
     }
   };
-  const title = `${format === "jpeg" ? "JPEG" : "WebP"} quality`;
+  const label = { jpeg: "JPEG", webp: "WebP", avif: "AVIF" }[format];
+  const title = `${label} quality`;
   return (
     <div className="qualityControl">
       <label htmlFor={`${idPrefix}${format}-quality-number`} title={title}>
-        {compact ? `${format === "jpeg" ? "JPG" : "WebP"} Q` : title}
+        {compact ? `${label} Q` : title}
       </label>
       {!compact && (
         <input
           type="range"
-          min="30"
+          min={minimum}
           max="100"
           step="1"
           value={valid ? percent : Math.round(value * 100)}
@@ -75,7 +77,7 @@ function QualityControl({
         id={`${idPrefix}${format}-quality-number`}
         className="numeric qualityNumber"
         type="number"
-        min="30"
+        min={minimum}
         max="100"
         step="1"
         required
@@ -95,7 +97,7 @@ function QualityControl({
       <span>%</span>
       {!valid && (
         <span role="status">
-          Enter 30–100%. Applied: {Math.round(value * 100)}%.
+          Enter {minimum}–100%. Applied: {Math.round(value * 100)}%.
         </span>
       )}
     </div>
@@ -120,7 +122,7 @@ export default function CompressionSelect({
     (webp.mode !== "lossy" || webp.targetSizeKB > 0);
   return (
     <>
-      {["jpeg", "webp"]
+      {["jpeg", "webp", "avif"]
         .filter(
           (type) =>
             formats.includes(type) && !(type === "webp" && webpQualityInactive),
