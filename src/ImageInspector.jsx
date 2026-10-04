@@ -28,6 +28,8 @@ export default function ImageInspector({
   });
   const [actualSize, setActualSize] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [candidateA, setCandidateA] = useState(null);
+  const [compareOutputs, setCompareOutputs] = useState(false);
   const [split, setSplit] = useState(50);
   const comparison = useRef(null);
   const slider = useRef(null);
@@ -35,6 +37,9 @@ export default function ImageInspector({
   useEffect(() => setDraft(settings), [settings]);
   useEffect(() => {
     setSplit(50);
+    setCandidateA((current) =>
+      current?.result.id === source.id ? current : null,
+    );
   }, [source.id]);
   useEffect(() => {
     const controller = new AbortController();
@@ -73,6 +78,14 @@ export default function ImageInspector({
   }, [source, draft, processor, batchResult]);
   const result =
     preview.result?.id === source.id ? preview.result : batchResult;
+  const savedA = candidateA?.result.id === source.id ? candidateA : null;
+  const leftOutput = compareOutputs ? savedA?.result : null;
+  const currentResult =
+    result &&
+    settingsKey(result.settings) ===
+      settingsKey(resolveSettings(source, draft));
+  const details = (output) =>
+    `${output.settings?.format?.toUpperCase() || ""} · ${formatKb(output.filesizeAfter)} · ${output.widthAfter}×${output.heightAfter}px${Number.isFinite(output.encodingTimeMs) ? ` · ${(output.encodingTimeMs / 1000).toFixed(2)} s encoding` : ""}`;
   const viewport = useImagePan(actualSize, source.id, result ? split : 100);
   const changed =
     JSON.stringify(draft.processing) !== JSON.stringify(settings.processing) ||
@@ -146,14 +159,53 @@ export default function ImageInspector({
           </button>
         </div>
       </div>
+      <div className={styles.controls}>
+        <button
+          disabled={!currentResult || preview.busy || Boolean(preview.error)}
+          onClick={() => {
+            setCandidateA({ result, settings: draft });
+            setCompareOutputs(true);
+          }}
+        >
+          {savedA ? "Replace A with current output" : "Save output as A"}
+        </button>
+        {savedA && (
+          <>
+            <button
+              aria-pressed={compareOutputs}
+              onClick={() => setCompareOutputs(!compareOutputs)}
+            >
+              {compareOutputs ? "Compare original" : "Compare A/B"}
+            </button>
+            <button onClick={() => onApply(savedA.settings)}>
+              Apply A to batch
+            </button>
+            <button
+              onClick={() => {
+                setCandidateA(null);
+                setCompareOutputs(false);
+              }}
+            >
+              Discard A
+            </button>
+          </>
+        )}
+      </div>
+      <p className={styles.hint}>
+        {savedA
+          ? "A is saved independently. Adjust the controls below to create B, then apply your preferred output to the batch."
+          : "Save an output as A to compare two formats or quality settings."}
+      </p>
       <div>
         <div className={styles.captions}>
-          <span>Original · {formatKb(source.file.size)}</span>
           <span>
-            {changed ? "Trial output" : "Output"}
-            {result
-              ? ` · ${formatKb(result.filesizeAfter)} · ${result.widthAfter}×${result.heightAfter}px`
-              : ""}
+            {leftOutput
+              ? `A · ${details(leftOutput)}`
+              : `Original · ${formatKb(source.file.size)}`}
+          </span>
+          <span>
+            {leftOutput ? "B" : changed ? "Trial output" : "Output"}
+            {result ? ` · ${details(result)}` : ""}
           </span>
         </div>
         <div
@@ -209,8 +261,8 @@ export default function ImageInspector({
               </div>
               <div className={`${styles.imageLayer} ${styles.before}`}>
                 <OutputImage
-                  blob={source.file}
-                  filename={`Original ${source.file.name}`}
+                  blob={leftOutput?.blob || source.file}
+                  filename={`${leftOutput ? "Output A" : "Original"} ${source.file.name}`}
                   width={result?.widthAfter}
                   height={result?.heightAfter}
                 />
@@ -227,7 +279,7 @@ export default function ImageInspector({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(split)}
-              aria-valuetext={`${Math.round(split)}% original visible`}
+              aria-valuetext={`${Math.round(split)}% ${leftOutput ? "output A" : "original"} visible`}
               aria-orientation="horizontal"
               onKeyDown={(event) => {
                 const steps = {
@@ -290,7 +342,7 @@ export default function ImageInspector({
           disabled={!changed || preview.busy || Boolean(preview.error)}
           onClick={() => onApply(draft)}
         >
-          Apply to batch
+          {leftOutput ? "Apply B to batch" : "Apply to batch"}
         </button>
         {changed && (
           <button onClick={() => setDraft(settings)}>Revert trial</button>

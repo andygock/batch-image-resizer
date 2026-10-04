@@ -145,6 +145,7 @@ export async function resizeImage({ id, file }, settings, signal) {
       ctx.drawImage(bitmap.image, 0, 0, size.width, size.height);
     }
     stage = "encode";
+    const encodingStarted = performance.now();
     const { mimeType, extension } = outputFormats[settings.format];
     const encoded =
       settings.format === "png"
@@ -185,6 +186,7 @@ export async function resizeImage({ id, file }, settings, signal) {
           ? "The WebP output exceeds the requested target size. Try smaller dimensions or a larger target."
           : ""),
       appliedColours,
+      encodingTimeMs: performance.now() - encodingStarted,
     };
   } catch (error) {
     if (signal.aborted) throw signal.reason;

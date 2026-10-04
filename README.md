@@ -77,6 +77,8 @@ The comparison panel has its own **Advanced** button. **Apply to trial** updates
 
 ## Keyboard and selection
 
+In the comparison panel, **Save output as A** freezes the current result and its settings. Adjust the controls to generate B, then compare both outputs using the shared divider, zoom and pan. Captions show format, dimensions, file size and encoding time. Apply either candidate to the batch, switch back to the original, replace A, or discard it. A is cleared when navigating to another image or closing the panel.
+
 - Shift-click an image checkbox to select a range.
 - With focus in the image batch, use Ctrl/Cmd+A to select all, Delete to remove the selection and Escape to clear it.
 - In the comparison panel, use Left/Right to inspect adjacent images and Escape to close it.

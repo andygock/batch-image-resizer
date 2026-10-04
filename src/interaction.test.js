@@ -636,6 +636,44 @@ test("single-image quality trials do not change the batch until applied", async 
   assert.equal(root.querySelector("#jpeg-quality-number").value, "60");
 });
 
+test("saved output A stays independent while B changes format and either can be applied", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([jpeg()]);
+  await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
+  for (let i = 0; i < 20 && button("Save output as A").disabled; i++)
+    await settle();
+  assert.equal(button("Save output as A").disabled, false);
+  await click(button("Save output as A"));
+  const left = root.querySelector(".before img");
+  const savedUrl = left.src;
+  await change(root.querySelector("#trial-format"), "webp");
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 230));
+  });
+  assert.equal(left.src, savedUrl);
+  assert.match(
+    root.querySelector(".captions").textContent,
+    /A · JPEG.*B · WEBP/,
+  );
+  assert.equal(button("Apply B to batch").disabled, false);
+  await click(button("Apply B to batch"));
+  await settle();
+  assert.equal(
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).outputFormat,
+    "webp",
+  );
+  await click(button("Apply A to batch"));
+  await settle();
+  assert.equal(
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).outputFormat,
+    "source",
+  );
+  await click(button("Discard A"));
+  await settle();
+  assert.match(root.querySelector(".before img").alt, /Original/);
+});
+
 test("comparison modal supports pointer and keyboard sliding, navigation and dismissal", async () => {
   await act(() => render(h(App), root));
   await settle();
