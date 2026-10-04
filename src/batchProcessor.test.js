@@ -138,16 +138,14 @@ test("paused batches accept edits without starting work until resumed", async ()
   assert.deepEqual(calls, ["a"]);
 });
 
-test("undo restores cached results without encoding them again", async () => {
+test("removal drops cached results while retaining remaining images", async () => {
   let calls = 0;
   const processor = createBatchProcessor(async ({ id }) => {
     calls++;
     return { id };
   });
   await processor.run(sources, settings, {}, () => {});
-  const saved = processor.capture(["a", "b"]);
-  processor.clear();
-  processor.restore(saved);
+  processor.remove(["a"]);
   await processor.run(sources, settings, {}, () => {});
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
 });

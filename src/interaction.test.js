@@ -233,82 +233,123 @@ test("the menu gear opens storage controls in a dismissible modal", async () => 
   assert.equal(document.activeElement, gear);
 });
 
-test("clear all removes database, web storage, pending work and undo without re-saving", async () => {
+for (const control of ["toolbar", "storage settings"]) {
+  test(`${control} clear removes database, web storage, pending work and undo without re-saving`, async () => {
+    await act(() => render(h(App), root));
+    await settle();
+    const input = root.querySelector("#add-images");
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      value: [jpeg()],
+    });
+    await act(() =>
+      input.dispatchEvent(new window.Event("change", { bubbles: true })),
+    );
+    await settle();
+    assert.equal(root.querySelectorAll(".imageCard").length, 1);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    assert.ok(
+      (await indexedDB.databases()).some(
+        ({ name }) => name === BATCH_DATABASE_NAME,
+      ),
+    );
+    await click(root.querySelector("button[aria-label='Remove photo.jpg']"));
+    assert.equal(button("Undo removal"), undefined);
+    await upload([jpeg("next.jpg")]);
+    assert.equal(root.querySelectorAll(".imageCard").length, 1);
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
+    localStorage.setItem("unrelated", "keep");
+    localStorage.setItem("batch-image-resizer:unrecognised", "keep");
+    sessionStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
+    sessionStorage.setItem(STORAGE_POLICY_KEY, "choices");
+    sessionStorage.setItem("batch-image-resizer:unrecognised", "keep");
+    sessionStorage.setItem("unrelated", "keep");
+    const otherDatabaseName = "batch-image-resizer:unrecognised";
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open(otherDatabaseName);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore("important").put("keep", "data");
+      };
+      request.onsuccess = () => {
+        request.result.close();
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+    if (control === "toolbar") {
+      const clear = button("Clear");
+      assert.equal(clear.querySelector("span").className, "");
+      await click(clear);
+    } else {
+      await click(
+        root.querySelector("button[aria-label='Saved data and preferences']"),
+      );
+      await click(button("Clear all app data and current batch"));
+    }
+    await settle();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+    assert.equal(root.querySelectorAll(".imageCard").length, 0);
+    assert.equal(button("Undo removal"), undefined);
+    assert.deepEqual(
+      (await indexedDB.databases()).map(({ name }) => name),
+      [otherDatabaseName],
+    );
+    const otherData = await new Promise((resolve, reject) => {
+      const request = indexedDB.open(otherDatabaseName);
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction("important", "readonly");
+        const read = transaction.objectStore("important").get("data");
+        read.onsuccess = () => resolve(read.result);
+        read.onerror = () => reject(read.error);
+        transaction.oncomplete = () => database.close();
+      };
+      request.onerror = () => reject(request.error);
+    });
+    assert.equal(otherData, "keep");
+    assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
+    assert.equal(
+      localStorage.getItem("batch-image-resizer:unrecognised"),
+      "keep",
+    );
+    assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), null);
+    assert.equal(sessionStorage.getItem(STORAGE_POLICY_KEY), null);
+    assert.equal(
+      sessionStorage.getItem("batch-image-resizer:unrecognised"),
+      "keep",
+    );
+    assert.equal(localStorage.getItem("unrelated"), "keep");
+    assert.equal(sessionStorage.getItem("unrelated"), "keep");
+  });
+}
+
+test("toolbar clear works without images and reports storage failures for retry", async (t) => {
   await act(() => render(h(App), root));
   await settle();
-  const input = root.querySelector("#add-images");
-  Object.defineProperty(input, "files", {
-    configurable: true,
-    value: [jpeg()],
+  localStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
+  sessionStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
+  const remove = t.mock.method(sessionStorage, "removeItem", () => {
+    throw new Error("Storage is blocked");
   });
-  await act(() =>
-    input.dispatchEvent(new window.Event("change", { bubbles: true })),
-  );
+  assert.equal(button("Clear").disabled, false);
+  await click(button("Clear"));
   await settle();
-  assert.equal(root.querySelectorAll(".imageCard").length, 1);
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  });
-  assert.ok(
-    (await indexedDB.databases()).some(
-      ({ name }) => name === BATCH_DATABASE_NAME,
-    ),
-  );
-  localStorage.setItem("unrelated", "keep");
-  localStorage.setItem("batch-image-resizer:unrecognised", "keep");
-  sessionStorage.setItem(PREFERENCES_STORAGE_KEY, "keep");
-  sessionStorage.setItem("unrelated", "keep");
-  const otherDatabaseName = "batch-image-resizer:unrecognised";
-  await new Promise((resolve, reject) => {
-    const request = indexedDB.open(otherDatabaseName);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore("important").put("keep", "data");
-    };
-    request.onsuccess = () => {
-      request.result.close();
-      resolve();
-    };
-    request.onerror = () => reject(request.error);
-  });
-  await click(
-    root.querySelector("button[aria-label='Saved data and preferences']"),
-  );
-  await click(button("Clear all app data and current batch"));
-  await settle();
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 350));
-  });
-  assert.equal(root.querySelectorAll(".imageCard").length, 0);
-  assert.equal(button("Undo removal"), undefined);
-  assert.deepEqual(
-    (await indexedDB.databases()).map(({ name }) => name),
-    [otherDatabaseName],
-  );
-  const otherData = await new Promise((resolve, reject) => {
-    const request = indexedDB.open(otherDatabaseName);
-    request.onsuccess = () => {
-      const database = request.result;
-      const transaction = database.transaction("important", "readonly");
-      const read = transaction.objectStore("important").get("data");
-      read.onsuccess = () => resolve(read.result);
-      read.onerror = () => reject(read.error);
-      transaction.oncomplete = () => database.close();
-    };
-    request.onerror = () => reject(request.error);
-  });
-  assert.equal(otherData, "keep");
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-  assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
-  assert.equal(
-    localStorage.getItem("batch-image-resizer:unrecognised"),
-    "keep",
-  );
-  assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), "keep");
-  assert.equal(localStorage.getItem("unrelated"), "keep");
-  assert.equal(sessionStorage.getItem("unrelated"), "keep");
+  assert.match(root.textContent, /Some browser storage could not be cleared/);
+  assert.equal(button("Clear").disabled, false);
+  remove.mock.restore();
+  await click(button("Clear"));
+  await settle();
+  assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), null);
+  assert.match(root.textContent, /All app data, current images/);
 });
 
-test("ready cards remain usable and paused edits stay paused with undo", async (t) => {
+test("deletion cannot be undone and paused edits stay paused", async (t) => {
   let release;
   t.mock.method(globalThis, "createImageBitmap", async (file) =>
     file.name === "later.jpg"
@@ -326,9 +367,18 @@ test("ready cards remain usable and paused edits stay paused with undo", async (
   await click(root.querySelector("button[aria-label='Pause processing']"));
   await click(root.querySelector("button[aria-label='Remove photo.jpg']"));
   assert.ok(root.querySelector("button[aria-label='Resume processing']"));
-  await click(button("Undo removal"));
-  assert.equal(root.querySelectorAll(".imageCard").length, 2);
-  assert.equal(root.querySelectorAll(".imageCard a[download]").length, 1);
+  assert.equal(button("Undo removal"), undefined);
+  await act(() =>
+    document.dispatchEvent(
+      new window.KeyboardEvent("keydown", {
+        key: "z",
+        ctrlKey: true,
+        bubbles: true,
+      }),
+    ),
+  );
+  assert.equal(root.querySelectorAll(".imageCard").length, 1);
+  assert.equal(root.querySelectorAll(".imageCard a[download]").length, 0);
   assert.ok(root.querySelector("button[aria-label='Resume processing']"));
   assert.equal(
     root.querySelector(".imageCard input[type=checkbox]").checked,
@@ -336,6 +386,35 @@ test("ready cards remain usable and paused edits stay paused with undo", async (
   );
   release({ width: 1200, height: 800, close() {} });
   await settle();
+});
+
+test("individual and selected deletions reach saved storage before the save debounce", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload(
+    [1, 2, 3].map(
+      (number) =>
+        new File([new Uint8Array([255, 216, 255, number])], `${number}.jpg`),
+    ),
+  );
+  await waitForSave();
+  await click(root.querySelector("button[aria-label='Remove 1.jpg']"));
+  let saved = await loadBatch();
+  assert.deepEqual(
+    saved.sources.map(({ file }) => file.name),
+    ["2.jpg", "3.jpg"],
+  );
+  for (const input of root.querySelectorAll(".imageCard input[type=checkbox]"))
+    await click(input);
+  await click(button("Remove selected"));
+  saved = await loadBatch();
+  assert.equal(saved, null);
+  assert.deepEqual(await indexedDB.databases(), []);
+  assert.equal(button("Undo removal"), undefined);
+  await act(() => render(null, root));
+  await act(() => render(h(App), root));
+  await settle();
+  assert.equal(root.querySelectorAll(".imageCard").length, 0);
 });
 
 test("range selection and keyboard removal retain the nearest context", async () => {

@@ -52,7 +52,7 @@ export default function StorageSettings({
             Clear app Local Storage
           </button>
           <button onClick={onClearCache} disabled={busy}>
-            Clear cached results and undo history
+            Clear cached results
           </button>
           <button onClick={onClearAll} disabled={busy}>
             Clear all app data and current batch
@@ -62,12 +62,13 @@ export default function StorageSettings({
           Clearing a saved category also stops saving it. Turning remembering
           off is remembered as a storage choice. Clearing Local Storage removes
           those choices too; saving stays off for this visit until enabled
-          again. Clearing all also removes the current batch and its undo
-          history.
+          again. Clearing all also removes the current batch. Image deletion is
+          permanent and cannot be undone.
         </p>
         <p>
-          Only this app’s known Local Storage keys and saved batch database are
-          removed. Other browser data and files already downloaded are kept.
+          Clearing all removes this app’s known Local Storage and Session
+          Storage keys and saved batch database. Other browser data and files
+          already downloaded are kept.
         </p>
         {message && <p role="status">{message}</p>}
         {error && <p role="alert">{error}</p>}

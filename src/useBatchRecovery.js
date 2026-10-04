@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { clearBatch, loadBatch, saveBatch } from "./batchStorage.js";
+import {
+  clearBatch,
+  loadBatch,
+  removeSavedImages,
+  saveBatch,
+} from "./batchStorage.js";
 
 export default function useBatchRecovery(
   images,
@@ -111,5 +116,29 @@ export default function useBatchRecovery(
     [setPreference, pauseSaving],
   );
 
-  return { markChanged, forgetBatch, pauseSaving, hydrated, message, error };
+  const removeImages = useCallback(
+    async (ids) => {
+      markChanged();
+      clearTimeout(timer.current);
+      try {
+        await removeSavedImages(ids);
+        setError("");
+      } catch (failure) {
+        setError(
+          `${failure.message}. Retry Clear to delete all saved app data.`,
+        );
+      }
+    },
+    [markChanged],
+  );
+
+  return {
+    markChanged,
+    forgetBatch,
+    removeImages,
+    pauseSaving,
+    hydrated,
+    message,
+    error,
+  };
 }

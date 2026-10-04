@@ -52,6 +52,54 @@ test("batch storage saves a single snapshot and restores file metadata and setti
   assert.equal(adapter.record.sources[0].fileName, "");
 });
 
+test("image deletion removes stored bytes and metadata, then deletes the empty database", async () => {
+  const indexedDB = new IDBFactory();
+  const storage = createBatchStorage(createIndexedDbAdapter(indexedDB));
+  const sources = ["a", "b"].map((id) => ({
+    id,
+    file: new Blob([id]),
+    sourceFormat: "jpeg",
+  }));
+  const saving = storage.saveBatch({
+    sources,
+    preferences: {},
+    selectedIds: ["a", "b"],
+    downloadContext: {
+      names: ["a", "b"].map((id) => [id, { name: `${id}.jpg`, signature: id }]),
+      requests: [JSON.stringify(["a"]), JSON.stringify(["b"]), "invalid"],
+    },
+  });
+  const deleting = storage.removeImages(["a"]);
+  await Promise.all([saving, deleting]);
+  const saved = await storage.loadBatch();
+  assert.deepEqual(
+    saved.sources.map(({ id }) => id),
+    ["b"],
+  );
+  assert.equal(await saved.sources[0].file.text(), "b");
+  assert.deepEqual(saved.selectedIds, ["b"]);
+  assert.deepEqual(
+    saved.downloadContext.names.map(([id]) => id),
+    ["b"],
+  );
+  assert.deepEqual(saved.downloadContext.requests, [JSON.stringify(["b"])]);
+  const storedIds = await new Promise((resolve, reject) => {
+    const request = indexedDB.open(BATCH_DATABASE_NAME);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction("sources", "readonly");
+      const keys = transaction.objectStore("sources").getAllKeys();
+      keys.onsuccess = () => resolve(keys.result);
+      keys.onerror = () => reject(keys.error);
+      transaction.oncomplete = () => database.close();
+    };
+    request.onerror = () => reject(request.error);
+  });
+  assert.deepEqual(storedIds, ["b"]);
+  await storage.removeImages(["b"]);
+  assert.deepEqual(await indexedDB.databases(), []);
+});
+
 test("clear is queued after earlier saves and removes the database snapshot", async () => {
   let releaseSave;
   let record = null;

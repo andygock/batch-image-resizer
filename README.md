@@ -12,7 +12,7 @@ Live app hosted on Vercel:
 
 - Resize multiple images at once.
 - Add more images without clearing the current batch.
-- Remove individual images or a selection, with undo.
+- Permanently delete individual images or a selection.
 - Drag and drop files anywhere on the page or paste images.
 - Check image signatures and skip identical files, with an option to add duplicates anyway.
 - Resize into a bounding box while preserving aspect ratio.
@@ -46,9 +46,9 @@ The selected size is a maximum bounding box, not a crop. For example, a 1200x800
 
 Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding area of 16,777,216 pixels. Edit both dimensions, then apply them with Enter or by leaving the dimension group. Escape restores the applied values. Invalid drafts explain the correction and block downloads until fixed. Transparent images exported to JPEG use a white background; PNG and WebP retain transparency. Browser encoder failures are reported rather than downloading files with misleading extensions.
 
-Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch; Undo removal restores it, including cached results while they remain in the bounded undo history. Removing an image or a selection can also be undone.
+Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch, saved preferences, IndexedDB batch, known app Local Storage and Session Storage keys and cached results. It resets settings and keeps saving off for this visit. Deleting an image or a selection removes its saved source bytes, selection and download metadata, and cached outputs. Deletion cannot be undone.
 
-ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Individual images use native download links to their output blobs; ZIPs use FileSaver. Downloads do not add a success message to the page, and the app cannot verify where the browser saved them.
+ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Deleting images cancels an active export so it cannot download deleted outputs. Individual images use native download links to their output blobs; ZIPs use FileSaver. Downloads do not add a success message to the page, and the app cannot verify where the browser saved them.
 
 Choose an image preview to compare it with the original or an available previous output. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch. Previous variants use a bounded memory cache and may be evicted as you work.
 
@@ -58,7 +58,6 @@ If the PNG optimiser produces incomplete output, the browser's lossless PNG enco
 
 - Shift-click an image checkbox to select a range.
 - With focus in the image batch, use Ctrl/Cmd+A to select all, Delete to remove the selection and Escape to clear it.
-- Use Ctrl/Cmd+Z outside editable controls to undo the latest removal.
 - In the comparison panel, use Left/Right to inspect adjacent images and Escape to close it.
 - Apply numeric fields with Enter and restore their applied values with Escape.
 
@@ -66,9 +65,9 @@ If the PNG optimiser produces incomplete output, the browser's lossless PNG enco
 
 Open **Saved data and preferences** in the footer to control storage. Remembering preferences and recovering the batch are enabled by default and can be switched off independently.
 
-Preferences and storage choices use app-specific Local Storage keys. Source images, batch settings, pause state, selection, output names and download request markers are saved in IndexedDB after a short debounce. Outputs are regenerated after recovery. Undo history and previous output variants remain in memory only. No images are uploaded.
+Preferences and storage choices use app-specific Local Storage keys. Source images, batch settings, pause state, selection, output names and download request markers are saved in IndexedDB after a short debounce. Outputs are regenerated after recovery. Previous output variants remain in memory only. No images are uploaded.
 
-The panel provides separate controls to clear saved preferences, the IndexedDB batch, app Local Storage, app Session Storage, cached results and undo history, or all app data and the current batch. Clearing a saved category stops saving it and tells other open app tabs to pause saving that category too. Clearing stored data leaves the current images available unless you choose to clear all app data. Clearing cached results pauses processing until you resume.
+The panel provides separate controls to clear saved preferences, the IndexedDB batch, app Local Storage and cached results, or all app data and the current batch. Clearing all also removes known app Session Storage keys, and the toolbar Clear button performs the same cleanup. Clearing a saved category stops saving it and tells other open app tabs to pause saving that category too. Clearing stored data leaves the current images available unless you choose to clear all app data. Clearing cached results pauses processing until you resume.
 
 Switching remembering off saves a minimal storage choice so it remains off next time. Clearing Local Storage removes those choices too; preference saving stays off for the current visit until enabled again. Clearing all removes both storage choices and the current batch and keeps both kinds of saving off for the visit. These controls affect only this app's data, not other applications or files already downloaded. The app does not use a service worker or Cache Storage for images.
 

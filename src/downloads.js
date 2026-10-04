@@ -8,6 +8,16 @@ export function downloadRequestKey(output) {
   ]);
 }
 
+export function retainDownloadRequests(requests, ids) {
+  return requests.filter((request) => {
+    try {
+      return ids.has(JSON.parse(request)[0]);
+    } catch {
+      return false;
+    }
+  });
+}
+
 export function archiveFilename(outputs, date = new Date()) {
   const sizes = new Set(
     outputs.map(

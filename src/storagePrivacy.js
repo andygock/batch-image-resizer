@@ -33,3 +33,8 @@ export function clearAppLocalStorage() {
   for (const key of [PREFERENCES_STORAGE_KEY, STORAGE_POLICY_KEY])
     globalThis.localStorage.removeItem(key);
 }
+
+export function clearAppSessionStorage() {
+  for (const key of [PREFERENCES_STORAGE_KEY, STORAGE_POLICY_KEY])
+    globalThis.sessionStorage.removeItem(key);
+}

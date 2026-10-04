@@ -36,10 +36,6 @@ export function createResultCache({
     retain(ids) {
       for (const [name, entry] of entries) if (!ids.has(entry.id)) remove(name);
     },
-    capture: (id) => [...entries.values()].filter((entry) => entry.id === id),
-    restore(id, saved) {
-      for (const { key, result } of saved ?? []) set(id, key, result);
-    },
     clear() {
       entries.clear();
       bytes = 0;

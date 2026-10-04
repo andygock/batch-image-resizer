@@ -5,7 +5,11 @@ import "./App.css";
 import styles from "./App.module.css";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect";
-import { archiveFilename, downloadRequestKey } from "./downloads.js";
+import {
+  archiveFilename,
+  downloadRequestKey,
+  retainDownloadRequests,
+} from "./downloads.js";
 import Errors from "./Errors";
 import ImageInspector from "./ImageInspector.jsx";
 import { nameOutputs, outputFormats } from "./imageUtils.js";
@@ -15,8 +19,7 @@ import { DEFAULT_PREFERENCES, sanitisePreferences } from "./preferences.js";
 import SizeSelect from "./SizeSelect";
 import StorageSettings from "./StorageSettings.jsx";
 import { updateSelection } from "./selection.js";
-import { STORAGE_CHANNEL } from "./storagePrivacy.js";
-import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
+import { clearAppSessionStorage, STORAGE_CHANNEL } from "./storagePrivacy.js";
 import useBatchProcessor from "./useBatchProcessor.js";
 import useBatchRecovery from "./useBatchRecovery.js";
 import { useDragAndDrop } from "./useDragAndDrop";
@@ -55,7 +58,6 @@ function App() {
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
-  const [undoHistory, setUndoHistory] = useState([]);
   const nameAssignments = useRef(new Map());
   const [selected, setSelected] = useState(new Set());
   const [downloadRequests, setDownloadRequests] = useState(new Set());
@@ -217,24 +219,29 @@ function App() {
     setPreference(key, value);
   };
 
-  const handleReset = () => {
-    rememberRemoval(
-      images.map(({ id }) => id),
-      true,
-    );
-    cancelImports();
-    invalidate();
-    processor.clear();
-    nameAssignments.current.clear();
-    setCancelled(false);
-    setImages([]);
-    setSelected(new Set());
-  };
-
   const handleRemoveImages = (ids) => {
-    rememberRemoval(ids);
     invalidate();
     const removed = new Set(ids);
+    processor.remove(ids);
+    storageChannel.current?.postMessage("batch");
+    zipExporter.current.cancel();
+    cancelImports();
+    // Deletion bypasses the save debounce, even when remembering is off.
+    void recovery.removeImages(ids);
+    for (const id of ids) nameAssignments.current.delete(id);
+    setDownloadRequests(
+      (current) =>
+        new Set(
+          retainDownloadRequests(
+            [...current],
+            new Set(
+              images.filter(({ id }) => !removed.has(id)).map(({ id }) => id),
+            ),
+          ),
+        ),
+    );
+    if (removed.has(inspectedId)) setInspectedId(null);
+    if (removed.has(selectionAnchor.current)) selectionAnchor.current = null;
     const restoreFocus = ids.some((id) =>
       document.getElementById(`image-${id}`)?.contains(document.activeElement),
     );
@@ -259,58 +266,6 @@ function App() {
         target?.focus({ preventScroll: true });
       });
   };
-  const rememberRemoval = (ids, cleared = false) => {
-    const removedIds = new Set(ids);
-    const removed = images.flatMap((source, index) =>
-      removedIds.has(source.id) ? [{ source, index }] : [],
-    );
-    if (!removed.length) return;
-    const entry = {
-      removed,
-      outputs: processor.capture(ids),
-      names: ids.map((id) => [id, nameAssignments.current.get(id)]),
-      selection: ids.filter((id) => selected.has(id)),
-      paused: cleared ? cancelled : null,
-    };
-    setUndoHistory((current) => appendUndo(current, entry));
-  };
-  const undoRemoval = useCallback(() => {
-    const entry = undoHistory.at(-1);
-    if (!entry) return;
-    invalidate();
-    processor.restore(entry.outputs);
-    for (const [id, name] of entry.names) {
-      if (
-        name &&
-        ![...nameAssignments.current.values()].some(
-          (existing) => existing.name.toLowerCase() === name.name.toLowerCase(),
-        )
-      )
-        nameAssignments.current.set(id, name);
-    }
-    setImages((current) => restoreRemovedSources(current, entry.removed));
-    setSelected((current) => new Set([...current, ...entry.selection]));
-    if (entry.paused !== null) setCancelled(entry.paused);
-    setUndoHistory((current) => current.slice(0, -1));
-  }, [undoHistory, invalidate, processor]);
-  useEffect(() => {
-    const handleUndo = (event) => {
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === "z" &&
-        !event.target.closest?.(
-          "input, textarea, select, [contenteditable='true']",
-        ) &&
-        undoHistory.length
-      ) {
-        event.preventDefault();
-        undoRemoval();
-      }
-    };
-    document.addEventListener("keydown", handleUndo);
-    return () => document.removeEventListener("keydown", handleUndo);
-  }, [undoRemoval, undoHistory.length]);
 
   const outputNames = useMemo(
     () =>
@@ -328,7 +283,7 @@ function App() {
     [resizedImages, outputNames],
   );
 
-  // Exports own their output snapshot so editing the next batch cannot cancel them.
+  // Exports own their output snapshot; deleting images explicitly cancels it.
   const downloadZip = async (selection) => {
     if (isZipping || !outputs.length || sizeDraft.invalid) return;
     const targets = selection
@@ -361,13 +316,13 @@ function App() {
     zipExporter.current.cancel();
     setCancelled(true);
     setRetry({ ids: [] });
-    setUndoHistory([]);
     setInspectedId(null);
     setDataMessage(
-      "Cached outputs and undo history cleared. Source images remain; Resume rebuilds the outputs.",
+      "Cached outputs cleared. Source images remain; Resume rebuilds the outputs.",
     );
   };
   const clearAllData = async () => {
+    if (clearingData) return;
     setClearingData(true);
     storageChannel.current?.postMessage("all");
     pauseSaving();
@@ -378,8 +333,8 @@ function App() {
     nameAssignments.current.clear();
     setImages([]);
     setSelected(new Set());
+    selectionAnchor.current = null;
     setDownloadRequests(new Set());
-    setUndoHistory([]);
     setInspectedId(null);
     setCancelled(false);
     setRetry({ ids: [] });
@@ -392,10 +347,16 @@ function App() {
     });
     const batchCleared = await recovery.forgetBatch(false);
     const localCleared = clearLocalData();
+    let sessionCleared = true;
+    try {
+      clearAppSessionStorage();
+    } catch {
+      sessionCleared = false;
+    }
     setDataMessage(
-      batchCleared && localCleared
-        ? "All app data, current images, cached outputs and undo history cleared. Saving is off for this visit."
-        : "Some storage could not be cleared. Saving is off; retry the affected clear control below.",
+      batchCleared && localCleared && sessionCleared
+        ? "All app data, current images and cached outputs cleared. Saving is off for this visit."
+        : "Some browser storage could not be cleared. Saving is off; try Clear again or review Saved data and preferences.",
     );
     setClearingData(false);
   };
@@ -490,13 +451,13 @@ function App() {
           </button>
           <button
             className={styles.clearButton}
-            onClick={handleReset}
-            disabled={isEmpty}
-            aria-label="Clear batch"
-            title="Clear batch (can be undone)"
+            onClick={clearAllData}
+            disabled={clearingData}
+            aria-label="Clear all app data and current batch"
+            title="Clear images and saved browser data permanently"
           >
             <Trash2 size={15} aria-hidden="true" />
-            <span className={styles.compactText}>Clear</span>
+            <span>Clear</span>
           </button>
           <button
             className={styles.pauseButton}
@@ -554,8 +515,9 @@ function App() {
           </button>
         </div>
       </div>
+      {dataMessage && !storageOpen && <p role="status">{dataMessage}</p>}
       {isZipping && (
-        <div className={styles.undo}>
+        <div className={styles.statusBar}>
           <span role="status">
             Creating {zipState.filename} from {zipState.count} images ·{" "}
             {zipState.progress}%
@@ -599,7 +561,7 @@ function App() {
       />
       {isImporting && <p role="status">Checking image files…</p>}
       {duplicates.length > 0 && (
-        <div className={styles.undo}>
+        <div className={styles.statusBar}>
           <span role="status">
             Skipped {duplicates.length} identical{" "}
             {duplicates.length === 1 ? "image" : "images"} already in the batch.
@@ -613,13 +575,6 @@ function App() {
             Add duplicates anyway
           </button>
           <button onClick={dismissDuplicates}>Dismiss</button>
-        </div>
-      )}
-      {undoHistory.length > 0 && (
-        <div className={styles.undo} role="status">
-          <span>Removed {undoHistory.at(-1).removed.length} images.</span>
-          <button onClick={undoRemoval}>Undo removal</button>
-          <button onClick={() => setUndoHistory([])}>Dismiss</button>
         </div>
       )}
       {cancelled && (

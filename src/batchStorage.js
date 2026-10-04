@@ -1,3 +1,4 @@
+import { retainDownloadRequests } from "./downloads.js";
 import { sanitisePreferences } from "./preferences.js";
 
 export const BATCH_DATABASE_NAME = "batch-image-resizer:batch:v1";
@@ -383,6 +384,38 @@ export function createBatchStorage(adapter) {
         }
       });
     },
+    removeImages(ids) {
+      return enqueue(async () => {
+        try {
+          const snapshot = await adapter.readSnapshot();
+          if (!snapshot) return;
+          const removed = new Set(ids);
+          const sources = snapshot.sources.filter(({ id }) => !removed.has(id));
+          if (!sources.length) {
+            await adapter.deleteDatabase();
+            return;
+          }
+          await adapter.writeSnapshot({
+            ...snapshot,
+            sources,
+            selectedIds: (snapshot.selectedIds ?? []).filter(
+              (id) => !removed.has(id),
+            ),
+            downloadContext: {
+              names: (snapshot.downloadContext?.names ?? []).filter(
+                ([id]) => !removed.has(id),
+              ),
+              requests: retainDownloadRequests(
+                snapshot.downloadContext?.requests ?? [],
+                new Set(sources.map(({ id }) => id)),
+              ),
+            },
+          });
+        } catch (error) {
+          throw storageError("remove images from", error);
+        }
+      });
+    },
     clearBatch() {
       return enqueue(async () => {
         try {
@@ -417,3 +450,4 @@ export const loadBatch = () => defaultStorage.loadBatch();
 export const saveBatch = (snapshot, shouldSave) =>
   defaultStorage.saveBatch(snapshot, shouldSave);
 export const clearBatch = () => defaultStorage.clearBatch();
+export const removeSavedImages = (ids) => defaultStorage.removeImages(ids);
