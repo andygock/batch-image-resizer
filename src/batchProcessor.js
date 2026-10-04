@@ -1,3 +1,4 @@
+import { effectiveAdvanced } from "./advancedSettings.js";
 import { createJobOwner } from "./jobs.js";
 import { resizeImage } from "./resizeImage.js";
 
@@ -12,10 +13,18 @@ export function resolveSettings(source, settings) {
 }
 
 export function settingsKey(settings) {
+  const advanced = effectiveAdvanced(settings);
   return JSON.stringify({
     bounds: settings.bounds,
     format: settings.format,
-    quality: settings.format === "png" ? null : settings.quality,
+    quality:
+      settings.format === "png" ||
+      (settings.format === "webp" &&
+        advanced.encoder === "advanced" &&
+        (advanced.mode !== "lossy" || advanced.targetSizeKB > 0))
+        ? null
+        : settings.quality,
+    advanced,
     colours: settings.format === "png" ? settings.colours : null,
     disableUpscale: settings.disableUpscale,
   });

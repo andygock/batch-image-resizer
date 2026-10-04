@@ -91,6 +91,116 @@ test.afterEach(async () => {
 });
 test.after(() => window.happyDOM.abort());
 
+const labelledControl = (text, within = root) => {
+  const label = [...within.querySelectorAll("label")].find(
+    (element) => element.textContent.trim() === text,
+  );
+  assert.ok(label, `Label exists: ${text}`);
+  return (
+    document.getElementById(label.htmlFor) ||
+    label.querySelector("input, select")
+  );
+};
+
+test("advanced settings are staged, validated, saved per format and restored", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  const trigger = button("Advanced");
+  trigger.focus();
+  await click(trigger);
+  await change(labelledControl("Encoder"), "advanced");
+  await change(labelledControl("Compression mode"), "near-lossless");
+  await change(labelledControl("Near-lossless fidelity"), "45");
+  assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
+  await click(button("Cancel"));
+  assert.equal(document.activeElement, trigger);
+  await click(trigger);
+  assert.equal(labelledControl("Encoder").value, "browser");
+  await change(labelledControl("Encoder"), "advanced");
+  await change(labelledControl("Compression mode"), "near-lossless");
+  await change(labelledControl("Near-lossless fidelity"), "101");
+  assert.equal(button("Apply settings").disabled, true);
+  await click(button("PNG"));
+  await change(root.querySelector("#advanced-png-colors"), "4");
+  await change(labelledControl("Dithering strength (%)"), "75");
+  assert.equal(button("Apply settings").disabled, true);
+  await click(button("WebP"));
+  await change(labelledControl("Near-lossless fidelity"), "45");
+  await click(button("Apply settings"));
+  await settle();
+  assert.equal(root.querySelector("dialog"), null);
+  const saved = JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY));
+  assert.equal(saved.advanced.webp.mode, "near-lossless");
+  assert.equal(saved.advanced.webp.nearLossless, 45);
+  assert.equal(saved.advanced.png.dither, 75);
+  assert.equal(saved.pngColors, 4);
+  await act(() => render(null, root));
+  await act(() => render(h(App), root));
+  await settle();
+  await click(button("Advanced"));
+  assert.equal(labelledControl("Near-lossless fidelity").value, "45");
+  await click(button("Reset WebP"));
+  assert.equal(labelledControl("Encoder").value, "browser");
+  await click(button("PNG"));
+  assert.equal(labelledControl("Dithering strength (%)").value, "75");
+});
+
+test("advanced trial settings stay isolated and nested dismissal retains the comparison", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([jpeg()]);
+  await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
+  const comparison = root.querySelector("dialog");
+  const advancedTrigger = [...comparison.querySelectorAll("button")].find(
+    (element) => element.textContent === "Advanced",
+  );
+  advancedTrigger.focus();
+  await click(advancedTrigger);
+  const child = comparison.querySelector("dialog");
+  await act(() =>
+    child.dispatchEvent(
+      new window.Event("cancel", { cancelable: true, bubbles: true }),
+    ),
+  );
+  assert.equal(root.querySelectorAll("dialog").length, 1);
+  assert.equal(document.activeElement, advancedTrigger);
+  await click(advancedTrigger);
+  await click(button("JPEG"));
+  await change(labelledControl("Transparency background"), "#123456");
+  await click(button("Apply to trial"));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 230));
+  });
+  assert.equal(button("Apply to batch").disabled, false);
+  assert.equal(
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) || "{}").advanced
+      ?.jpeg?.background,
+    undefined,
+  );
+  await click(button("Apply to batch"));
+  await settle();
+  assert.equal(
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).advanced.jpeg
+      .background,
+    "#123456",
+  );
+});
+
+test("PNG dithering is disabled without a palette and lossless WebP hides lossy quality", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await click(button("Advanced"));
+  await click(button("PNG"));
+  assert.equal(labelledControl("Dithering strength (%)").disabled, true);
+  await change(root.querySelector("#advanced-png-colors"), "2");
+  assert.equal(labelledControl("Dithering strength (%)").disabled, false);
+  await click(button("WebP"));
+  await change(labelledControl("Encoder"), "advanced");
+  await change(labelledControl("Compression mode"), "lossless");
+  assert.equal(root.querySelector("#advanced-webp-quality-number"), null);
+  assert.equal(labelledControl("Lossless compression effort").value, "75");
+});
+
 test("custom dimensions commit only when the complete pair is submitted", async () => {
   const sizes = [];
   await act(() =>

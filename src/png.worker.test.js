@@ -12,7 +12,7 @@ test("PNG worker encodes lossless pixels with transparency", async () => {
   try {
     await import("./png.worker.js");
     const pixels = new Uint8Array([255, 0, 0, 255, 0, 0, 255, 128]);
-    self.onmessage({
+    await self.onmessage({
       data: { buffer: pixels.buffer, width: 2, height: 1, colours: 0 },
     });
     assert.equal(response.error, undefined);

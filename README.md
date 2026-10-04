@@ -20,6 +20,8 @@ Live app hosted on Vercel:
 - Keep each source format by default, or convert to JPEG, PNG or WebP.
 - Independent JPEG/WebP quality sliders and percentage fields.
 - PNG colour optimisation options.
+- Advanced output modal with per-format settings, presets, Apply/Cancel and reset controls.
+- Optional local libwebp and MozJPEG encoders, plus PNG dithering and OxiPNG optimisation.
 - Optional filename suffix for generated files.
 - Download each ready image individually, or export all ready images or a selection as a ZIP.
 - Batch summary showing output size and savings.
@@ -43,7 +45,7 @@ Live app hosted on Vercel:
 
 The selected size is a maximum bounding box, not a crop. For example, a 1200x800 image resized to 512x512 becomes 512x341.
 
-Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding area of 16,777,216 pixels. Edit both dimensions, then apply them with Enter or by leaving the dimension group. Escape restores the applied values. Invalid drafts explain the correction and block downloads until fixed. Transparent images exported to JPEG use a white background; PNG and WebP retain transparency. Browser encoder failures are reported rather than downloading files with misleading extensions.
+Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding area of 16,777,216 pixels. Edit both dimensions, then apply them with Enter or by leaving the dimension group. Escape restores the applied values. Invalid drafts explain the correction and block downloads until fixed. Transparent images exported to JPEG use a configurable background, white by default; PNG and WebP retain transparency. Encoder failures are reported rather than downloading files with misleading extensions.
 
 Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch and keeps your preferences. Deleting an image or a selection removes its source, output and selection state. Deletion cannot be undone.
 
@@ -51,7 +53,25 @@ ZIP exports use a snapshot of the ready images at the time of the click. You can
 
 Choose an image preview to compare it with the original. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch.
 
-If the PNG optimiser produces incomplete output, the browser's lossless PNG encoder is used instead. The image card explains that the selected palette reduction was skipped.
+If standard PNG encoding produces incomplete output, the browser's lossless PNG encoder is used instead. The image card explains that the selected palette reduction was skipped.
+
+## Advanced output settings
+
+Choose **Advanced** next to the format controls. The modal keeps separate settings for WebP, JPEG and PNG. Changing the modal's format section does not change the batch output format. Edits take effect together with **Apply settings**; Cancel, Escape and closing the modal discard them. Each format has a reset button. Less common encoder controls are under **Fine tuning**.
+
+JPEG and WebP use the browser encoder by default. Select **Advanced** in the format's Encoder menu to use the additional controls. These encoders and their WebAssembly files load from the app's own assets on demand and run in cancellable workers. Images never leave the device. Higher effort settings can take substantially longer, especially for large batches.
+
+| Format | Available advanced controls |
+| --- | --- |
+| WebP | Lossy, lossless and near-lossless modes; encoding effort; lossless compression effort; near-lossless fidelity; image hints; transparency quality and filtering; preservation of invisible RGB; sharper colour conversion; spatial noise shaping; deblocking strength, sharpness and automatic filtering; analysis passes; target file size; lower-memory encoding; photo, drawing and text starting presets. |
+| JPEG | Background colour with either encoder; progressive or sequential output; entropy coding optimisation for sequential output; greyscale; automatic, 4:4:4 or 4:2:0 chroma subsampling; separate chroma quality; input smoothing; quantisation tables; trellis optimisation controls; fast, balanced and best-compression starting presets. |
+| PNG | Lossless colours or palettes from 2 to 256 colours; Riemersma dithering strength for reduced palettes; OxiPNG compression effort; Adam7 interlacing; optional optimisation of RGB values beneath fully transparent pixels. |
+
+Lossless describes the resized pixels, not preservation of the original dimensions. WebP lossless compression effort controls processing time and size, not visual quality. The usual WebP quality control is hidden in lossless and near-lossless modes and when targeting file size. WebP size targets use decimal KB (1 KB = 1000 bytes), override ordinary quality, and are best effort rather than hard limits; an output above its target carries a warning. Targeting uses at least six analysis passes.
+
+PNG compression effort preserves pixels after any palette reduction. Palette reduction and dithering can change colours and transparency. Interlacing can increase file size. Invisible RGB optimisation is optional because it changes hidden pixel values. When advanced PNG processing is requested, a damaged intermediate PNG is recovered where possible without dropping those settings; otherwise an error is shown. Advanced JPEG/WebP failures also remain errors rather than silently switching to the browser encoder.
+
+The comparison panel has its own **Advanced** button. **Apply to trial** updates only that preview; **Apply to batch** then commits the trial settings to the batch. Advanced preferences follow the existing preference-saving controls, and changing a format's settings reuses completed outputs for unaffected formats.
 
 ## Keyboard and selection
 
@@ -64,7 +84,7 @@ If the PNG optimiser produces incomplete output, the browser's lossless PNG enco
 
 Open **Saved preferences** using the toolbar gear to control preference saving, which is enabled by default.
 
-Menu options, including dimensions, output format, quality, filename suffix, recent sizes and view mode, use one app-specific Local Storage key. Images and outputs stay in memory for the current tab. Reloading or closing the tab discards the batch, selection and output names. No images are uploaded.
+Menu options, including dimensions, output format, quality, advanced encoder settings, filename suffix, recent sizes and view mode, use one app-specific Local Storage key. Images and outputs stay in memory for the current tab. Reloading or closing the tab discards the batch, selection and output names. No images are uploaded.
 
 The panel lets you switch preference saving off or clear saved preferences. Switching saving off remembers that choice without retaining your menu settings. Clearing saved preferences keeps the current settings and images and pauses saving until you enable it again. The toolbar Clear button only removes the current batch.
 
@@ -119,12 +139,16 @@ pnpm preview
 
 ## Tech
 
-Run regression tests with `pnpm test`. These use Node's test runner, mocked image allocation APIs and a simulated DOM for component interactions. They do not run browser smoke tests.
+Run regression tests with `pnpm test`. These use Node's test runner, mocked image allocation APIs, real local WebAssembly codec round trips and a simulated DOM for component interactions. They do not run browser smoke tests or fetch encoder assets from the network.
+
+Run `pnpm test:build` to build the production app and execute its emitted worker modules and lazy codec chunks directly in Node. This checks bundled WASM asset paths and catches production-only module interop failures without a browser.
 
 - Vite
 - Preact via React compatibility
 - Canvas and `OffscreenCanvas`
 - `upng-js` for PNG encoding
+- `image-q` for PNG palette dithering
+- `@jsquash/webp`, `@jsquash/jpeg` and `@jsquash/oxipng` for local advanced encoding and optimisation
 - `jszip` and `file-saver` for ZIP downloads
 
 ## Favicon

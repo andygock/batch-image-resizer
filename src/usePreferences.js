@@ -33,6 +33,7 @@ export default function usePreferences() {
       if (key !== "boundingBox") clean.boundingBox = current.boundingBox;
       if (key !== "qualityByFormat")
         clean.qualityByFormat = current.qualityByFormat;
+      if (key !== "advanced") clean.advanced = current.advanced;
       return clean;
     });
   }, []);

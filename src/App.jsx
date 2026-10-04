@@ -2,6 +2,7 @@ import saveAs from "file-saver";
 import { Download, Pause, Play, Settings, Trash2, Upload } from "lucide-preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import AdvancedSettings from "./AdvancedSettings.jsx";
 import styles from "./App.module.css";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect";
@@ -44,6 +45,7 @@ function App() {
     suffix,
     disableUpscale,
     recentSizes,
+    advanced,
   } = preferences;
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
@@ -53,6 +55,7 @@ function App() {
   const [inspectedId, setInspectedId] = useState(null);
   const [dataMessage, setDataMessage] = useState("");
   const [storageOpen, setStorageOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const inspectedSource = images.find(({ id }) => id === inspectedId);
   const selectionAnchor = useRef(null);
   const dropRef = useRef(null);
@@ -65,8 +68,16 @@ function App() {
       qualityByFormat,
       colours: pngColors,
       disableUpscale,
+      advanced,
     }),
-    [boundingBox, outputFormat, qualityByFormat, pngColors, disableUpscale],
+    [
+      boundingBox,
+      outputFormat,
+      qualityByFormat,
+      pngColors,
+      disableUpscale,
+      advanced,
+    ],
   );
   const { records, isProcessing, progress, processingTime, processor } =
     useBatchProcessor(images, settings, cancelled, retry);
@@ -261,6 +272,7 @@ function App() {
             />
             <CompressionSelect
               compact
+              advanced={advanced}
               format={outputFormat}
               onQualityChange={(format, quality) =>
                 changeSetting("qualityByFormat")({
@@ -273,6 +285,12 @@ function App() {
               pngColors={pngColors}
               onPngColorsChange={changeSetting("pngColors")}
             />
+            <button
+              onClick={() => setAdvancedOpen(true)}
+              aria-haspopup="dialog"
+            >
+              Advanced
+            </button>
           </div>
           <div className={styles.controlGroup}>
             <label>
@@ -520,6 +538,7 @@ function App() {
                 outputFormat: options.format,
                 qualityByFormat: options.qualityByFormat,
                 pngColors: options.colours,
+                advanced: options.advanced,
               }));
             }}
           />
@@ -539,6 +558,24 @@ function App() {
               setDataMessage(
                 "Saved preferences cleared. Current settings remain in this tab; preference saving is off.",
               );
+          }}
+        />
+      )}
+      {advancedOpen && (
+        <AdvancedSettings
+          settings={settings}
+          initialFormat={
+            outputFormat === "source" ? images[0]?.sourceFormat : outputFormat
+          }
+          onClose={() => setAdvancedOpen(false)}
+          onApply={(options) => {
+            invalidate();
+            applyPreferences((current) => ({
+              ...current,
+              advanced: options.advanced,
+              qualityByFormat: options.qualityByFormat,
+              pngColors: options.colours,
+            }));
           }}
         />
       )}

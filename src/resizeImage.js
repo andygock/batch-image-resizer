@@ -1,7 +1,8 @@
+import { sanitiseAdvanced } from "./advancedSettings.js";
 import { decodeImage } from "./decodeImage.js";
 import { fitDimensions, outputFormats } from "./imageUtils.js";
 
-function encodePng(canvas, colours, signal) {
+function encodePng(canvas, colours, signal, advanced) {
   return new Promise((resolve, reject) => {
     signal.throwIfAborted();
     const worker = new Worker(new URL("./png.worker.js", import.meta.url), {
@@ -50,6 +51,57 @@ function encodePng(canvas, colours, signal) {
           width: canvas.width,
           height: canvas.height,
           colours,
+          advanced,
+        },
+        [data.buffer],
+      );
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+function encodeWithWorker(canvas, settings, signal) {
+  return new Promise((resolve, reject) => {
+    signal.throwIfAborted();
+    const worker = new Worker(new URL("./encoder.worker.js", import.meta.url), {
+      type: "module",
+    });
+    const finish = (error, buffer) => {
+      signal.removeEventListener("abort", abort);
+      worker.terminate();
+      if (error) reject(error);
+      else
+        resolve({
+          blob: new Blob([buffer], {
+            type: outputFormats[settings.format].mimeType,
+          }),
+        });
+    };
+    const abort = () => finish(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    worker.onmessage = ({ data }) =>
+      finish(
+        data.error
+          ? new Error(data.error)
+          : !data.buffer?.byteLength
+            ? new Error("Advanced encoder returned no image.")
+            : null,
+        data.buffer,
+      );
+    worker.onerror = () => finish(new Error("Advanced encoder worker failed."));
+    worker.onmessageerror = () =>
+      finish(new Error("Invalid advanced encoder response."));
+    try {
+      const { data } = canvas
+        .getContext("2d")
+        .getImageData(0, 0, canvas.width, canvas.height);
+      worker.postMessage(
+        {
+          buffer: data.buffer,
+          width: canvas.width,
+          height: canvas.height,
+          settings,
         },
         [data.buffer],
       );
@@ -79,7 +131,7 @@ export async function resizeImage({ id, file }, settings, signal) {
     if (!ctx) throw new Error("Canvas context unavailable.");
     // JPEG cannot preserve transparency; make the flattening colour explicit.
     if (settings.format === "jpeg") {
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = sanitiseAdvanced(settings.advanced).jpeg.background;
       ctx.fillRect(0, 0, size.width, size.height);
     }
     ctx.drawImage(bitmap.image, 0, 0, size.width, size.height);
@@ -87,13 +139,16 @@ export async function resizeImage({ id, file }, settings, signal) {
     const { mimeType, extension } = outputFormats[settings.format];
     const encoded =
       settings.format === "png"
-        ? await encodePng(canvas, settings.colours, signal)
-        : {
-            blob: await canvas.convertToBlob({
-              type: mimeType,
-              quality: settings.quality,
-            }),
-          };
+        ? await encodePng(canvas, settings.colours, signal, settings.advanced)
+        : sanitiseAdvanced(settings.advanced)[settings.format]?.encoder ===
+            "advanced"
+          ? await encodeWithWorker(canvas, settings, signal)
+          : {
+              blob: await canvas.convertToBlob({
+                type: mimeType,
+                quality: settings.quality,
+              }),
+            };
     const { blob, encodingWarning, appliedColours } = encoded;
     signal.throwIfAborted();
     if (!blob?.size || blob.type !== mimeType)
@@ -111,7 +166,15 @@ export async function resizeImage({ id, file }, settings, signal) {
       widthAfter: size.width,
       heightAfter: size.height,
       outputExtension: extension,
-      encodingWarning,
+      encodingWarning:
+        encodingWarning ||
+        (settings.format === "webp" &&
+        settings.advanced?.webp?.encoder === "advanced" &&
+        settings.advanced.webp.mode === "lossy" &&
+        settings.advanced.webp.targetSizeKB > 0 &&
+        blob.size > settings.advanced.webp.targetSizeKB * 1000
+          ? "The WebP output exceeds the requested target size. Try smaller dimensions or a larger target."
+          : ""),
       appliedColours,
     };
   } catch (error) {

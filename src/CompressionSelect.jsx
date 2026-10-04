@@ -6,6 +6,10 @@ const pngColorOptions = [
   [128, "128 colours"],
   [64, "64 colours"],
   [32, "32 colours"],
+  [16, "16 colours"],
+  [8, "8 colours"],
+  [4, "4 colours"],
+  [2, "2 colours"],
 ];
 
 function QualityControl({
@@ -74,6 +78,7 @@ function QualityControl({
         min="30"
         max="100"
         step="1"
+        required
         value={draft}
         aria-label={title}
         onChange={(event) => setDraft(event.target.value)}
@@ -81,7 +86,10 @@ function QualityControl({
         aria-invalid={!valid}
         onKeyDown={(event) => {
           cancel(event);
-          if (event.key === "Enter") commit();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          }
         }}
       />
       <span>%</span>
@@ -101,14 +109,22 @@ export default function CompressionSelect({
   pngColors,
   onPngColorsChange,
   sourceFormats = [],
+  advanced,
   idPrefix = "",
   compact = false,
 }) {
   const formats = format === "source" ? [...new Set(sourceFormats)] : [format];
+  const webp = advanced?.webp;
+  const webpQualityInactive =
+    webp?.encoder === "advanced" &&
+    (webp.mode !== "lossy" || webp.targetSizeKB > 0);
   return (
     <>
       {["jpeg", "webp"]
-        .filter((type) => formats.includes(type))
+        .filter(
+          (type) =>
+            formats.includes(type) && !(type === "webp" && webpQualityInactive),
+        )
         .map((type) => (
           <QualityControl
             key={type}
@@ -119,6 +135,15 @@ export default function CompressionSelect({
             onChange={(quality) => onQualityChange(type, quality)}
           />
         ))}
+      {formats.includes("webp") && webpQualityInactive && (
+        <span>
+          {webp.mode === "lossless"
+            ? "Lossless WebP"
+            : webp.mode === "near-lossless"
+              ? "Near-lossless WebP"
+              : `WebP target: ${webp.targetSizeKB} KB`}
+        </span>
+      )}
       {formats.includes("png") && (
         <label htmlFor={`${idPrefix}png-colors`}>
           {compact ? "Palette" : "PNG colours"}

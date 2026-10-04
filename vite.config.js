@@ -4,6 +4,10 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "./",
+  worker: { format: "es" },
+  optimizeDeps: {
+    exclude: ["@jsquash/webp", "@jsquash/jpeg", "@jsquash/oxipng"],
+  },
   plugins: [
     preact(),
     // visualizer({ filename: "dist/bundle-analysis.html", open: true }),

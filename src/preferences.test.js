@@ -28,7 +28,7 @@ test("preferences sanitisation validates sizes, options, and unique recents", ()
     boundingBox: { width: 9000, height: 1 },
     outputFormat: "gif",
     qualityByFormat: { jpeg: 1.2, webp: 0.5 },
-    pngColors: 16,
+    pngColors: 17,
     suffix: "x".repeat(140),
     viewMode: "tiles",
     recentSizes: [

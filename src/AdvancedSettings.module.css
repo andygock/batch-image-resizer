@@ -1,0 +1,94 @@
+.modal {
+  width: min(700px, calc(100% - 24px));
+}
+.intro {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.formats {
+  display: flex;
+  gap: 8px;
+}
+.formats button {
+  flex: 1;
+}
+.formats button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.body {
+  display: grid;
+  gap: 16px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field label {
+  white-space: normal;
+  line-height: 1.4;
+}
+.field input[type="checkbox"] {
+  flex-shrink: 0;
+}
+.field input[type="number"],
+.field select {
+  width: 100%;
+}
+.field input[type="color"] {
+  width: 100%;
+  min-height: 32px;
+  padding: 2px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.field small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.quality,
+.preset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.details {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.details[open] summary {
+  margin-bottom: 16px;
+}
+.actions {
+  position: sticky;
+  bottom: -20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 12px 0;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.actions span {
+  flex: 1;
+}
+@media (max-width: 520px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

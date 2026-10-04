@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-preact";
 import { useEffect, useRef, useState } from "react";
+import AdvancedSettings from "./AdvancedSettings.jsx";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect.jsx";
 import styles from "./ImageInspector.module.css";
@@ -26,6 +27,7 @@ export default function ImageInspector({
     error: "",
   });
   const [actualSize, setActualSize] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [split, setSplit] = useState(50);
   const comparison = useRef(null);
   const slider = useRef(null);
@@ -73,6 +75,7 @@ export default function ImageInspector({
     preview.result?.id === source.id ? preview.result : batchResult;
   const viewport = useImagePan(actualSize, source.id, result ? split : 100);
   const changed =
+    JSON.stringify(draft.advanced) !== JSON.stringify(settings.advanced) ||
     draft.format !== settings.format ||
     draft.colours !== settings.colours ||
     JSON.stringify(draft.qualityByFormat) !==
@@ -265,6 +268,7 @@ export default function ImageInspector({
           onChange={(format) => setDraft({ ...draft, format })}
         />
         <CompressionSelect
+          advanced={draft.advanced}
           idPrefix="trial-"
           format={draft.format}
           sourceFormats={[source.sourceFormat]}
@@ -278,6 +282,9 @@ export default function ImageInspector({
           pngColors={draft.colours}
           onPngColorsChange={(colours) => setDraft({ ...draft, colours })}
         />
+        <button onClick={() => setAdvancedOpen(true)} aria-haspopup="dialog">
+          Advanced
+        </button>
         <button
           disabled={!changed || preview.busy || Boolean(preview.error)}
           onClick={() => onApply(draft)}
@@ -298,7 +305,24 @@ export default function ImageInspector({
               : "Compare quality here without changing the batch."}
       </p>
       {result?.encodingWarning && <p>{result.encodingWarning}</p>}
-      {draft.format === "jpeg" && <p>JPEG makes transparent areas white.</p>}
+      {(draft.format === "jpeg" ||
+        (draft.format === "source" && source.sourceFormat === "jpeg")) && (
+        <p>
+          JPEG flattens transparency onto{" "}
+          {draft.advanced?.jpeg?.background || "#ffffff"}.
+        </p>
+      )}
+      {advancedOpen && (
+        <AdvancedSettings
+          settings={draft}
+          initialFormat={
+            draft.format === "source" ? source.sourceFormat : draft.format
+          }
+          trial
+          onClose={() => setAdvancedOpen(false)}
+          onApply={setDraft}
+        />
+      )}
     </Modal>
   );
 }

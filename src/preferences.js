@@ -1,3 +1,4 @@
+import { DEFAULT_ADVANCED, sanitiseAdvanced } from "./advancedSettings.js";
 import { validateSize } from "./imageUtils.js";
 
 export const PREFERENCES_STORAGE_KEY = "batch-image-resizer:preferences:v1";
@@ -7,6 +8,7 @@ export const DEFAULT_PREFERENCES = Object.freeze({
   outputFormat: "source",
   qualityByFormat: Object.freeze({ jpeg: 0.8, webp: 0.8 }),
   pngColors: 0,
+  advanced: DEFAULT_ADVANCED,
   enableSuffix: true,
   suffix: "_small",
   disableUpscale: true,
@@ -17,7 +19,7 @@ export const DEFAULT_PREFERENCES = Object.freeze({
 
 const OUTPUT_FORMATS = new Set(["source", "jpeg", "png", "webp"]);
 const VIEW_MODES = new Set(["grid", "list"]);
-const PNG_COLOURS = new Set([0, 256, 128, 64, 32]);
+const PNG_COLOURS = new Set([0, 256, 128, 64, 32, 16, 8, 4, 2]);
 const MAX_SUFFIX_LENGTH = 100;
 const MAX_RECENT_SIZES = 6;
 
@@ -57,6 +59,7 @@ export function sanitisePreferences(value) {
       : {};
 
   return {
+    advanced: sanitiseAdvanced(input.advanced),
     boundingBox,
     outputFormat: OUTPUT_FORMATS.has(input.outputFormat)
       ? input.outputFormat

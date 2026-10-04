@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test src/*.test.js",
+    "test:build": "pnpm build && node --test test-support/built-codecs.test.js",
     "dev": "vite",
     "build": "vite build",
     "lint": "biome lint . --error-on-warnings",
@@ -15,7 +16,11 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
+    "@jsquash/jpeg": "1.6.0",
+    "@jsquash/oxipng": "2.3.0",
+    "@jsquash/webp": "1.5.0",
     "file-saver": "^2.0.5",
+    "image-q": "4.0.0",
     "jszip": "^3.10.1",
     "lucide-preact": "^1.38.0",
     "preact": "^10.29.1",

@@ -19,6 +19,7 @@ function installCanvas(
   let canvas;
   const calls = [];
   const drawn = [];
+  const backgrounds = [];
   t.mock.method(globalThis, "createImageBitmap", async () => ({
     width: 20,
     height: 10,
@@ -34,6 +35,9 @@ function installCanvas(
     }
     getContext() {
       return {
+        set fillStyle(value) {
+          backgrounds.push(value);
+        },
         fillRect() {
           calls.push("background");
         },
@@ -56,6 +60,7 @@ function installCanvas(
   return {
     calls,
     drawn,
+    backgrounds,
     get closed() {
       return closed;
     },
@@ -107,6 +112,7 @@ test("JPEG flattening precedes drawing and native allocations are released", asy
     new AbortController().signal,
   );
   assert.deepEqual(state.calls, ["background", "image"]);
+  assert.deepEqual(state.backgrounds, ["#ffffff"]);
   assert.equal(result.outputExtension, "jpg");
   assert.equal(state.closed, 1);
   assert.equal(state.canvas.width, 0);
@@ -273,4 +279,100 @@ test("cancellation while decoding closes the late bitmap without allocating canv
   await assert.rejects(work, { name: "AbortError" });
   assert.equal(closed, true);
   assert.equal(state.canvas, undefined);
+});
+
+test("custom JPEG background applies with the browser encoder", async (t) => {
+  const state = installCanvas(t);
+  await resizeImage(
+    source,
+    { ...settings, advanced: { jpeg: { background: "#123456" } } },
+    new AbortController().signal,
+  );
+  assert.deepEqual(state.backgrounds, ["#123456"]);
+  assert.deepEqual(state.calls, ["background", "image"]);
+});
+
+test("advanced encoding transfers pixels and settings and reports target-size misses", async (t) => {
+  const state = installCanvas(t);
+  let request;
+  let terminated = false;
+  t.mock.method(globalThis, "Worker", function (url) {
+    assert.match(url.href, /encoder\.worker\.js$/);
+    return {
+      postMessage(data, transfer) {
+        request = data;
+        assert.equal(transfer[0], data.buffer);
+        this.onmessage({ data: { buffer: new ArrayBuffer(2000) } });
+      },
+      terminate() {
+        terminated = true;
+      },
+    };
+  });
+  const advanced = {
+    webp: { encoder: "advanced", mode: "lossy", targetSizeKB: 1, method: 6 },
+  };
+  const result = await resizeImage(
+    source,
+    { ...settings, format: "webp", advanced },
+    new AbortController().signal,
+  );
+  assert.equal(result.blob.type, "image/webp");
+  assert.equal(request.settings.advanced.webp.method, 6);
+  assert.match(result.encodingWarning, /exceeds.*target/);
+  assert.equal(terminated, true);
+  assert.equal(state.canvas.width, 0);
+});
+
+test("cancelling advanced encoding terminates the worker and rejects late results", async (t) => {
+  const state = installCanvas(t);
+  const controller = new AbortController();
+  let terminated = false;
+  t.mock.method(globalThis, "Worker", function () {
+    return {
+      postMessage() {
+        controller.abort();
+        this.onmessage({ data: { buffer: new ArrayBuffer(12) } });
+      },
+      terminate() {
+        terminated = true;
+      },
+    };
+  });
+  await assert.rejects(
+    resizeImage(
+      source,
+      { ...settings, advanced: { jpeg: { encoder: "advanced" } } },
+      controller.signal,
+    ),
+    { name: "AbortError" },
+  );
+  assert.equal(terminated, true);
+  assert.equal(state.closed, 1);
+});
+
+test("advanced encoder failures do not silently switch to browser settings", async (t) => {
+  let nativeCalls = 0;
+  const state = installCanvas(t, async () => {
+    nativeCalls++;
+    return new Blob();
+  });
+  t.mock.method(globalThis, "Worker", function () {
+    return {
+      postMessage() {
+        this.onmessage({ data: { error: "WASM unavailable" } });
+      },
+      terminate() {},
+    };
+  });
+  await assert.rejects(
+    resizeImage(
+      source,
+      { ...settings, advanced: { jpeg: { encoder: "advanced" } } },
+      new AbortController().signal,
+    ),
+    /Could not encode.*WASM unavailable/,
+  );
+  assert.equal(nativeCalls, 0);
+  assert.equal(state.closed, 1);
 });
