@@ -76,13 +76,25 @@ test("built PNG worker loads dithering, optimiser and interlacing chunks", async
 });
 
 test("built processing worker resizes RGBA pixels", async () => {
-  const [buffer] = await runWorker("processing.worker", [
+  const [buffer, sharpened, unchanged] = await runWorker("processing.worker", [
     {
       target: { width: 8, height: 12 },
       processing: { method: "lanczos3", linearRGB: true, premultiply: true },
     },
+    {
+      target: { width: 32, height: 32 },
+      processing: { method: "auto", sharpen: true, amount: 1, threshold: 0 },
+    },
+    {
+      target: { width: 32, height: 32 },
+      processing: { method: "auto", sharpen: false },
+    },
   ]);
   assert.equal(buffer.byteLength, 8 * 12 * 4);
+  assert.notDeepEqual(new Uint8ClampedArray(sharpened), data);
+  assert.deepEqual(new Uint8ClampedArray(unchanged), data);
+  for (let i = 3; i < data.length; i += 4)
+    assert.equal(new Uint8ClampedArray(sharpened)[i], data[i]);
 });
 
 test("built JPEG and WebP worker loads bundled encoder assets", async () => {

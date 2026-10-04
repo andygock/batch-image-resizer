@@ -9,6 +9,27 @@ import {
 export default function ProcessingSettings({ value, onApply, onClose }) {
   const [draft, setDraft] = useState(() => sanitiseProcessing(value));
   const advanced = draft.method === "lanczos3" || draft.method === "mitchell";
+  const sharpeningFields = [
+    { key: "amount", label: "Sharpening amount", min: 0, max: 2, step: 0.1 },
+    {
+      key: "radius",
+      label: "Radius (output pixels)",
+      min: 0.3,
+      max: 3,
+      step: 0.1,
+    },
+    { key: "threshold", label: "Threshold (0–255)", min: 0, max: 255, step: 1 },
+  ];
+  const valid =
+    !draft.sharpen ||
+    sharpeningFields.every(
+      ({ key, min, max, step }) =>
+        typeof draft[key] === "number" &&
+        Number.isFinite(draft[key]) &&
+        draft[key] >= min &&
+        draft[key] <= max &&
+        (step !== 1 || Number.isInteger(draft[key])),
+    );
   return (
     <Modal
       title="Image processing"
@@ -64,6 +85,48 @@ export default function ProcessingSettings({ value, onApply, onClose }) {
         Weights colours by opacity to avoid fringes around transparent edges.
         Advanced methods support sources up to 33.5 megapixels.
       </p>
+      <label>
+        <input
+          type="checkbox"
+          checked={draft.sharpen}
+          onChange={(event) =>
+            setDraft({ ...draft, sharpen: event.target.checked })
+          }
+        />
+        Sharpen after resizing
+      </label>
+      <p>
+        Unsharp masking restores edge contrast before encoding. Start with a low
+        amount; the threshold leaves small colour differences untouched.
+        Transparency is preserved.
+      </p>
+      {sharpeningFields.map(({ key, label, min, max, step }) => (
+        <div className={styles.field} key={key}>
+          <label htmlFor={`sharpen-${key}`}>{label}</label>
+          <input
+            id={`sharpen-${key}`}
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            disabled={!draft.sharpen}
+            value={draft[key]}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                [key]:
+                  event.target.value === "" ? "" : Number(event.target.value),
+              })
+            }
+          />
+        </div>
+      ))}
+      {!valid && (
+        <p role="alert">
+          Enter an amount from 0 to 2, a radius from 0.3 to 3, and a
+          whole-number threshold from 0 to 255.
+        </p>
+      )}
       <div className={styles.actions}>
         <button onClick={() => setDraft({ ...DEFAULT_PROCESSING })}>
           Reset processing
@@ -72,6 +135,7 @@ export default function ProcessingSettings({ value, onApply, onClose }) {
         <button onClick={onClose}>Cancel</button>
         <button
           className="buttonPrimary"
+          disabled={!valid}
           onClick={() => {
             onApply(sanitiseProcessing(draft));
             onClose();

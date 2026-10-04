@@ -108,6 +108,11 @@ test("resize settings are staged in the processing modal and saved with the pare
   await click(button("Advanced"));
   await click(button("Image processing"));
   await change(root.querySelector("#resize-method"), "lanczos3");
+  await click(labelledControl("Sharpen after resizing"));
+  await change(root.querySelector("#sharpen-radius"), "9");
+  assert.equal(button("Use processing settings").disabled, true);
+  await change(root.querySelector("#sharpen-radius"), "1.5");
+  await change(root.querySelector("#sharpen-amount"), "0.8");
   await click(button("Use processing settings"));
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
   await click(button("Apply settings"));
@@ -116,6 +121,12 @@ test("resize settings are staged in the processing modal and saved with the pare
     JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).processing.method,
     "lanczos3",
   );
+  const saved = JSON.parse(
+    localStorage.getItem(PREFERENCES_STORAGE_KEY),
+  ).processing;
+  assert.equal(saved.sharpen, true);
+  assert.equal(saved.radius, 1.5);
+  assert.equal(saved.amount, 0.8);
 });
 
 test("advanced settings are staged, validated, saved per format and restored", async () => {

@@ -137,7 +137,11 @@ export async function resizeImage({ id, file }, settings, signal) {
       ctx.fillRect(0, 0, size.width, size.height);
     }
     const processing = sanitiseProcessing(settings.processing);
-    if (processing.method === "lanczos3" || processing.method === "mitchell") {
+    if (
+      processing.method === "lanczos3" ||
+      processing.method === "mitchell" ||
+      (processing.sharpen && processing.amount > 0)
+    ) {
       await drawProcessed(ctx, bitmap, size, processing, signal);
     } else {
       ctx.imageSmoothingEnabled = processing.method !== "nearest";

@@ -5,15 +5,23 @@ export async function drawProcessed(
   processing,
   signal,
 ) {
-  if (bitmap.width * bitmap.height > 33_554_432)
+  const advanced =
+    processing.method === "lanczos3" || processing.method === "mitchell";
+  const input = advanced ? bitmap : target;
+  if (
+    input.width * input.height > 33_554_432 ||
+    target.width * target.height > 33_554_432
+  )
     throw new Error(
-      "Advanced resizing supports sources up to 33,554,432 pixels. Use Auto for this image.",
+      "Image processing supports up to 33,554,432 pixels. Use Auto without sharpening, or smaller output dimensions.",
     );
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const canvas = new OffscreenCanvas(input.width, input.height);
   try {
     const source = canvas.getContext("2d");
     if (!source) throw new Error("Canvas context unavailable.");
-    source.drawImage(bitmap.image, 0, 0);
+    source.imageSmoothingEnabled = processing.method !== "nearest";
+    source.imageSmoothingQuality = "high";
+    source.drawImage(bitmap.image, 0, 0, input.width, input.height);
     const pixels = source.getImageData(0, 0, canvas.width, canvas.height);
     const buffer = await new Promise((resolve, reject) => {
       signal.throwIfAborted();
@@ -46,8 +54,8 @@ export async function drawProcessed(
         worker.postMessage(
           {
             buffer: pixels.data.buffer,
-            width: bitmap.width,
-            height: bitmap.height,
+            width: input.width,
+            height: input.height,
             target,
             processing,
           },

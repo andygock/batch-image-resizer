@@ -1,11 +1,21 @@
 import { resamplePixels } from "./resamplePixels.js";
+import { sharpenPixels } from "./sharpenPixels.js";
 
 self.onmessage = ({ data: { buffer, width, height, target, processing } }) => {
   try {
-    const pixels = resamplePixels(
-      new Uint8ClampedArray(buffer),
-      width,
-      height,
+    const resized =
+      width === target.width && height === target.height
+        ? new Uint8ClampedArray(buffer)
+        : resamplePixels(
+            new Uint8ClampedArray(buffer),
+            width,
+            height,
+            target.width,
+            target.height,
+            processing,
+          );
+    const pixels = sharpenPixels(
+      resized,
       target.width,
       target.height,
       processing,
