@@ -1,3 +1,4 @@
+import { decodeImage } from "./decodeImage.js";
 import { fitDimensions, outputFormats } from "./imageUtils.js";
 
 function encodePng(canvas, colours, signal) {
@@ -64,7 +65,7 @@ export async function resizeImage({ id, file }, settings, signal) {
   let stage = "decode";
   try {
     signal.throwIfAborted();
-    bitmap = await createImageBitmap(file);
+    bitmap = await decodeImage(file, signal);
     signal.throwIfAborted();
     stage = "resize";
     const size = fitDimensions(
@@ -81,7 +82,7 @@ export async function resizeImage({ id, file }, settings, signal) {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, size.width, size.height);
     }
-    ctx.drawImage(bitmap, 0, 0, size.width, size.height);
+    ctx.drawImage(bitmap.image, 0, 0, size.width, size.height);
     stage = "encode";
     const { mimeType, extension } = outputFormats[settings.format];
     const encoded =

@@ -313,7 +313,7 @@ export default function OutputImages({
                         <p>{record.error}</p>
                         <p>
                           {record.error.includes("decode")
-                            ? "Try exporting this file again as JPG, PNG or WebP, then add the replacement."
+                            ? "Automatic recovery could not read this image. Retry, or add the original file again."
                             : "Try a smaller size or another output format, then retry."}
                         </p>
                       </div>

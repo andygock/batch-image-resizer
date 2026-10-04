@@ -379,6 +379,38 @@ test("overlapping uploads skip duplicates and intentional duplication remains av
   assert.equal(button("Add duplicates anyway"), undefined);
 });
 
+test("transient decode failures become ready outputs without a Retry click", async (t) => {
+  const decode = globalThis.createImageBitmap;
+  let attempts = 0;
+  t.mock.method(globalThis, "createImageBitmap", async (file) => {
+    if (++attempts % 2 === 1)
+      throw new DOMException(
+        "The image could not be decoded",
+        "InvalidStateError",
+      );
+    return decode(file);
+  });
+  await act(() => render(h(App), root));
+  await settle();
+  await change(root.querySelector("#output-format"), "jpeg");
+  await upload([jpeg("ComfyUI_temp.jpg")]);
+  for (const [format, extension] of [
+    ["jpeg", "jpg"],
+    ["webp", "webp"],
+    ["jpeg", "jpg"],
+  ]) {
+    await change(root.querySelector("#output-format"), format);
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await settle();
+      if (root.querySelector(`a[download$='.${extension}']`)) break;
+    }
+    assert.ok(root.querySelector(`a[download$='.${extension}']`));
+    assert.doesNotMatch(root.textContent, /Could not decode|Could not process/);
+    assert.equal(button("Retry"), undefined);
+  }
+  assert.equal(attempts, 4);
+});
+
 test("reload restores files, selection and committed settings", async () => {
   await act(() => render(h(App), root));
   await settle();
@@ -695,6 +727,13 @@ test("100% comparison shares image dimensions and one pan position for both vers
   await act(() => render(h(App), root));
   await settle();
   await upload([jpeg()]);
+  for (
+    let attempt = 0;
+    attempt < 20 && !root.querySelector("a[download]");
+    attempt++
+  )
+    await settle();
+  assert.ok(root.querySelector("a[download]"));
   await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
   const viewport = root.querySelector(".comparison .imageViewport");
   const canvas = viewport.querySelector(".imageCanvas");

@@ -18,6 +18,7 @@ function installCanvas(
   let closed = 0;
   let canvas;
   const calls = [];
+  const drawn = [];
   t.mock.method(globalThis, "createImageBitmap", async () => ({
     width: 20,
     height: 10,
@@ -36,7 +37,8 @@ function installCanvas(
         fillRect() {
           calls.push("background");
         },
-        drawImage() {
+        drawImage(image) {
+          drawn.push(image);
           calls.push("image");
         },
         getImageData() {
@@ -53,6 +55,7 @@ function installCanvas(
   });
   return {
     calls,
+    drawn,
     get closed() {
       return closed;
     },
@@ -66,6 +69,7 @@ function installCanvas(
 globalThis.createImageBitmap = () => {};
 globalThis.OffscreenCanvas = class {};
 globalThis.Worker = class {};
+globalThis.Image = class {};
 
 test("truncated worker output falls back to native PNG encoding", async (t) => {
   const state = installCanvas(
@@ -107,6 +111,66 @@ test("JPEG flattening precedes drawing and native allocations are released", asy
   assert.equal(state.closed, 1);
   assert.equal(state.canvas.width, 0);
   assert.equal(state.canvas.height, 0);
+});
+
+test("a transient decoding failure produces the resized output without manual retry", async (t) => {
+  const state = installCanvas(t);
+  let attempts = 0;
+  t.mock.method(globalThis, "createImageBitmap", async () => {
+    if (++attempts === 1)
+      throw new DOMException(
+        "The image could not be decoded",
+        "InvalidStateError",
+      );
+    return { width: 20, height: 10, close() {} };
+  });
+  const result = await resizeImage(
+    source,
+    settings,
+    new AbortController().signal,
+  );
+  assert.equal(attempts, 2);
+  assert.equal(result.blob.type, "image/jpeg");
+  assert.equal(result.widthBefore, 20);
+  assert.equal(result.widthAfter, 20);
+  assert.equal(state.canvas.width, 0);
+});
+
+test("resizing draws the fallback image directly and releases its URL", async (t) => {
+  const state = installCanvas(t);
+  t.mock.method(globalThis, "createImageBitmap", async () => {
+    throw new Error("The image could not be decoded");
+  });
+  let image;
+  t.mock.method(globalThis, "Image", function () {
+    image = {
+      naturalWidth: 40,
+      naturalHeight: 20,
+      set src(url) {
+        this.url = url;
+        queueMicrotask(() => this.onload?.());
+      },
+      removeAttribute() {
+        this.removed = true;
+      },
+    };
+    return image;
+  });
+  const revoke = t.mock.method(URL, "revokeObjectURL");
+  const result = await resizeImage(
+    { id: "1", file: new File(["image"], "image.png") },
+    settings,
+    new AbortController().signal,
+  );
+  assert.equal(globalThis.createImageBitmap.mock.callCount(), 2);
+  assert.deepEqual(state.drawn, [image]);
+  assert.equal(result.widthBefore, 40);
+  assert.equal(result.heightBefore, 20);
+  assert.equal(result.widthAfter, 40);
+  assert.equal(result.heightAfter, 20);
+  assert.equal(image.removed, true);
+  assert.equal(revoke.mock.calls[0].arguments[0], image.url);
+  assert.equal(state.canvas.width, 0);
 });
 
 test("encoder fallback is rejected and resources are released", async (t) => {
