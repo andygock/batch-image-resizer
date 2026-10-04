@@ -631,9 +631,7 @@ function App() {
           images processed.
         </div>
       )}
-      <div
-        className={`${styles.workspace} ${inspectedSource ? styles.inspecting : ""}`}
-      >
+      <div className={styles.workspace}>
         <section className={styles.results}>
           <OutputImages
             images={images}

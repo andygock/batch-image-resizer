@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-preact";
+import { ChevronLeft, ChevronRight } from "lucide-preact";
 import CompressionSelect from "./CompressionSelect.jsx";
 import OutputFormatSelect from "./OutputFormatSelect.jsx";
 import { OutputImage, formatKb } from "./OutputImages.jsx";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import styles from "./ImageInspector.module.css";
-import useSyncedImagePan from "./useSyncedImagePan.js";
+import useImagePan from "./useImagePan.js";
+import Modal from "./Modal.jsx";
 
 export default function ImageInspector({
   source,
@@ -26,13 +27,14 @@ export default function ImageInspector({
   });
   const [compareWith, setCompareWith] = useState("original");
   const [actualSize, setActualSize] = useState(false);
-  const [beforeRef, afterRef] = useSyncedImagePan(actualSize, source.id);
-  const panel = useRef(null);
-  const title = useRef(null);
+  const [split, setSplit] = useState(50);
+  const comparison = useRef(null);
+  const slider = useRef(null);
+  const drag = useRef(null);
   useEffect(() => setDraft(settings), [settings]);
   useEffect(() => {
-    title.current?.focus({ preventScroll: true });
-  }, []);
+    setSplit(50);
+  }, [source.id]);
   useEffect(() => {
     const controller = new AbortController();
     const key = settingsKey(resolveSettings(source, draft));
@@ -74,23 +76,37 @@ export default function ImageInspector({
     ? processor.previous(source.id, settingsKey(result.settings))
     : undefined;
   const before = compareWith === "previous" && previous ? previous : null;
+  const viewport = useImagePan(actualSize, source.id, result ? split : 100);
   const changed =
     draft.format !== settings.format ||
     draft.colours !== settings.colours ||
     JSON.stringify(draft.qualityByFormat) !==
       JSON.stringify(settings.qualityByFormat);
+  const moveSlider = (event) => {
+    const bounds = comparison.current.getBoundingClientRect();
+    if (bounds.width)
+      setSplit(
+        Math.max(
+          0,
+          Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100),
+        ),
+      );
+  };
+  const stopSlider = (event) => {
+    if (drag.current !== event.pointerId) return;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  };
 
   return (
-    <aside
+    <Modal
+      title="Image comparison"
+      onClose={onClose}
       className={styles.inspector}
-      ref={panel}
-      aria-label="Image comparison"
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          onClose();
-        }
-        if (event.target.closest?.("input, select, textarea")) return;
+        if (event.target.closest?.('input, select, textarea, [role="slider"]'))
+          return;
         if (event.key === "ArrowLeft" && index > 0) {
           event.preventDefault();
           onNavigate(-1);
@@ -101,94 +117,165 @@ export default function ImageInspector({
         }
       }}
     >
-      <div className={styles.controls}>
-        <button
-          onClick={() => onNavigate(-1)}
-          disabled={index === 0}
-          aria-label="Previous image"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span>
-          {index + 1} / {total}
-        </span>
-        <button
-          onClick={() => onNavigate(1)}
-          disabled={index === total - 1}
-          aria-label="Next image"
-        >
-          <ChevronRight size={16} />
-        </button>
-        <button onClick={onClose} aria-label="Close comparison">
-          <X size={16} />
-        </button>
-      </div>
-      <h2 ref={title} tabIndex={-1}>
-        {source.file.name}
-      </h2>
-      <div className={styles.controls}>
-        <label>
-          Compare with{" "}
-          <select
-            value={compareWith}
-            onChange={(event) => setCompareWith(event.target.value)}
+      <div className={styles.toolbar}>
+        <div className={styles.controls}>
+          <button
+            onClick={() => onNavigate(-1)}
+            disabled={index === 0}
+            aria-label="Previous image"
           >
-            <option value="original">Original</option>
-            <option value="previous" disabled={!previous}>
-              Previous version
-            </option>
-          </select>
-        </label>
-        <button
-          aria-pressed={actualSize}
-          onClick={() => setActualSize(!actualSize)}
-        >
-          {actualSize ? "Fit previews" : "View at 100%"}
-        </button>
+            <ChevronLeft size={16} />
+          </button>
+          <span>
+            {index + 1} / {total}
+          </span>
+          <button
+            onClick={() => onNavigate(1)}
+            disabled={index === total - 1}
+            aria-label="Next image"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <h3>{source.file.name}</h3>
+        </div>
+        <div className={`${styles.controls} ${styles.compareControls}`}>
+          <label>
+            Compare with{" "}
+            <select
+              value={compareWith}
+              onChange={(event) => setCompareWith(event.target.value)}
+            >
+              <option value="original">Original</option>
+              <option value="previous" disabled={!previous}>
+                Previous version
+              </option>
+            </select>
+          </label>
+          <button
+            aria-pressed={actualSize}
+            onClick={() => setActualSize(!actualSize)}
+          >
+            {actualSize ? "Fit previews" : "View at 100%"}
+          </button>
+        </div>
       </div>
-      <div
-        className={`${styles.comparison} ${actualSize ? styles.actualSize : ""}`}
-      >
-        <figure>
-          <figcaption>
+      <div>
+        <div className={styles.captions}>
+          <span>
             {before ? "Previous" : "Original"} ·{" "}
             {formatKb(before?.filesizeAfter ?? source.file.size)}
-          </figcaption>
-          <div
-            ref={beforeRef}
-            title={actualSize ? "Drag to pan both images" : undefined}
-          >
-            <OutputImage
-              blob={before?.blob ?? source.file}
-              filename={`Original ${source.file.name}`}
-              width={before?.widthAfter}
-              height={before?.heightAfter}
-            />
-          </div>
-        </figure>
-        <figure>
-          <figcaption>
+          </span>
+          <span>
             {changed ? "Trial output" : "Output"}
             {result
               ? ` · ${formatKb(result.filesizeAfter)} · ${result.widthAfter}×${result.heightAfter}px`
               : ""}
-          </figcaption>
+          </span>
+        </div>
+        <div
+          ref={comparison}
+          className={`${styles.comparison} ${actualSize ? styles.actualSize : ""}`}
+          style={{ "--split": `${result ? split : 100}%` }}
+          onPointerDown={(event) => {
+            if (!result || event.button !== 0 || drag.current !== null) return;
+            if (actualSize && !event.target.closest?.('[role="slider"]')) return;
+            event.preventDefault();
+            slider.current.focus({ preventScroll: true });
+            event.currentTarget.setPointerCapture(event.pointerId);
+            drag.current = event.pointerId;
+            moveSlider(event);
+          }}
+          onPointerMove={(event) => {
+            if (event.pointerId === drag.current) moveSlider(event);
+          }}
+          onPointerUp={stopSlider}
+          onPointerCancel={stopSlider}
+          onLostPointerCapture={() => {
+            drag.current = null;
+          }}
+        >
           <div
-            ref={afterRef}
+            ref={viewport}
+            className={styles.imageViewport}
             title={actualSize ? "Drag to pan both images" : undefined}
           >
-            {result ? (
-              <OutputImage
-                blob={result.blob}
-                filename={`Output ${source.file.name}`}
-                width={result.widthAfter}
-                height={result.heightAfter}
-              />
-            ) : (
-              <p>No preview yet.</p>
-            )}
+            <div
+              className={styles.imageCanvas}
+              style={
+                actualSize && result
+                  ? {
+                      width: `${result.widthAfter}px`,
+                      height: `${result.heightAfter}px`,
+                    }
+                  : undefined
+              }
+            >
+              <div className={styles.imageLayer}>
+                {result ? (
+                  <OutputImage
+                    blob={result.blob}
+                    filename={`Output ${source.file.name}`}
+                    width={result.widthAfter}
+                    height={result.heightAfter}
+                  />
+                ) : (
+                  <p>No preview yet.</p>
+                )}
+              </div>
+              <div className={`${styles.imageLayer} ${styles.before}`}>
+                <OutputImage
+                  blob={before?.blob ?? source.file}
+                  filename={`${before ? "Previous" : "Original"} ${source.file.name}`}
+                  width={result?.widthAfter}
+                  height={result?.heightAfter}
+                />
+              </div>
+            </div>
           </div>
-        </figure>
+          {result && (
+            <button
+              ref={slider}
+              className={styles.slider}
+              type="button"
+              role="slider"
+              aria-label="Image comparison slider"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(split)}
+              aria-valuetext={`${Math.round(split)}% ${before ? "previous" : "original"} visible`}
+              aria-orientation="horizontal"
+              onKeyDown={(event) => {
+                const steps = {
+                  ArrowLeft: -1,
+                  ArrowDown: -1,
+                  ArrowRight: 1,
+                  ArrowUp: 1,
+                  PageDown: -10,
+                  PageUp: 10,
+                };
+                if (event.key === "Home") setSplit(0);
+                else if (event.key === "End") setSplit(100);
+                else if (event.key in steps)
+                  setSplit((current) =>
+                    Math.max(0, Math.min(100, current + steps[event.key])),
+                  );
+                else return;
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
+              <span className={styles.handle} aria-hidden="true">
+                <ChevronLeft size={18} />
+                <ChevronRight size={18} />
+              </span>
+            </button>
+          )}
+        </div>
+        <p className={styles.hint}>
+          {actualSize
+            ? "Drag the divider to compare. Drag an image to pan, or scroll."
+            : "Drag the divider to compare, or use the arrow keys when focused."}
+        </p>
       </div>
       <div className={styles.controls}>
         <OutputFormatSelect
@@ -231,6 +318,6 @@ export default function ImageInspector({
       </p>
       {result?.encodingWarning && <p>{result.encodingWarning}</p>}
       {draft.format === "jpeg" && <p>JPEG makes transparent areas white.</p>}
-    </aside>
+    </Modal>
   );
 }

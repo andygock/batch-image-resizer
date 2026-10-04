@@ -1,82 +1,155 @@
-.inspector {
-  position: sticky;
-  top: 76px;
-  align-self: start;
+.inspector.inspector {
+  width: min(1080px, calc(100% - 32px));
   min-width: 0;
-  max-height: calc(100dvh - 92px);
-  overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-}
-.inspector h2 {
-  font-size: 14px;
-  margin: 8px 0;
-  overflow-wrap: anywhere;
 }
 .controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  padding: 4px;
-  white-space: nowrap;
-  scrollbar-width: thin;
 }
-.controls > * {
-  flex-shrink: 0;
-}
-.comparison {
+.toolbar {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 10px 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
-.comparison figure {
+.compareControls {
+  justify-content: flex-end;
+}
+.controls h3 {
+  flex: 1;
   min-width: 0;
+  margin: 0 0 0 8px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
-.comparison figcaption {
-  min-height: 36px;
+.captions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
   font-size: var(--font-size-sm);
 }
-.comparison figure > div {
-  height: 260px;
-  overflow: auto;
+.captions span:last-child {
+  text-align: right;
+}
+.comparison {
+  position: relative;
+  height: clamp(180px, 48dvh, 560px);
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  touch-action: none;
+  user-select: none;
+}
+.imageViewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px
     16px;
+}
+.imageCanvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.imageLayer {
+  position: absolute;
+  inset: 0;
+  background: inherit;
+}
+.before {
+  background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px
+    16px;
+  clip-path: inset(0 max(0px, calc(100% - var(--reveal, var(--split)))) 0 0);
 }
 .comparison img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
-.actualSize img {
-  width: auto;
-  height: auto;
-  max-width: none;
+.slider.slider {
+  position: absolute;
+  inset: 0 auto 0 var(--split);
+  width: 44px;
+  padding: 0;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: ew-resize;
+  touch-action: none;
 }
-.actualSize figure > div {
+.slider::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: white;
+  box-shadow: 0 0 3px rgb(0 0 0 / 0.6);
+}
+.handle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}
+.slider:focus-visible .handle {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+.actualSize .imageViewport {
+  overflow: auto;
+  scrollbar-width: none;
   cursor: grab;
-  user-select: none;
   scroll-behavior: auto;
   overflow-anchor: none;
 }
-.actualSize figure > div[data-panning] {
+.actualSize .imageViewport::-webkit-scrollbar {
+  display: none;
+}
+/* Both versions use the output's pixel dimensions and one scroll position. */
+.actualSize img {
+  max-width: none;
+  object-fit: fill;
+}
+.actualSize .imageViewport[data-panning] {
   cursor: grabbing;
 }
+.hint,
 .feedback {
-  margin-top: 8px;
   color: var(--muted-foreground);
 }
-@media (max-width: 900px) {
-  .inspector {
-    position: fixed;
-    z-index: 15;
-    inset: auto 10px 10px;
-    max-height: 65dvh;
+.hint {
+  margin-top: 8px;
+  font-size: var(--font-size-sm);
+}
+@media (max-width: 600px) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .comparison figure > div {
-    height: 180px;
+  .compareControls label {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .compareControls select {
+    max-width: 100%;
+  }
+  .inspector.inspector {
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
   }
 }

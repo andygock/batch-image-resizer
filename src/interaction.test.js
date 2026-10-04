@@ -445,35 +445,122 @@ test("single-image quality trials do not change the batch until applied", async 
   assert.equal(root.querySelector("#jpeg-quality-number").value, "60");
 });
 
-test("comparison drag and scroll synchronise relative positions in both directions", async () => {
+test("comparison modal supports pointer and keyboard sliding, navigation and dismissal", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([
+    jpeg(),
+    new File([new Uint8Array([255, 216, 255, 4])], "next.jpg"),
+  ]);
+  const trigger = root.querySelector("button[aria-label='Compare photo.jpg']");
+  trigger.focus();
+  await click(trigger);
+  const dialog = root.querySelector("dialog");
+  assert.equal(dialog.open, true);
+  assert.equal(
+    document.getElementById(dialog.getAttribute("aria-labelledby")).textContent,
+    "Image comparison",
+  );
+  const slider = dialog.querySelector('[role="slider"]');
+  const comparison = dialog.querySelector(".comparison");
+  const toolbar = dialog.querySelector(".toolbar");
+  assert.ok(toolbar.querySelector("button[aria-label='Next image']"));
+  assert.ok(toolbar.querySelector(".compareControls select"));
+  assert.equal(slider.getAttribute("aria-valuenow"), "50");
+  comparison.getBoundingClientRect = () => ({ left: 100, width: 400 });
+  let captured = null;
+  comparison.setPointerCapture = (id) => { captured = id; };
+  comparison.hasPointerCapture = (id) => captured === id;
+  comparison.releasePointerCapture = () => { captured = null; };
+  const pointer = (type, clientX, pointerType = "mouse") =>
+    act(() =>
+      slider.dispatchEvent(
+        new window.PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 1,
+          pointerType,
+          button: 0,
+          clientX,
+        }),
+      ),
+    );
+  await pointer("pointerdown", 200);
+  assert.equal(slider.getAttribute("aria-valuenow"), "25");
+  assert.equal(document.activeElement, slider);
+  await pointer("pointermove", 400);
+  assert.equal(slider.getAttribute("aria-valuenow"), "75");
+  assert.equal(comparison.style.getPropertyValue("--split"), "75%");
+  await pointer("pointermove", 600);
+  assert.equal(slider.getAttribute("aria-valuenow"), "100");
+  await pointer("pointerup", 600);
+  assert.equal(captured, null);
+  await pointer("pointermove", 200);
+  assert.equal(slider.getAttribute("aria-valuenow"), "100");
+  await pointer("pointerdown", 300, "touch");
+  await pointer("pointermove", 0, "touch");
+  assert.equal(slider.getAttribute("aria-valuenow"), "0");
+  await pointer("pointercancel", 0, "touch");
+  await pointer("pointermove", 400, "touch");
+  assert.equal(slider.getAttribute("aria-valuenow"), "0");
+  const key = (key) =>
+    act(() =>
+      slider.dispatchEvent(
+        new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      ),
+    );
+  await key("ArrowRight");
+  assert.equal(slider.getAttribute("aria-valuenow"), "1");
+  assert.equal(dialog.querySelector("h3").textContent, "photo.jpg");
+  await key("PageUp");
+  assert.equal(slider.getAttribute("aria-valuenow"), "11");
+  await key("End");
+  assert.equal(slider.getAttribute("aria-valuenow"), "100");
+  await key("Home");
+  assert.equal(slider.getAttribute("aria-valuenow"), "0");
+  await click(dialog.querySelector("button[aria-label='Next image']"));
+  await settle();
+  assert.equal(dialog.querySelector("h3").textContent, "next.jpg");
+  assert.equal(slider.getAttribute("aria-valuenow"), "50");
+  await act(() => dialog.dispatchEvent(new window.Event("cancel", { cancelable: true })));
+  assert.equal(root.querySelector("dialog"), null);
+  assert.equal(document.activeElement, trigger);
+});
+
+test("100% comparison shares image dimensions and one pan position for both versions", async () => {
   await act(() => render(h(App), root));
   await settle();
   await upload([jpeg()]);
   await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
-  const panes = [...root.querySelectorAll(".comparison figure > div")];
-  for (const [index, pane] of panes.entries()) {
-    Object.defineProperties(pane, {
-      clientWidth: { configurable: true, value: 200 },
-      clientHeight: { configurable: true, value: 200 },
-      scrollWidth: { configurable: true, value: index ? 700 : 1200 },
-      scrollHeight: { configurable: true, value: index ? 600 : 1000 },
-    });
-    let captured = null;
-    pane.setPointerCapture = (id) => {
-      captured = id;
-    };
-    pane.hasPointerCapture = (id) => captured === id;
-    pane.releasePointerCapture = () => {
-      captured = null;
-    };
-  }
-  const pointer = (pane, type, x, y, buttons = 1) =>
+  const viewport = root.querySelector(".comparison .imageViewport");
+  const canvas = viewport.querySelector(".imageCanvas");
+  const images = [...canvas.querySelectorAll("img")];
+  assert.equal(root.querySelectorAll(".comparison .imageViewport").length, 1);
+  assert.equal(images.length, 2);
+  assert.equal(images[0].width, images[1].width);
+  assert.equal(images[0].height, images[1].height);
+  assert.notEqual(images[0].width, 1200);
+  Object.defineProperties(viewport, {
+    clientWidth: { configurable: true, value: 200 },
+    clientHeight: { configurable: true, value: 200 },
+    scrollWidth: { configurable: true, value: 700 },
+    scrollHeight: { configurable: true, value: 600 },
+  });
+  let captured = null;
+  viewport.setPointerCapture = (id) => {
+    captured = id;
+  };
+  viewport.hasPointerCapture = (id) => captured === id;
+  viewport.releasePointerCapture = () => {
+    captured = null;
+  };
+  const pointer = (target, type, x, y, buttons = 1, pointerType = "mouse") =>
     act(() =>
-      pane.dispatchEvent(
+      target.dispatchEvent(
         new window.PointerEvent(type, {
           bubbles: true,
           cancelable: true,
-          pointerType: "mouse",
+          pointerType,
           pointerId: 1,
           button: 0,
           buttons,
@@ -482,70 +569,58 @@ test("comparison drag and scroll synchronise relative positions in both directio
         }),
       ),
     );
-  const positions = () =>
-    panes.map((pane) => [pane.scrollLeft, pane.scrollTop]);
+  const position = () => [viewport.scrollLeft, viewport.scrollTop];
 
   await click(button("View at 100%"));
-  await pointer(panes[0], "pointerdown", 100, 100);
-  assert.equal(panes[0].hasPointerCapture(1), true);
-  await pointer(panes[0], "pointermove", 0, 20);
-  assert.deepEqual(positions(), [
-    [100, 80],
-    [50, 40],
-  ]);
-  await pointer(panes[0], "pointerup", 0, 20, 0);
-  assert.equal(panes[0].hasPointerCapture(1), false);
-  assert.equal(panes[0].dataset.panning, undefined);
+  assert.equal(canvas.style.width, `${images[0].width}px`);
+  assert.equal(canvas.style.height, `${images[0].height}px`);
+  await pointer(images[0], "pointerdown", 100, 100);
+  assert.equal(viewport.hasPointerCapture(1), true);
+  await pointer(images[0], "pointermove", 0, 20);
+  assert.deepEqual(position(), [100, 80]);
+  assert.equal(viewport.style.getPropertyValue("--reveal"), "200px");
+  await pointer(images[0], "pointerup", 0, 20, 0);
+  assert.equal(viewport.hasPointerCapture(1), false);
+  assert.equal(viewport.dataset.panning, undefined);
 
-  await pointer(panes[1], "pointerdown", 100, 100);
-  await pointer(panes[1], "pointermove", 50, 60);
-  assert.deepEqual(positions(), [
-    [200, 160],
-    [100, 80],
-  ]);
-  await pointer(panes[1], "pointercancel", 50, 60, 0);
-  await pointer(panes[1], "pointermove", 0, 0);
-  assert.deepEqual(positions(), [
-    [200, 160],
-    [100, 80],
-  ]);
+  await pointer(images[1], "pointerdown", 100, 100);
+  await pointer(images[1], "pointermove", 50, 60);
+  assert.deepEqual(position(), [150, 120]);
+  await pointer(images[1], "pointercancel", 50, 60, 0);
+  await pointer(images[1], "pointermove", 0, 0);
+  assert.deepEqual(position(), [150, 120]);
 
   await act(() => {
-    panes[1].scrollLeft = 250;
-    panes[1].scrollTop = 200;
-    panes[1].dispatchEvent(new window.Event("scroll"));
-    panes[0].dispatchEvent(new window.Event("scroll"));
-    panes[1].dispatchEvent(new window.Event("scroll"));
+    viewport.scrollLeft = 250;
+    viewport.scrollTop = 200;
+    viewport.dispatchEvent(new window.Event("scroll"));
   });
-  assert.deepEqual(positions(), [
-    [500, 400],
-    [250, 200],
-  ]);
+  assert.deepEqual(position(), [250, 200]);
+  assert.equal(viewport.style.getPropertyValue("--reveal"), "350px");
+  const slider = root.querySelector('[role="slider"]');
+  await act(() => slider.dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+  ));
+  assert.deepEqual(position(), [250, 200]);
+  assert.equal(viewport.style.getPropertyValue("--reveal"), "352px");
 
-  await pointer(panes[0], "pointerdown", 100, 100);
-  await pointer(panes[0], "pointermove", -2000, -2000);
-  assert.deepEqual(positions(), [
-    [1000, 800],
-    [500, 400],
-  ]);
-  await pointer(panes[0], "pointermove", 2000, 2000);
-  assert.deepEqual(positions(), [
-    [0, 0],
-    [0, 0],
-  ]);
-  await pointer(panes[0], "pointermove", 0, 0);
+  await pointer(images[1], "pointerdown", 100, 100, 1, "touch");
+  await pointer(images[1], "pointermove", 50, 50, 1, "touch");
+  assert.deepEqual(position(), [300, 250]);
+  await pointer(images[1], "pointerup", 50, 50, 0, "touch");
+  await pointer(images[0], "pointerdown", 100, 100);
+  await pointer(images[0], "pointermove", -2000, -2000);
+  assert.deepEqual(position(), [500, 400]);
+  await pointer(images[0], "pointermove", 2000, 2000);
+  assert.deepEqual(position(), [0, 0]);
+  await pointer(images[0], "pointermove", 0, 0);
   await click(button("Fit previews"));
-  assert.deepEqual(positions(), [
-    [0, 0],
-    [0, 0],
-  ]);
-  assert.equal(panes[0].hasPointerCapture(1), false);
-  await pointer(panes[0], "pointerdown", 100, 100);
-  await pointer(panes[0], "pointermove", 0, 0);
-  assert.deepEqual(positions(), [
-    [0, 0],
-    [0, 0],
-  ]);
+  assert.deepEqual(position(), [0, 0]);
+  assert.equal(viewport.hasPointerCapture(1), false);
+  assert.equal(canvas.style.width, "");
+  await pointer(images[0], "pointerdown", 100, 100);
+  await pointer(images[0], "pointermove", 0, 0);
+  assert.deepEqual(position(), [0, 0]);
 });
 
 test("a clear-data message pauses saving in another open tab", async () => {

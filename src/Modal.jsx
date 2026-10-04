@@ -2,7 +2,13 @@ import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-preact";
 import styles from "./Modal.module.css";
 
-export default function Modal({ title, onClose, children }) {
+export default function Modal({
+  title,
+  onClose,
+  children,
+  className = "",
+  onKeyDown,
+}) {
   const dialog = useRef(null);
   const titleId = useId();
   useEffect(() => {
@@ -18,8 +24,9 @@ export default function Modal({ title, onClose, children }) {
   return (
     <dialog
       ref={dialog}
-      className={styles.modal}
+      className={`${styles.modal} ${className}`}
       aria-labelledby={titleId}
+      onKeyDown={onKeyDown}
       onCancel={(event) => {
         event.preventDefault();
         onClose();

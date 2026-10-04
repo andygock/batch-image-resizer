@@ -157,17 +157,6 @@
 .results {
   min-width: 0;
 }
-.inspecting {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 45%);
-  gap: 12px;
-}
-@media (max-width: 900px) {
-  .inspecting {
-    display: block;
-    padding-bottom: 66dvh;
-  }
-}
 .storage {
   display: grid;
   gap: 12px;
