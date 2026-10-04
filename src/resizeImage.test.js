@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { resizeImage } from "./resizeImage.js";
 
 const source = { id: "1", file: { name: "image.png", size: 12 } };

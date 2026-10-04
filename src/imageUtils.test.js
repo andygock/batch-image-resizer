@@ -1,11 +1,11 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import JSZip from "jszip";
 import {
+  describeSizeDraft,
   fitDimensions,
   nameOutputs,
   validateSize,
-  describeSizeDraft,
 } from "./imageUtils.js";
 import { createJobOwner } from "./jobs.js";
 
@@ -72,9 +72,9 @@ test("colliding names preserve every file through a ZIP round trip", async () =>
     "",
   );
   const zip = new JSZip();
-  outputs.forEach(({ downloadFilename, id }) =>
-    zip.file(downloadFilename, String(id)),
-  );
+  outputs.forEach(({ downloadFilename, id }) => {
+    zip.file(downloadFilename, String(id));
+  });
   const loaded = await JSZip.loadAsync(
     await zip.generateAsync({ type: "uint8array" }),
   );

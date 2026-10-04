@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MAX_DIMENSION, describeSizeDraft } from "./imageUtils.js";
+import { describeSizeDraft, MAX_DIMENSION } from "./imageUtils.js";
 import styles from "./SizeSelect.module.css";
 
 const sizes = [

@@ -86,14 +86,13 @@ export function nameOutputs(
     const stem = dot > 0 ? image.filename.slice(0, dot) : image.filename;
     // Portable, flat ZIP entries; normalise names before checking collisions.
     // Control characters are deliberately removed from filesystem names.
-    /* eslint-disable no-control-regex */
     let base =
       `${stem}${enableSuffix ? suffix : ""}`
         .normalize("NFC")
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: Remove control characters from portable filenames.
         .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
         .replace(/^[. ]+|[. ]+$/g, "")
         .slice(0, 160) || "image";
-    /* eslint-enable no-control-regex */
     if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(base))
       base = `_${base}`;
     let name = `${base}.${image.outputExtension}`;

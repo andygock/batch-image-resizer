@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import UPNG from "upng-js";
 
 test("PNG worker encodes lossless pixels with transparency", async () => {

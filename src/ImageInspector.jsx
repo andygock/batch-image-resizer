@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-preact";
-import CompressionSelect from "./CompressionSelect.jsx";
-import OutputFormatSelect from "./OutputFormatSelect.jsx";
-import { OutputImage, formatKb } from "./OutputImages.jsx";
+import { useEffect, useRef, useState } from "react";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
+import CompressionSelect from "./CompressionSelect.jsx";
 import styles from "./ImageInspector.module.css";
-import useImagePan from "./useImagePan.js";
 import Modal from "./Modal.jsx";
+import OutputFormatSelect from "./OutputFormatSelect.jsx";
+import { formatKb, OutputImage } from "./OutputImages.jsx";
+import useImagePan from "./useImagePan.js";
 
 export default function ImageInspector({
   source,
@@ -178,7 +178,8 @@ export default function ImageInspector({
           style={{ "--split": `${result ? split : 100}%` }}
           onPointerDown={(event) => {
             if (!result || event.button !== 0 || drag.current !== null) return;
-            if (actualSize && !event.target.closest?.('[role="slider"]')) return;
+            if (actualSize && !event.target.closest?.('[role="slider"]'))
+              return;
             event.preventDefault();
             slider.current.focus({ preventScroll: true });
             event.currentTarget.setPointerCapture(event.pointerId);

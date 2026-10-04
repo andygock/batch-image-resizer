@@ -1,5 +1,5 @@
-import Modal from "./Modal.jsx";
 import styles from "./App.module.css";
+import Modal from "./Modal.jsx";
 
 export default function StorageSettings({
   preferences,
@@ -37,9 +37,9 @@ export default function StorageSettings({
           Recover this batch after closing or reloading
         </label>
         <p>
-          Source images and batch settings are saved in this browser’s IndexedDB.
-          Preferences and storage choices use Local Storage. No images are
-          uploaded.
+          Source images and batch settings are saved in this browser’s
+          IndexedDB. Preferences and storage choices use Local Storage. No
+          images are uploaded.
         </p>
         <div className={styles.dataActions}>
           <button onClick={onClearPreferences} disabled={busy}>
@@ -59,10 +59,11 @@ export default function StorageSettings({
           </button>
         </div>
         <p>
-          Clearing a saved category also stops saving it. Turning remembering off
-          is remembered as a storage choice. Clearing Local Storage removes those
-          choices too; saving stays off for this visit until enabled again.
-          Clearing all also removes the current batch and its undo history.
+          Clearing a saved category also stops saving it. Turning remembering
+          off is remembered as a storage choice. Clearing Local Storage removes
+          those choices too; saving stays off for this visit until enabled
+          again. Clearing all also removes the current batch and its undo
+          history.
         </p>
         <p>
           Only this app’s known Local Storage keys and saved batch database are

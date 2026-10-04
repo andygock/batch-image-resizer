@@ -9,7 +9,7 @@ self.onmessage = ({ data: { buffer, width, height, colours } }) => {
       height,
       colours,
       undefined,
-      buffer.byteLength < 4096
+      buffer.byteLength < 4096,
     );
     const bytes = new Uint8Array(encoded);
     const trailer = [0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130];

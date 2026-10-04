@@ -82,8 +82,8 @@
   height: 160px;
   object-fit: contain;
   border-radius: 4px;
-  background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px
-    16px;
+  background:
+    repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px 16px;
 }
 .previewButton {
   display: block;

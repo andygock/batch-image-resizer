@@ -1,10 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
-  DEFAULT_PREFERENCES,
-  PREFERENCES_STORAGE_KEY,
   clearPreferences,
+  DEFAULT_PREFERENCES,
   loadPreferences,
+  PREFERENCES_STORAGE_KEY,
   sanitisePreferences,
   savePreferences,
 } from "./preferences.js";

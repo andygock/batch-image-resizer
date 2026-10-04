@@ -48,8 +48,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px
-    16px;
+  background:
+    repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px 16px;
 }
 .imageCanvas {
   position: relative;
@@ -62,8 +62,8 @@
   background: inherit;
 }
 .before {
-  background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px
-    16px;
+  background:
+    repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 16px 16px;
   clip-path: inset(0 max(0px, calc(100% - var(--reveal, var(--split)))) 0 0);
 }
 .comparison img {

@@ -204,7 +204,7 @@ function validateAndPrepareSnapshot(snapshot) {
       continue;
     // Stored names are untrusted and must remain portable, flat download names.
     if (
-      // eslint-disable-next-line no-control-regex
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: Reject control characters in untrusted stored filenames.
       /[<>:"/\\|?*\u0000-\u001f]/.test(name) ||
       /^[. ]|[. ]$/.test(name) ||
       usedNames.has(name.toLowerCase())

@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { restoreRemovedSources, appendUndo } from "./undoHistory.js";
+import test from "node:test";
+import { appendUndo, restoreRemovedSources } from "./undoHistory.js";
 
 test("undo restores removed order without discarding later additions", () => {
   const source = (id) => ({ id, file: new Blob([id]) });

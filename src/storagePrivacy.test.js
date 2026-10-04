@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   clearAppLocalStorage,
   readStoragePolicy,
@@ -36,8 +36,11 @@ test("storage clearing removes only known app keys and preserves unrecognised ke
     rememberBatch: false,
   });
   clearAppLocalStorage();
-  assert.deepEqual([...values], [
-    ["batch-image-resizer:old:v0", "old"],
-    ["another-app", "keep"],
-  ]);
+  assert.deepEqual(
+    [...values],
+    [
+      ["batch-image-resizer:old:v0", "old"],
+      ["another-app", "keep"],
+    ],
+  );
 });

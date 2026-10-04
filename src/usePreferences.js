@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   clearPreferences,
   loadPreferences,
-  savePreferences,
   sanitisePreferences,
+  savePreferences,
 } from "./preferences.js";
 import {
   clearAppLocalStorage,

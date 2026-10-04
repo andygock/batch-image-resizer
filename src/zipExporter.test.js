@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { createZipExporter } from "./zipExporter.js";
 
 test("exports retain their snapshot and reject duplicate starts", async () => {

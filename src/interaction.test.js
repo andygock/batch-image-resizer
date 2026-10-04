@@ -1,16 +1,16 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { Window } from "happy-dom";
+import test from "node:test";
 import { IDBFactory } from "fake-indexeddb";
+import { Window } from "happy-dom";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+import { BATCH_DATABASE_NAME, clearBatch, saveBatch } from "./batchStorage.js";
 import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
 import {
-  STORAGE_POLICY_KEY,
-  STORAGE_CHANNEL,
   clearAppLocalStorage,
+  STORAGE_CHANNEL,
+  STORAGE_POLICY_KEY,
 } from "./storagePrivacy.js";
-import { BATCH_DATABASE_NAME, clearBatch, saveBatch } from "./batchStorage.js";
 
 const window = new Window({
   url: "http://localhost/",
@@ -220,9 +220,9 @@ test("the menu gear opens storage controls in a dismissible modal", async () => 
 
   await click(gear);
   await act(() =>
-    root.querySelector("dialog").dispatchEvent(
-      new window.Event("cancel", { cancelable: true }),
-    ),
+    root
+      .querySelector("dialog")
+      .dispatchEvent(new window.Event("cancel", { cancelable: true })),
   );
   assert.equal(root.querySelector("dialog"), null);
   assert.equal(document.activeElement, gear);
@@ -294,7 +294,10 @@ test("clear all removes database, web storage, pending work and undo without re-
   assert.equal(otherData, "keep");
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
   assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
-  assert.equal(localStorage.getItem("batch-image-resizer:unrecognised"), "keep");
+  assert.equal(
+    localStorage.getItem("batch-image-resizer:unrecognised"),
+    "keep",
+  );
   assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), "keep");
   assert.equal(localStorage.getItem("unrelated"), "keep");
   assert.equal(sessionStorage.getItem("unrelated"), "keep");
@@ -391,7 +394,10 @@ test("reload restores files, selection and committed settings", async () => {
   assert.equal(root.querySelector("#size").value, "1024x1024");
 });
 
-for (const [format, extension] of [["jpeg", "jpg"], ["webp", "webp"]]) {
+for (const [format, extension] of [
+  ["jpeg", "jpg"],
+  ["webp", "webp"],
+]) {
   test(`recovered ${format} downloads repair stale filenames without clearing the batch`, async (t) => {
     const blobs = new Map();
     const createObjectURL = URL.createObjectURL;
@@ -404,14 +410,23 @@ for (const [format, extension] of [["jpeg", "jpg"], ["webp", "webp"]]) {
       sources: [{ id: "restored", file: jpeg(), sourceFormat: "jpeg" }],
       preferences: { outputFormat: format },
       downloadContext: {
-        names: [["restored", {
-          signature: JSON.stringify(["photo.jpg", extension, "_small"]),
-          name: "photo_small.html",
-        }]],
+        names: [
+          [
+            "restored",
+            {
+              signature: JSON.stringify(["photo.jpg", extension, "_small"]),
+              name: "photo_small.html",
+            },
+          ],
+        ],
       },
     });
     await act(() => render(h(App), root));
-    for (let attempt = 0; attempt < 20 && !root.querySelector("a[download]"); attempt++)
+    for (
+      let attempt = 0;
+      attempt < 20 && !root.querySelector("a[download]");
+      attempt++
+    )
       await settle();
     const link = root.querySelector(".imageCard a[download]");
     assert.ok(link, "Recovered output has a download link");
@@ -423,7 +438,11 @@ for (const [format, extension] of [["jpeg", "jpg"], ["webp", "webp"]]) {
     await waitForSave();
     await act(() => render(null, root));
     await act(() => render(h(App), root));
-    for (let attempt = 0; attempt < 20 && !root.querySelector("a[download]"); attempt++)
+    for (
+      let attempt = 0;
+      attempt < 20 && !root.querySelector("a[download]");
+      attempt++
+    )
       await settle();
     const reloaded = root.querySelector(".imageCard a[download]");
     assert.equal(reloaded.download, `photo_small.${extension}`);
@@ -528,9 +547,13 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
   assert.equal(slider.getAttribute("aria-valuenow"), "50");
   comparison.getBoundingClientRect = () => ({ left: 100, width: 400 });
   let captured = null;
-  comparison.setPointerCapture = (id) => { captured = id; };
+  comparison.setPointerCapture = (id) => {
+    captured = id;
+  };
   comparison.hasPointerCapture = (id) => captured === id;
-  comparison.releasePointerCapture = () => { captured = null; };
+  comparison.releasePointerCapture = () => {
+    captured = null;
+  };
   const pointer = (type, clientX, pointerType = "mouse") =>
     act(() =>
       slider.dispatchEvent(
@@ -565,7 +588,11 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
   const key = (key) =>
     act(() =>
       slider.dispatchEvent(
-        new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+        new window.KeyboardEvent("keydown", {
+          key,
+          bubbles: true,
+          cancelable: true,
+        }),
       ),
     );
   await key("ArrowRight");
@@ -581,7 +608,9 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
   await settle();
   assert.equal(dialog.querySelector("h3").textContent, "next.jpg");
   assert.equal(slider.getAttribute("aria-valuenow"), "50");
-  await act(() => dialog.dispatchEvent(new window.Event("cancel", { cancelable: true })));
+  await act(() =>
+    dialog.dispatchEvent(new window.Event("cancel", { cancelable: true })),
+  );
   assert.equal(root.querySelector("dialog"), null);
   assert.equal(document.activeElement, trigger);
 });
@@ -657,9 +686,11 @@ test("100% comparison shares image dimensions and one pan position for both vers
   assert.deepEqual(position(), [250, 200]);
   assert.equal(viewport.style.getPropertyValue("--reveal"), "350px");
   const slider = root.querySelector('[role="slider"]');
-  await act(() => slider.dispatchEvent(
-    new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
-  ));
+  await act(() =>
+    slider.dispatchEvent(
+      new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+    ),
+  );
   assert.deepEqual(position(), [250, 200]);
   assert.equal(viewport.style.getPropertyValue("--reveal"), "352px");
 
@@ -708,4 +739,5 @@ test("a clear-data message pauses saving in another open tab", async () => {
     otherTab.close();
   }
 });
+
 import "../test-support/register.js";

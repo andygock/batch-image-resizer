@@ -94,11 +94,26 @@ Build for production:
 pnpm build
 ```
 
-Run linting:
+Run Biome linting:
 
 ```sh
 pnpm lint
 ```
+
+Format all supported files with Biome:
+
+```sh
+pnpm format
+```
+
+Check formatting without changing files with `pnpm format:check`, or run linting,
+formatting and import-order checks together with `pnpm check`.
+
+Biome uses two-space indentation and respects `.gitignore`. The configuration
+keeps the existing unused-variable and blank-target exceptions, and allows
+intentional hook dependencies that reset state when the selected image changes.
+Additional accessibility, callback-style and CSS specificity rules are disabled
+to keep this tooling migration focused on the existing behaviour.
 
 Preview the production build:
 

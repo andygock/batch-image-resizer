@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { createResultCache } from "./resultCache.js";
+import test from "node:test";
 import { createBatchProcessor } from "./batchProcessor.js";
+import { createResultCache } from "./resultCache.js";
 
 test("variant cache evicts least-recently-used data within its byte budget", () => {
   const cache = createResultCache({ maxBytes: 6, maxEntries: 10 });

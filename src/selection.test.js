@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { updateSelection } from "./selection.js";
 
 test("range selection works in both directions without losing other selections", () => {

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Download, ImagePlus, Trash2 } from "lucide-preact";
+import { useEffect, useState } from "react";
 import styles from "./OutputImages.module.css";
 
 export const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;

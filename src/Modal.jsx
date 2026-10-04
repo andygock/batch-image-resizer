@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-preact";
+import { useEffect, useId, useRef } from "react";
 import styles from "./Modal.module.css";
 
 export default function Modal({
