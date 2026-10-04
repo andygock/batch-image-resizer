@@ -13,7 +13,6 @@ export const DEFAULT_PREFERENCES = Object.freeze({
   recentSizes: Object.freeze([]),
   viewMode: "grid",
   rememberPreferences: true,
-  rememberBatch: true,
 });
 
 const OUTPUT_FORMATS = new Set(["source", "jpeg", "png", "webp"]);
@@ -87,10 +86,6 @@ export function sanitisePreferences(value) {
       typeof input.rememberPreferences === "boolean"
         ? input.rememberPreferences
         : DEFAULT_PREFERENCES.rememberPreferences,
-    rememberBatch:
-      typeof input.rememberBatch === "boolean"
-        ? input.rememberBatch
-        : DEFAULT_PREFERENCES.rememberBatch,
   };
 }
 
@@ -119,7 +114,9 @@ export function savePreferences(value) {
   try {
     globalThis.localStorage.setItem(
       PREFERENCES_STORAGE_KEY,
-      JSON.stringify(clean),
+      JSON.stringify(
+        clean.rememberPreferences ? clean : { rememberPreferences: false },
+      ),
     );
     return clean;
   } catch (error) {

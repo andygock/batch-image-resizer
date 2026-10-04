@@ -75,11 +75,7 @@ export function nameOutputs(
       enableSuffix ? suffix : "",
     ]);
     const previous = assignments.get(identity);
-    // A matching saved signature alone does not guarantee the correct extension.
-    if (
-      previous?.signature === signature &&
-      previous.name.toLowerCase().endsWith(`.${image.outputExtension}`)
-    )
+    if (previous?.signature === signature)
       return { ...image, downloadFilename: previous.name };
     if (previous) used.delete(previous.name.toLowerCase());
     const dot = image.filename.lastIndexOf(".");

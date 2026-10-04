@@ -25,7 +25,6 @@ export default function ImageInspector({
     busy: false,
     error: "",
   });
-  const [compareWith, setCompareWith] = useState("original");
   const [actualSize, setActualSize] = useState(false);
   const [split, setSplit] = useState(50);
   const comparison = useRef(null);
@@ -72,10 +71,6 @@ export default function ImageInspector({
   }, [source, draft, processor, batchResult]);
   const result =
     preview.result?.id === source.id ? preview.result : batchResult;
-  const previous = result
-    ? processor.previous(source.id, settingsKey(result.settings))
-    : undefined;
-  const before = compareWith === "previous" && previous ? previous : null;
   const viewport = useImagePan(actualSize, source.id, result ? split : 100);
   const changed =
     draft.format !== settings.format ||
@@ -139,18 +134,6 @@ export default function ImageInspector({
           <h3>{source.file.name}</h3>
         </div>
         <div className={`${styles.controls} ${styles.compareControls}`}>
-          <label>
-            Compare with{" "}
-            <select
-              value={compareWith}
-              onChange={(event) => setCompareWith(event.target.value)}
-            >
-              <option value="original">Original</option>
-              <option value="previous" disabled={!previous}>
-                Previous version
-              </option>
-            </select>
-          </label>
           <button
             aria-pressed={actualSize}
             onClick={() => setActualSize(!actualSize)}
@@ -161,10 +144,7 @@ export default function ImageInspector({
       </div>
       <div>
         <div className={styles.captions}>
-          <span>
-            {before ? "Previous" : "Original"} ·{" "}
-            {formatKb(before?.filesizeAfter ?? source.file.size)}
-          </span>
+          <span>Original · {formatKb(source.file.size)}</span>
           <span>
             {changed ? "Trial output" : "Output"}
             {result
@@ -225,8 +205,8 @@ export default function ImageInspector({
               </div>
               <div className={`${styles.imageLayer} ${styles.before}`}>
                 <OutputImage
-                  blob={before?.blob ?? source.file}
-                  filename={`${before ? "Previous" : "Original"} ${source.file.name}`}
+                  blob={source.file}
+                  filename={`Original ${source.file.name}`}
                   width={result?.widthAfter}
                   height={result?.heightAfter}
                 />
@@ -243,7 +223,7 @@ export default function ImageInspector({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(split)}
-              aria-valuetext={`${Math.round(split)}% ${before ? "previous" : "original"} visible`}
+              aria-valuetext={`${Math.round(split)}% original visible`}
               aria-orientation="horizontal"
               onKeyDown={(event) => {
                 const steps = {

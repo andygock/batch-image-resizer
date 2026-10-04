@@ -143,13 +143,6 @@
   .toolbar {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .compareControls label {
-    flex-wrap: wrap;
-    white-space: normal;
-  }
-  .compareControls select {
-    max-width: 100%;
-  }
   .inspector.inspector {
     width: calc(100% - 16px);
     max-height: calc(100dvh - 16px);

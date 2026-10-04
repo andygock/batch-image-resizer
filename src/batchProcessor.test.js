@@ -138,7 +138,7 @@ test("paused batches accept edits without starting work until resumed", async ()
   assert.deepEqual(calls, ["a"]);
 });
 
-test("removal drops cached results while retaining remaining images", async () => {
+test("removal drops results while retaining remaining images", async () => {
   let calls = 0;
   const processor = createBatchProcessor(async ({ id }) => {
     calls++;
@@ -148,4 +148,40 @@ test("removal drops cached results while retaining remaining images", async () =
   processor.remove(["a"]);
   await processor.run(sources, settings, {}, () => {});
   assert.equal(calls, 3);
+});
+
+test("changing settings back regenerates outputs without retaining variants", async () => {
+  const qualities = [];
+  const processor = createBatchProcessor(async ({ id }, options) => {
+    qualities.push(options.quality);
+    return { id };
+  });
+  let state;
+  const publish = (next) => {
+    state = next;
+  };
+  await processor.run(sources, settings, {}, publish);
+  await processor.run(sources, { ...settings, quality: 0.7 }, {}, publish);
+  await processor.run(sources, settings, { paused: true }, publish);
+  assert.equal(state.records.a.status, "pending");
+  assert.equal(state.records.a.result, undefined);
+  await processor.run(sources, settings, {}, publish);
+  assert.deepEqual(qualities, [0.8, 0.8, 0.7, 0.7, 0.8, 0.8]);
+});
+
+test("trial previews are regenerated and do not become batch outputs", async () => {
+  let calls = 0;
+  const processor = createBatchProcessor(async ({ id }) => ({
+    id,
+    attempt: ++calls,
+  }));
+  const signal = new AbortController().signal;
+  await processor.preview(sources[0], settings, signal);
+  const preview = await processor.preview(sources[0], settings, signal);
+  assert.equal(preview.attempt, 2);
+  let state;
+  await processor.run(sources.slice(0, 1), settings, {}, (next) => {
+    state = next;
+  });
+  assert.equal(state.records.a.result.attempt, 3);
 });

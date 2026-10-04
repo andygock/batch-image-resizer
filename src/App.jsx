@@ -5,23 +5,16 @@ import "./App.css";
 import styles from "./App.module.css";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect";
-import {
-  archiveFilename,
-  downloadRequestKey,
-  retainDownloadRequests,
-} from "./downloads.js";
+import { archiveFilename } from "./downloads.js";
 import Errors from "./Errors";
 import ImageInspector from "./ImageInspector.jsx";
 import { nameOutputs, outputFormats } from "./imageUtils.js";
 import OutputFormatSelect from "./OutputFormatSelect";
 import OutputImages from "./OutputImages";
-import { DEFAULT_PREFERENCES, sanitisePreferences } from "./preferences.js";
 import SizeSelect from "./SizeSelect";
 import StorageSettings from "./StorageSettings.jsx";
 import { updateSelection } from "./selection.js";
-import { clearAppSessionStorage, STORAGE_CHANNEL } from "./storagePrivacy.js";
 import useBatchProcessor from "./useBatchProcessor.js";
-import useBatchRecovery from "./useBatchRecovery.js";
 import { useDragAndDrop } from "./useDragAndDrop";
 import useImageImports from "./useImageImports.js";
 import usePreferences from "./usePreferences.js";
@@ -38,11 +31,8 @@ function App() {
   const {
     preferences,
     setPreference,
-    restorePreferences,
     applyPreferences,
     forgetPreferences,
-    pauseStorage,
-    clearLocalData,
     storageError,
   } = usePreferences();
   const {
@@ -60,16 +50,11 @@ function App() {
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const nameAssignments = useRef(new Map());
   const [selected, setSelected] = useState(new Set());
-  const [downloadRequests, setDownloadRequests] = useState(new Set());
   const [inspectedId, setInspectedId] = useState(null);
   const [dataMessage, setDataMessage] = useState("");
-  const [clearingData, setClearingData] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
-  const [formResetKey, setFormResetKey] = useState(0);
-  const storageChannel = useRef(null);
   const inspectedSource = images.find(({ id }) => id === inspectedId);
   const selectionAnchor = useRef(null);
-  const selectedIds = useMemo(() => [...selected], [selected]);
   const dropRef = useRef(null);
   const zipExporter = useRef(null);
   if (!zipExporter.current) zipExporter.current = createZipExporter(saveAs);
@@ -100,7 +85,6 @@ function App() {
     .filter(({ id }) => records[id]?.status === "error")
     .map(({ id }) => id);
   const retryImages = (ids) => {
-    markChanged();
     processor.cancel();
     setCancelled(false);
     setRetry({ ids });
@@ -122,65 +106,9 @@ function App() {
       ),
     [images, outputFormat, enableSuffix, suffix],
   );
-  const downloadContext = useMemo(
-    () => ({
-      names: namedSources.map(({ id }) => [
-        id,
-        nameAssignments.current.get(id),
-      ]),
-      requests: [...downloadRequests],
-    }),
-    [namedSources, downloadRequests],
-  );
-  const recovery = useBatchRecovery(
-    images,
-    preferences,
-    (saved) => {
-      restorePreferences({
-        ...saved.preferences,
-        rememberPreferences: preferences.rememberPreferences,
-        rememberBatch: preferences.rememberBatch,
-      });
-      setCancelled(saved.paused);
-      setSelected(new Set(saved.selectedIds));
-      nameAssignments.current = new Map(saved.downloadContext.names);
-      setDownloadRequests(new Set(saved.downloadContext.requests));
-      setImages(saved.sources);
-    },
-    setPreference,
-    cancelled,
-    selectedIds,
-    downloadContext,
-  );
-  const { markChanged } = recovery;
-  const { pauseSaving } = recovery;
-  useEffect(() => {
-    if (typeof BroadcastChannel !== "function") return;
-    let channel;
-    try {
-      channel = new BroadcastChannel(STORAGE_CHANNEL);
-    } catch {
-      return;
-    }
-    storageChannel.current = channel;
-    channel.onmessage = ({ data }) => {
-      if (!["preferences", "local", "batch", "all"].includes(data)) return;
-      pauseStorage(data);
-      if (data === "batch" || data === "all") pauseSaving();
-      setDataMessage(
-        "Saved data was cleared in another tab. Saving the affected data has been paused here too.",
-      );
-    };
-    return () => {
-      channel.close();
-      storageChannel.current = null;
-    };
-  }, [pauseStorage, pauseSaving]);
-
   const invalidate = useCallback(() => {
-    markChanged();
     processor.cancel();
-  }, [processor, markChanged]);
+  }, [processor]);
 
   const {
     addFiles: handleImageUpload,
@@ -223,23 +151,9 @@ function App() {
     invalidate();
     const removed = new Set(ids);
     processor.remove(ids);
-    storageChannel.current?.postMessage("batch");
     zipExporter.current.cancel();
     cancelImports();
-    // Deletion bypasses the save debounce, even when remembering is off.
-    void recovery.removeImages(ids);
     for (const id of ids) nameAssignments.current.delete(id);
-    setDownloadRequests(
-      (current) =>
-        new Set(
-          retainDownloadRequests(
-            [...current],
-            new Set(
-              images.filter(({ id }) => !removed.has(id)).map(({ id }) => id),
-            ),
-          ),
-        ),
-    );
     if (removed.has(inspectedId)) setInspectedId(null);
     if (removed.has(selectionAnchor.current)) selectionAnchor.current = null;
     const restoreFocus = ids.some((id) =>
@@ -289,44 +203,19 @@ function App() {
     const targets = selection
       ? outputs.filter(({ id }) => selection.has(id))
       : outputs;
-    const snapshot = await zipExporter.current.start(
+    await zipExporter.current.start(
       targets,
       archiveFilename(targets),
       setZipState,
     );
-    if (snapshot) markDownloads(snapshot);
-  };
-  const markDownloads = (items) => {
-    markChanged();
-    setDownloadRequests(
-      (current) =>
-        new Set([...current, ...items.map(downloadRequestKey)].slice(-2000)),
-    );
   };
 
   const cancelResize = () => {
-    markChanged();
     processor.cancel();
     setCancelled(true);
   };
   const isEmpty = images.length === 0;
-  const clearCachedResults = () => {
-    markChanged();
-    processor.clear();
-    zipExporter.current.cancel();
-    setCancelled(true);
-    setRetry({ ids: [] });
-    setInspectedId(null);
-    setDataMessage(
-      "Cached outputs cleared. Source images remain; Resume rebuilds the outputs.",
-    );
-  };
-  const clearAllData = async () => {
-    if (clearingData) return;
-    setClearingData(true);
-    storageChannel.current?.postMessage("all");
-    pauseSaving();
-    pauseStorage("all");
+  const clearBatch = () => {
     cancelImports();
     processor.clear();
     zipExporter.current.cancel(false);
@@ -334,31 +223,11 @@ function App() {
     setImages([]);
     setSelected(new Set());
     selectionAnchor.current = null;
-    setDownloadRequests(new Set());
     setInspectedId(null);
     setCancelled(false);
     setRetry({ ids: [] });
     setZipState({ isZipping: false, progress: 0, error: "" });
-    setFormResetKey((value) => value + 1);
-    applyPreferences({
-      ...sanitisePreferences(DEFAULT_PREFERENCES),
-      rememberPreferences: false,
-      rememberBatch: false,
-    });
-    const batchCleared = await recovery.forgetBatch(false);
-    const localCleared = clearLocalData();
-    let sessionCleared = true;
-    try {
-      clearAppSessionStorage();
-    } catch {
-      sessionCleared = false;
-    }
-    setDataMessage(
-      batchCleared && localCleared && sessionCleared
-        ? "All app data, current images and cached outputs cleared. Saving is off for this visit."
-        : "Some browser storage could not be cleared. Saving is off; try Clear again or review Saved data and preferences.",
-    );
-    setClearingData(false);
+    setDataMessage("");
   };
 
   return (
@@ -368,7 +237,6 @@ function App() {
         <div className={styles.config}>
           <div className={styles.controlGroup}>
             <SizeSelect
-              key={formResetKey}
               onChange={changeSetting("boundingBox")}
               recentSizes={recentSizes}
               onDraftStateChange={setSizeDraft}
@@ -393,7 +261,6 @@ function App() {
             />
             <CompressionSelect
               compact
-              key={formResetKey}
               format={outputFormat}
               onQualityChange={(format, quality) =>
                 changeSetting("qualityByFormat")({
@@ -413,7 +280,6 @@ function App() {
                 type="checkbox"
                 checked={enableSuffix}
                 onChange={() => {
-                  markChanged();
                   setPreference("enableSuffix", !enableSuffix);
                 }}
               />
@@ -423,7 +289,6 @@ function App() {
               type="text"
               value={suffix}
               onChange={(e) => {
-                markChanged();
                 setPreference("suffix", e.target.value);
               }}
               aria-label="Filename suffix"
@@ -451,10 +316,10 @@ function App() {
           </button>
           <button
             className={styles.clearButton}
-            onClick={clearAllData}
-            disabled={clearingData}
-            aria-label="Clear all app data and current batch"
-            title="Clear images and saved browser data permanently"
+            onClick={clearBatch}
+            disabled={isEmpty && !isImporting && !isZipping}
+            aria-label="Clear current batch"
+            title="Clear current images"
           >
             <Trash2 size={15} aria-hidden="true" />
             <span>Clear</span>
@@ -506,8 +371,8 @@ function App() {
           </label>
           <button
             className="buttonIcon"
-            aria-label="Saved data and preferences"
-            title="Saved data and preferences"
+            aria-label="Saved preferences"
+            title="Saved preferences"
             aria-haspopup="dialog"
             onClick={() => setStorageOpen(true)}
           >
@@ -543,15 +408,7 @@ function App() {
           restores the applied dimensions.
         </p>
       )}
-      {(storageError || recovery.error) && (
-        <p role="alert">
-          Saved data needs attention. Current images remain usable.{" "}
-          {[storageError, recovery.error].filter(Boolean).join(" ")}{" "}
-          <button onClick={() => setStorageOpen(true)}>
-            Review storage options
-          </button>
-        </p>
-      )}
+      {storageError && <p role="alert">{storageError}</p>}
       <Errors
         onDismiss={() => {
           clearErrors();
@@ -604,7 +461,6 @@ function App() {
             onRemoveImage={(id) => handleRemoveImages([id])}
             selected={selected}
             onSelectImage={(id, extend) => {
-              markChanged();
               const anchor = selectionAnchor.current;
               setSelected((current) =>
                 updateSelection(
@@ -618,11 +474,9 @@ function App() {
               selectionAnchor.current = id;
             }}
             onSelectAll={() => {
-              markChanged();
               setSelected(new Set(images.map(({ id }) => id)));
             }}
             onClearSelection={() => {
-              markChanged();
               setSelected(new Set());
             }}
             onRemoveSelected={() => handleRemoveImages([...selected])}
@@ -630,7 +484,6 @@ function App() {
             isZipping={isZipping}
             viewMode={preferences.viewMode}
             onViewModeChange={(value) => {
-              markChanged();
               setPreference("viewMode", value);
             }}
             onRetryImage={(id) => retryImages([id])}
@@ -676,51 +529,17 @@ function App() {
         <StorageSettings
           onClose={() => setStorageOpen(false)}
           preferences={preferences}
-          busy={clearingData}
-          message={dataMessage || recovery.message}
-          error={[storageError, recovery.error].filter(Boolean).join(" ")}
-          onRememberPreferences={(enabled) => {
-            if (enabled) setPreference("rememberPreferences", true);
-            else {
-              storageChannel.current?.postMessage("preferences");
-              forgetPreferences();
-            }
-          }}
-          onRememberBatch={(enabled) => {
-            markChanged();
-            if (enabled) setPreference("rememberBatch", true);
-            else {
-              storageChannel.current?.postMessage("batch");
-              void recovery.forgetBatch();
-            }
-          }}
+          message={dataMessage}
+          error={storageError}
+          onRememberPreferences={(enabled) =>
+            setPreference("rememberPreferences", enabled)
+          }
           onClearPreferences={() => {
-            storageChannel.current?.postMessage("preferences");
             if (forgetPreferences())
               setDataMessage(
                 "Saved preferences cleared. Current settings remain in this tab; preference saving is off.",
               );
           }}
-          onClearBatch={async () => {
-            storageChannel.current?.postMessage("batch");
-            setClearingData(true);
-            const success = await recovery.forgetBatch();
-            setDataMessage(
-              success
-                ? "IndexedDB batch deleted. Current images remain in this tab; batch saving is off."
-                : "Could not delete the batch database. Close other app tabs and try again.",
-            );
-            setClearingData(false);
-          }}
-          onClearLocal={() => {
-            storageChannel.current?.postMessage("local");
-            if (clearLocalData())
-              setDataMessage(
-                "App preferences and storage choices cleared from Local Storage. Preference saving is off for this visit.",
-              );
-          }}
-          onClearCache={clearCachedResults}
-          onClearAll={clearAllData}
         />
       )}
       <div className={styles.footer}>

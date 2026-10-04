@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createBatchStorage } from "./batchStorage.js";
 import { inspectImageFile, partitionImageFiles } from "./imageFiles.js";
 
 function imageFile(name, bytes, type = "") {
@@ -14,7 +13,7 @@ const webp = [
   0x52, 0x49, 0x46, 0x46, 0x01, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
 ];
 
-test("imported bytes survive loss of the original file and batch storage round trips", async () => {
+test("imported bytes survive loss of the original file", async () => {
   const bytes = new Uint8Array(128 * 1024 + 7);
   bytes.set(png);
   bytes[bytes.length - 1] = 123;
@@ -37,22 +36,6 @@ test("imported bytes survive loss of the original file and batch storage round t
     accepted,
   );
   assert.deepEqual(duplicate.duplicates, ["another.png"]);
-  let stored;
-  const storage = createBatchStorage({
-    async writeSnapshot(snapshot) {
-      stored = structuredClone(snapshot);
-    },
-    async readSnapshot() {
-      return stored;
-    },
-  });
-  await storage.saveBatch({ sources: [{ ...imported, id: "1" }] });
-  const restored = await storage.loadBatch();
-  assert.deepEqual(
-    new Uint8Array(await restored.sources[0].file.arrayBuffer()),
-    bytes,
-  );
-  assert.equal(restored.sources[0].file.name, original.name);
 });
 
 test("a file that becomes unreadable during import is rejected before processing", async () => {

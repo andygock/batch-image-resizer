@@ -4,71 +4,32 @@ import Modal from "./Modal.jsx";
 export default function StorageSettings({
   preferences,
   onRememberPreferences,
-  onRememberBatch,
   onClearPreferences,
-  onClearBatch,
-  onClearLocal,
-  onClearCache,
-  onClearAll,
-  busy,
   message,
   error,
   onClose,
 }) {
   return (
-    <Modal title="Saved data and preferences" onClose={onClose}>
+    <Modal title="Saved preferences" onClose={onClose}>
       <div className={styles.storage}>
         <label>
           <input
             type="checkbox"
             checked={preferences.rememberPreferences}
             onChange={(event) => onRememberPreferences(event.target.checked)}
-            disabled={busy}
           />
           Remember preferences on this device
         </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={preferences.rememberBatch}
-            onChange={(event) => onRememberBatch(event.target.checked)}
-            disabled={busy}
-          />
-          Recover this batch after closing or reloading
-        </label>
         <p>
-          Source images and batch settings are saved in this browser’s
-          IndexedDB. Preferences and storage choices use Local Storage. No
-          images are uploaded.
+          Menu options are saved in Local Storage. Images stay in this tab and
+          are lost when you close or reload it. No images are uploaded.
         </p>
         <div className={styles.dataActions}>
-          <button onClick={onClearPreferences} disabled={busy}>
-            Clear saved preferences
-          </button>
-          <button onClick={onClearBatch} disabled={busy}>
-            Clear IndexedDB batch
-          </button>
-          <button onClick={onClearLocal} disabled={busy}>
-            Clear app Local Storage
-          </button>
-          <button onClick={onClearCache} disabled={busy}>
-            Clear cached results
-          </button>
-          <button onClick={onClearAll} disabled={busy}>
-            Clear all app data and current batch
-          </button>
+          <button onClick={onClearPreferences}>Clear saved preferences</button>
         </div>
         <p>
-          Clearing a saved category also stops saving it. Turning remembering
-          off is remembered as a storage choice. Clearing Local Storage removes
-          those choices too; saving stays off for this visit until enabled
-          again. Clearing all also removes the current batch. Image deletion is
-          permanent and cannot be undone.
-        </p>
-        <p>
-          Clearing all removes this app’s known Local Storage and Session
-          Storage keys and saved batch database. Other browser data and files
-          already downloaded are kept.
+          Clearing saved preferences keeps your current settings and pauses
+          saving until you enable it again.
         </p>
         {message && <p role="status">{message}</p>}
         {error && <p role="alert">{error}</p>}

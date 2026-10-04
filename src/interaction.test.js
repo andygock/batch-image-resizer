@@ -1,21 +1,10 @@
+import "../test-support/register.js";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IDBFactory } from "fake-indexeddb";
 import { Window } from "happy-dom";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import {
-  BATCH_DATABASE_NAME,
-  clearBatch,
-  loadBatch,
-  saveBatch,
-} from "./batchStorage.js";
 import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
-import {
-  clearAppLocalStorage,
-  STORAGE_CHANNEL,
-  STORAGE_POLICY_KEY,
-} from "./storagePrivacy.js";
 
 const window = new Window({
   url: "http://localhost/",
@@ -39,7 +28,6 @@ for (const key of [
 }
 globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
 globalThis.cancelAnimationFrame = clearTimeout;
-globalThis.indexedDB = new IDBFactory();
 globalThis.createImageBitmap = async () => ({
   width: 1200,
   height: 800,
@@ -96,16 +84,10 @@ const upload = async (files) => {
   );
   await settle();
 };
-const waitForSave = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 320));
-  });
-
 test.afterEach(async () => {
   await act(() => render(null, root));
   localStorage.clear();
   sessionStorage.clear();
-  globalThis.indexedDB = new IDBFactory();
 });
 test.after(() => window.happyDOM.abort());
 
@@ -176,35 +158,44 @@ test("quality sliders commit on release and keep format values independent", asy
   assert.equal(root.querySelector("#webp-quality-number").value, "70");
 });
 
-test("storage choices can be disabled, re-enabled and cleared without reappearing", async () => {
+test("preferences can be disabled, re-enabled and cleared without reappearing", async () => {
   let state;
   function Probe() {
     state = usePreferences();
     return null;
   }
   await act(() => render(h(Probe), root));
-  await act(() => state.forgetPreferences());
+  await act(() => state.setPreference("suffix", "_saved"));
   assert.equal(
-    JSON.parse(localStorage.getItem(STORAGE_POLICY_KEY)).rememberPreferences,
-    false,
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).suffix,
+    "_saved",
   );
+  await act(() => state.setPreference("rememberPreferences", false));
+  await act(() => state.setPreference("suffix", "_private"));
+  await act(() => render(null, root));
+  await act(() => render(h(Probe), root));
+  assert.equal(state.preferences.rememberPreferences, false);
+  assert.equal(state.preferences.suffix, "_small");
   await act(() => state.setPreference("rememberPreferences", true));
+  await act(() => state.setPreference("suffix", "_remembered"));
   assert.equal(
-    JSON.parse(localStorage.getItem(STORAGE_POLICY_KEY)).rememberPreferences,
-    true,
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).suffix,
+    "_remembered",
   );
-  await act(() => state.clearLocalData());
+  await act(() => state.forgetPreferences());
   await act(() => state.setPreference("suffix", "_private"));
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-  assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
+  await act(() => state.setPreference("rememberPreferences", true));
+  assert.equal(
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).suffix,
+    "_private",
+  );
 });
 
-test("the menu gear opens storage controls in a dismissible modal", async () => {
+test("the menu gear opens preference controls in a dismissible modal", async () => {
   await act(() => render(h(App), root));
   await settle();
-  const gear = root.querySelector(
-    "button[aria-label='Saved data and preferences']",
-  );
+  const gear = root.querySelector("button[aria-label='Saved preferences']");
   assert.equal(root.querySelector("dialog"), null);
   gear.focus();
   await click(gear);
@@ -212,13 +203,13 @@ test("the menu gear opens storage controls in a dismissible modal", async () => 
   assert.equal(dialog.open, true);
   assert.equal(
     document.getElementById(dialog.getAttribute("aria-labelledby")).textContent,
-    "Saved data and preferences",
+    "Saved preferences",
   );
-  assert.ok(button("Clear app Local Storage"));
-  assert.ok(button("Clear IndexedDB batch"));
-  assert.equal(button("Clear app Session Storage"), undefined);
+  assert.ok(button("Clear saved preferences"));
+  assert.equal(dialog.querySelectorAll("input[type=checkbox]").length, 1);
+  assert.equal(dialog.querySelectorAll(".dataActions button").length, 1);
   await click(
-    root.querySelector("button[aria-label='Close saved data and preferences']"),
+    root.querySelector("button[aria-label='Close saved preferences']"),
   );
   assert.equal(root.querySelector("dialog"), null);
   assert.equal(document.activeElement, gear);
@@ -233,120 +224,53 @@ test("the menu gear opens storage controls in a dismissible modal", async () => 
   assert.equal(document.activeElement, gear);
 });
 
-for (const control of ["toolbar", "storage settings"]) {
-  test(`${control} clear removes database, web storage, pending work and undo without re-saving`, async () => {
-    await act(() => render(h(App), root));
-    await settle();
-    const input = root.querySelector("#add-images");
-    Object.defineProperty(input, "files", {
-      configurable: true,
-      value: [jpeg()],
-    });
-    await act(() =>
-      input.dispatchEvent(new window.Event("change", { bubbles: true })),
-    );
-    await settle();
-    assert.equal(root.querySelectorAll(".imageCard").length, 1);
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    });
-    assert.ok(
-      (await indexedDB.databases()).some(
-        ({ name }) => name === BATCH_DATABASE_NAME,
-      ),
-    );
-    await click(root.querySelector("button[aria-label='Remove photo.jpg']"));
-    assert.equal(button("Undo removal"), undefined);
-    await upload([jpeg("next.jpg")]);
-    assert.equal(root.querySelectorAll(".imageCard").length, 1);
-    localStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
-    localStorage.setItem("unrelated", "keep");
-    localStorage.setItem("batch-image-resizer:unrecognised", "keep");
-    sessionStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
-    sessionStorage.setItem(STORAGE_POLICY_KEY, "choices");
-    sessionStorage.setItem("batch-image-resizer:unrecognised", "keep");
-    sessionStorage.setItem("unrelated", "keep");
-    const otherDatabaseName = "batch-image-resizer:unrecognised";
-    await new Promise((resolve, reject) => {
-      const request = indexedDB.open(otherDatabaseName);
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore("important").put("keep", "data");
-      };
-      request.onsuccess = () => {
-        request.result.close();
-        resolve();
-      };
-      request.onerror = () => reject(request.error);
-    });
-    if (control === "toolbar") {
-      const clear = button("Clear");
-      assert.equal(clear.querySelector("span").className, "");
-      await click(clear);
-    } else {
-      await click(
-        root.querySelector("button[aria-label='Saved data and preferences']"),
-      );
-      await click(button("Clear all app data and current batch"));
-    }
-    await settle();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 350));
-    });
-    assert.equal(root.querySelectorAll(".imageCard").length, 0);
-    assert.equal(button("Undo removal"), undefined);
-    assert.deepEqual(
-      (await indexedDB.databases()).map(({ name }) => name),
-      [otherDatabaseName],
-    );
-    const otherData = await new Promise((resolve, reject) => {
-      const request = indexedDB.open(otherDatabaseName);
-      request.onsuccess = () => {
-        const database = request.result;
-        const transaction = database.transaction("important", "readonly");
-        const read = transaction.objectStore("important").get("data");
-        read.onsuccess = () => resolve(read.result);
-        read.onerror = () => reject(read.error);
-        transaction.oncomplete = () => database.close();
-      };
-      request.onerror = () => reject(request.error);
-    });
-    assert.equal(otherData, "keep");
-    assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
-    assert.equal(
-      localStorage.getItem("batch-image-resizer:unrecognised"),
-      "keep",
-    );
-    assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-    assert.equal(sessionStorage.getItem(STORAGE_POLICY_KEY), null);
-    assert.equal(
-      sessionStorage.getItem("batch-image-resizer:unrecognised"),
-      "keep",
-    );
-    assert.equal(localStorage.getItem("unrelated"), "keep");
-    assert.equal(sessionStorage.getItem("unrelated"), "keep");
-  });
-}
-
-test("toolbar clear works without images and reports storage failures for retry", async (t) => {
+test("toolbar clear removes the batch and keeps saved preferences", async () => {
   await act(() => render(h(App), root));
   await settle();
-  localStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
-  sessionStorage.setItem(PREFERENCES_STORAGE_KEY, "settings");
-  const remove = t.mock.method(sessionStorage, "removeItem", () => {
+  await change(root.querySelector("#size"), "1024x1024");
+  await upload([jpeg()]);
+  await click(root.querySelector(".imageCard input[type=checkbox]"));
+  const saved = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+  localStorage.setItem("unrelated", "keep");
+  sessionStorage.setItem("unrelated", "keep");
+  await click(button("Clear"));
+  await settle();
+  assert.equal(root.querySelectorAll(".imageCard").length, 0);
+  assert.equal(root.querySelector("#size").value, "1024x1024");
+  assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), saved);
+  assert.equal(localStorage.getItem("unrelated"), "keep");
+  assert.equal(sessionStorage.getItem("unrelated"), "keep");
+  await upload([jpeg()]);
+  assert.equal(root.querySelectorAll(".imageCard").length, 1);
+  assert.equal(
+    root.querySelector(".imageCard input[type=checkbox]").checked,
+    false,
+  );
+});
+
+test("clearing preferences keeps images and reports storage failures for retry", async (t) => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([jpeg()]);
+  await change(
+    root.querySelector("input[aria-label='Filename suffix']"),
+    "_saved",
+  );
+  await click(root.querySelector("button[aria-label='Saved preferences']"));
+  const remove = t.mock.method(localStorage, "removeItem", () => {
     throw new Error("Storage is blocked");
   });
-  assert.equal(button("Clear").disabled, false);
-  await click(button("Clear"));
+  await click(button("Clear saved preferences"));
+  assert.match(root.textContent, /Could not clear preferences/);
+  remove.mock.restore();
+  await click(button("Clear saved preferences"));
   await settle();
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-  assert.match(root.textContent, /Some browser storage could not be cleared/);
-  assert.equal(button("Clear").disabled, false);
-  remove.mock.restore();
-  await click(button("Clear"));
-  await settle();
-  assert.equal(sessionStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-  assert.match(root.textContent, /All app data, current images/);
+  assert.equal(root.querySelectorAll(".imageCard").length, 1);
+  assert.equal(
+    root.querySelector("input[aria-label='Filename suffix']").value,
+    "_saved",
+  );
 });
 
 test("deletion cannot be undone and paused edits stay paused", async (t) => {
@@ -386,35 +310,6 @@ test("deletion cannot be undone and paused edits stay paused", async (t) => {
   );
   release({ width: 1200, height: 800, close() {} });
   await settle();
-});
-
-test("individual and selected deletions reach saved storage before the save debounce", async () => {
-  await act(() => render(h(App), root));
-  await settle();
-  await upload(
-    [1, 2, 3].map(
-      (number) =>
-        new File([new Uint8Array([255, 216, 255, number])], `${number}.jpg`),
-    ),
-  );
-  await waitForSave();
-  await click(root.querySelector("button[aria-label='Remove 1.jpg']"));
-  let saved = await loadBatch();
-  assert.deepEqual(
-    saved.sources.map(({ file }) => file.name),
-    ["2.jpg", "3.jpg"],
-  );
-  for (const input of root.querySelectorAll(".imageCard input[type=checkbox]"))
-    await click(input);
-  await click(button("Remove selected"));
-  saved = await loadBatch();
-  assert.equal(saved, null);
-  assert.deepEqual(await indexedDB.databases(), []);
-  assert.equal(button("Undo removal"), undefined);
-  await act(() => render(null, root));
-  await act(() => render(h(App), root));
-  await settle();
-  assert.equal(root.querySelectorAll(".imageCard").length, 0);
 });
 
 test("range selection and keyboard removal retain the nearest context", async () => {
@@ -487,30 +382,25 @@ test("transient decode failures become ready outputs without a Retry click", asy
     assert.doesNotMatch(root.textContent, /Could not decode|Could not process/);
     assert.equal(button("Retry"), undefined);
   }
-  assert.equal(attempts, 4);
+  assert.equal(attempts, 6);
 });
 
-test("reload restores files, selection and committed settings", async () => {
+test("reload keeps menu preferences and discards the batch", async () => {
   await act(() => render(h(App), root));
   await settle();
   await upload([jpeg()]);
   await click(root.querySelector(".imageCard input[type=checkbox]"));
   await change(root.querySelector("#size"), "1024x1024");
   await settle();
-  await waitForSave();
   await act(() => render(null, root));
   await act(() => render(h(App), root));
   await settle();
   await settle();
-  assert.equal(root.querySelectorAll(".imageCard").length, 1);
-  assert.equal(
-    root.querySelector(".imageCard input[type=checkbox]").checked,
-    true,
-  );
+  assert.equal(root.querySelectorAll(".imageCard").length, 0);
   assert.equal(root.querySelector("#size").value, "1024x1024");
 });
 
-test("format changes and recovery use imported bytes after the temporary file disappears", async (t) => {
+test("format changes use imported bytes after the temporary file disappears", async (t) => {
   const original = jpeg("ComfyUI_temp.jpg");
   const expected = new Uint8Array(await original.arrayBuffer());
   let decodes = 0;
@@ -558,86 +448,10 @@ test("format changes and recovery use imported bytes after the temporary file di
     assert.ok(root.querySelector(`a[download$='.${extension}']`));
     assert.doesNotMatch(root.textContent, /Could not decode/);
   }
-  assert.ok(decodes >= 3);
-  await waitForSave();
-  assert.doesNotMatch(root.textContent, /Saved data needs attention/);
-  const saved = await loadBatch();
-  assert.deepEqual(
-    new Uint8Array(await saved.sources[0].file.arrayBuffer()),
-    expected,
-  );
-  await act(() => render(null, root));
-  await act(() => render(h(App), root));
-  for (
-    let attempt = 0;
-    attempt < 20 && !root.querySelector("a[download]");
-    attempt++
-  )
-    await settle();
-  assert.ok(root.querySelector("a[download$='.jpg']"));
-  assert.doesNotMatch(
-    root.textContent,
-    /Could not decode|Saved data needs attention/,
-  );
+  assert.equal(decodes, 7);
 });
 
-for (const [format, extension] of [
-  ["jpeg", "jpg"],
-  ["webp", "webp"],
-]) {
-  test(`recovered ${format} downloads repair stale filenames without clearing the batch`, async (t) => {
-    const blobs = new Map();
-    const createObjectURL = URL.createObjectURL;
-    t.mock.method(URL, "createObjectURL", (blob) => {
-      const url = createObjectURL(blob);
-      blobs.set(url, blob);
-      return url;
-    });
-    await saveBatch({
-      sources: [{ id: "restored", file: jpeg(), sourceFormat: "jpeg" }],
-      preferences: { outputFormat: format },
-      downloadContext: {
-        names: [
-          [
-            "restored",
-            {
-              signature: JSON.stringify(["photo.jpg", extension, "_small"]),
-              name: "photo_small.html",
-            },
-          ],
-        ],
-      },
-    });
-    await act(() => render(h(App), root));
-    for (
-      let attempt = 0;
-      attempt < 20 && !root.querySelector("a[download]");
-      attempt++
-    )
-      await settle();
-    const link = root.querySelector(".imageCard a[download]");
-    assert.ok(link, "Recovered output has a download link");
-    assert.equal(link.download, `photo_small.${extension}`);
-    assert.equal(blobs.get(link.href).type, `image/${format}`);
-    assert.equal(link.href, root.querySelector(".imageCard img").src);
-    assert.equal(link.target, "");
-    assert.equal(link.getAttribute("aria-disabled"), "false");
-    await waitForSave();
-    await act(() => render(null, root));
-    await act(() => render(h(App), root));
-    for (
-      let attempt = 0;
-      attempt < 20 && !root.querySelector("a[download]");
-      attempt++
-    )
-      await settle();
-    const reloaded = root.querySelector(".imageCard a[download]");
-    assert.equal(reloaded.download, `photo_small.${extension}`);
-    assert.equal(blobs.get(reloaded.href).type, `image/${format}`);
-  });
-}
-
-test("native downloads preserve card content and collision filenames after reload", async () => {
+test("native downloads preserve card content and collision filenames", async () => {
   await act(() => render(h(App), root));
   await settle();
   await upload([
@@ -671,20 +485,6 @@ test("native downloads preserve card content and collision filenames after reloa
   assert.equal(prevented, false);
   assert.equal(download.href, url);
   assert.doesNotMatch(content, /Download requested/);
-  await waitForSave();
-  await act(() => render(null, root));
-  await act(() => render(h(App), root));
-  for (
-    let attempt = 0;
-    attempt < 20 && !root.querySelector(".imageCard a[download]");
-    attempt++
-  )
-    await settle();
-  assert.equal(root.querySelector(".imageCard a[download]").download, filename);
-  assert.doesNotMatch(
-    root.querySelector(".imageCard").textContent,
-    /Download requested/,
-  );
 });
 
 test("single-image quality trials do not change the batch until applied", async () => {
@@ -730,7 +530,7 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
   const comparison = dialog.querySelector(".comparison");
   const toolbar = dialog.querySelector(".toolbar");
   assert.ok(toolbar.querySelector("button[aria-label='Next image']"));
-  assert.ok(toolbar.querySelector(".compareControls select"));
+  assert.equal(toolbar.querySelector(".compareControls select"), null);
   assert.equal(slider.getAttribute("aria-valuenow"), "50");
   comparison.getBoundingClientRect = () => ({ left: 100, width: 400 });
   let captured = null;
@@ -906,32 +706,3 @@ test("100% comparison shares image dimensions and one pan position for both vers
   await pointer(images[0], "pointermove", 0, 0);
   assert.deepEqual(position(), [0, 0]);
 });
-
-test("a clear-data message pauses saving in another open tab", async () => {
-  await act(() => render(h(App), root));
-  await settle();
-  await upload([jpeg()]);
-  await waitForSave();
-  const otherTab = new BroadcastChannel(STORAGE_CHANNEL);
-  try {
-    otherTab.postMessage("all");
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    });
-    await clearBatch();
-    clearAppLocalStorage();
-    await change(
-      root.querySelector("input[aria-label='Filename suffix']"),
-      "_new",
-    );
-    await waitForSave();
-    assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(STORAGE_POLICY_KEY), null);
-    assert.deepEqual(await indexedDB.databases(), []);
-    assert.equal(root.querySelectorAll(".imageCard").length, 1);
-  } finally {
-    otherTab.close();
-  }
-});
-
-import "../test-support/register.js";

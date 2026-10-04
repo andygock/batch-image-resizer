@@ -25,11 +25,10 @@ Live app hosted on Vercel:
 - Batch summary showing output size and savings.
 - Pause and resume processing, with per-image progress, inline retries and reuse of unchanged outputs.
 - Keep source cards and completed images usable while other images process.
-- Compare an original, current output and previous variants in place, with 100% inspection and single-image quality trials.
+- Compare an original and current output in place, with 100% inspection and single-image quality trials.
 - Switch between thumbnail grid and compact list views.
-- Remember preferences, recent dimensions, selection, output names and download requests.
-- Recover source images and committed batch settings after a reload.
-- Clear saved preferences, IndexedDB, app web storage or cached results from dedicated controls.
+- Remember menu preferences and recent dimensions in Local Storage.
+- Clear the current batch or saved preferences with dedicated controls.
 - Keep settings and primary actions in one sticky toolbar row; scroll settings horizontally when space is limited.
 - Collision-free filenames for individual downloads and ZIP entries.
 - PNG encoding in a local browser worker; no server-side image processing.
@@ -46,11 +45,11 @@ The selected size is a maximum bounding box, not a crop. For example, a 1200x800
 
 Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding area of 16,777,216 pixels. Edit both dimensions, then apply them with Enter or by leaving the dimension group. Escape restores the applied values. Invalid drafts explain the correction and block downloads until fixed. Transparent images exported to JPEG use a white background; PNG and WebP retain transparency. Browser encoder failures are reported rather than downloading files with misleading extensions.
 
-Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch, saved preferences, IndexedDB batch, known app Local Storage and Session Storage keys and cached results. It resets settings and keeps saving off for this visit. Deleting an image or a selection removes its saved source bytes, selection and download metadata, and cached outputs. Deletion cannot be undone.
+Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch and keeps your preferences. Deleting an image or a selection removes its source, output and selection state. Deletion cannot be undone.
 
 ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Deleting images cancels an active export so it cannot download deleted outputs. Individual images use native download links to their output blobs; ZIPs use FileSaver. Downloads do not add a success message to the page, and the app cannot verify where the browser saved them.
 
-Choose an image preview to compare it with the original or an available previous output. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch. Previous variants use a bounded memory cache and may be evicted as you work.
+Choose an image preview to compare it with the original. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch.
 
 If the PNG optimiser produces incomplete output, the browser's lossless PNG encoder is used instead. The image card explains that the selected palette reduction was skipped.
 
@@ -63,15 +62,13 @@ If the PNG optimiser produces incomplete output, the browser's lossless PNG enco
 
 ## Saved data and privacy
 
-Open **Saved data and preferences** in the footer to control storage. Remembering preferences and recovering the batch are enabled by default and can be switched off independently.
+Open **Saved preferences** using the toolbar gear to control preference saving, which is enabled by default.
 
-Preferences and storage choices use app-specific Local Storage keys. Source images, batch settings, pause state, selection, output names and download request markers are saved in IndexedDB after a short debounce. Outputs are regenerated after recovery. Previous output variants remain in memory only. No images are uploaded.
+Menu options, including dimensions, output format, quality, filename suffix, recent sizes and view mode, use one app-specific Local Storage key. Images and outputs stay in memory for the current tab. Reloading or closing the tab discards the batch, selection and output names. No images are uploaded.
 
-The panel provides separate controls to clear saved preferences, the IndexedDB batch, app Local Storage and cached results, or all app data and the current batch. Clearing all also removes known app Session Storage keys, and the toolbar Clear button performs the same cleanup. Clearing a saved category stops saving it and tells other open app tabs to pause saving that category too. Clearing stored data leaves the current images available unless you choose to clear all app data. Clearing cached results pauses processing until you resume.
+The panel lets you switch preference saving off or clear saved preferences. Switching saving off remembers that choice without retaining your menu settings. Clearing saved preferences keeps the current settings and images and pauses saving until you enable it again. The toolbar Clear button only removes the current batch.
 
-Switching remembering off saves a minimal storage choice so it remains off next time. Clearing Local Storage removes those choices too; preference saving stays off for the current visit until enabled again. Clearing all removes both storage choices and the current batch and keeps both kinds of saving off for the visit. These controls affect only this app's data, not other applications or files already downloaded. The app does not use a service worker or Cache Storage for images.
-
-Browser storage can be unavailable, full or evicted by the browser. Storage failures are reported without blocking work in the current tab. Recovery is a convenience, not a substitute for downloading files you want to keep.
+Storage failures are reported without blocking work in the current tab. These controls affect only this app's preferences, not other applications or files already downloaded.
 
 ## Development
 
@@ -122,7 +119,7 @@ pnpm preview
 
 ## Tech
 
-Run regression tests with `pnpm test`. These use Node's test runner, mocked image allocation APIs, a simulated DOM for component interactions and an IndexedDB implementation for recovery checks. They do not run browser smoke tests.
+Run regression tests with `pnpm test`. These use Node's test runner, mocked image allocation APIs and a simulated DOM for component interactions. They do not run browser smoke tests.
 
 - Vite
 - Preact via React compatibility
