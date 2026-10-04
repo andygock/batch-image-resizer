@@ -39,7 +39,14 @@ globalThis.OffscreenCanvas = class {
     this.height = height;
   }
   getContext() {
-    return { fillRect() {}, drawImage() {} };
+    return {
+      fillRect() {},
+      drawImage() {},
+      getImageData: () => ({
+        data: new Uint8ClampedArray(this.width * this.height * 4),
+      }),
+      putImageData() {},
+    };
   }
   async convertToBlob({ type }) {
     return new Blob(["output"], { type });
@@ -683,6 +690,70 @@ test("saved output A stays independent while B changes format and either can be 
   await click(button("Discard A"));
   await settle();
   assert.match(root.querySelector(".before img").alt, /Original/);
+});
+
+test("transparency controls change both previews without changing output settings or downloads", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await upload([jpeg()]);
+  await click(root.querySelector('button[aria-label="Compare photo.jpg"]'));
+  for (let i = 0; i < 20 && button("Save output as A").disabled; i++)
+    await settle();
+  await click(button("Save output as A"));
+  const preferences = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+  const download = root.querySelector("a[download]").href;
+  await change(root.querySelector("#preview-background"), "#000000");
+  assert.equal(
+    root
+      .querySelector(".comparison")
+      .style.getPropertyValue("--preview-background"),
+    "#000000",
+  );
+  await change(root.querySelector("#preview-background"), "custom");
+  await change(labelledControl("Custom preview colour"), "#123456");
+  assert.equal(
+    root
+      .querySelector(".comparison")
+      .style.getPropertyValue("--preview-background"),
+    "#123456",
+  );
+  await click(labelledControl("Alpha-only view"));
+  for (
+    let i = 0;
+    i < 20 &&
+    root.querySelectorAll('.comparison img[alt^="Alpha channel"]').length < 2;
+    i++
+  )
+    await settle();
+  assert.equal(
+    root.querySelectorAll('.comparison img[alt^="Alpha channel"]').length,
+    2,
+  );
+  assert.equal(root.querySelector("#preview-background").disabled, true);
+  await click(button("Compare original"));
+  for (
+    let i = 0;
+    i < 20 &&
+    !root.querySelector(
+      '.comparison img[alt="Alpha channel · Original photo.jpg"]',
+    );
+    i++
+  )
+    await settle();
+  assert.ok(
+    root.querySelector(
+      '.comparison img[alt="Alpha channel · Original photo.jpg"]',
+    ),
+  );
+  await click(labelledControl("Alpha-only view"));
+  await settle();
+  assert.equal(
+    root.querySelectorAll('.comparison img[alt^="Alpha channel"]').length,
+    0,
+  );
+  assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), preferences);
+  assert.equal(root.querySelector("a[download]").href, download);
+  assert.equal(button("Apply to batch").disabled, true);
 });
 
 test("comparison modal supports pointer and keyboard sliding, navigation and dismissal", async () => {

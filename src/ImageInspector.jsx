@@ -4,9 +4,10 @@ import AdvancedSettings from "./AdvancedSettings.jsx";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect.jsx";
 import styles from "./ImageInspector.module.css";
+import InspectorImage from "./InspectorImage.jsx";
 import Modal from "./Modal.jsx";
 import OutputFormatSelect from "./OutputFormatSelect.jsx";
-import { formatKb, OutputImage } from "./OutputImages.jsx";
+import { formatKb } from "./OutputImages.jsx";
 import useImagePan from "./useImagePan.js";
 
 export default function ImageInspector({
@@ -31,6 +32,9 @@ export default function ImageInspector({
   const [candidateA, setCandidateA] = useState(null);
   const [compareOutputs, setCompareOutputs] = useState(false);
   const [split, setSplit] = useState(50);
+  const [background, setBackground] = useState("checkerboard");
+  const [customBackground, setCustomBackground] = useState("#808080");
+  const [alphaOnly, setAlphaOnly] = useState(false);
   const comparison = useRef(null);
   const slider = useRef(null);
   const drag = useRef(null);
@@ -196,6 +200,45 @@ export default function ImageInspector({
           ? "A is saved independently. Adjust the controls below to create B, then apply your preferred output to the batch."
           : "Save an output as A to compare two formats or quality settings."}
       </p>
+      <div className={styles.controls}>
+        <label htmlFor="preview-background">Preview background</label>
+        <select
+          id="preview-background"
+          value={background}
+          disabled={alphaOnly}
+          onChange={(event) => setBackground(event.target.value)}
+        >
+          <option value="checkerboard">Checkerboard</option>
+          <option value="#ffffff">White</option>
+          <option value="#000000">Black</option>
+          <option value="custom">Custom</option>
+        </select>
+        {background === "custom" && (
+          <label>
+            Custom preview colour{" "}
+            <input
+              type="color"
+              value={customBackground}
+              disabled={alphaOnly}
+              onChange={(event) => setCustomBackground(event.target.value)}
+            />
+          </label>
+        )}
+        <label>
+          <input
+            type="checkbox"
+            checked={alphaOnly}
+            onChange={(event) => setAlphaOnly(event.target.checked)}
+          />
+          Alpha-only view
+        </label>
+      </div>
+      <p className={styles.hint}>
+        {alphaOnly
+          ? "Alpha channel: white is opaque, black is transparent and grey is partially transparent."
+          : "Preview backgrounds help reveal transparent edges."}{" "}
+        These controls affect only the preview; exported images are unchanged.
+      </p>
       <div>
         <div className={styles.captions}>
           <span>
@@ -211,7 +254,15 @@ export default function ImageInspector({
         <div
           ref={comparison}
           className={`${styles.comparison} ${actualSize ? styles.actualSize : ""}`}
-          style={{ "--split": `${result ? split : 100}%` }}
+          style={{
+            "--split": `${result ? split : 100}%`,
+            "--preview-background":
+              background === "checkerboard"
+                ? undefined
+                : background === "custom"
+                  ? customBackground
+                  : background,
+          }}
           onPointerDown={(event) => {
             if (!result || event.button !== 0 || drag.current !== null) return;
             if (actualSize && !event.target.closest?.('[role="slider"]'))
@@ -249,7 +300,8 @@ export default function ImageInspector({
             >
               <div className={styles.imageLayer}>
                 {result ? (
-                  <OutputImage
+                  <InspectorImage
+                    alphaOnly={alphaOnly}
                     blob={result.blob}
                     filename={`Output ${source.file.name}`}
                     width={result.widthAfter}
@@ -260,7 +312,8 @@ export default function ImageInspector({
                 )}
               </div>
               <div className={`${styles.imageLayer} ${styles.before}`}>
-                <OutputImage
+                <InspectorImage
+                  alphaOnly={alphaOnly}
                   blob={leftOutput?.blob || source.file}
                   filename={`${leftOutput ? "Output A" : "Original"} ${source.file.name}`}
                   width={result?.widthAfter}
