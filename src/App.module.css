@@ -33,13 +33,11 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   margin-bottom: var(--space-2);
-  padding: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
@@ -47,8 +45,8 @@
 }
 
 .title {
-  flex: 0 0 auto;
-  margin: 0 4px 0 2px;
+  display: none;
+  margin: 0;
   white-space: nowrap;
   color: var(--card-foreground);
   font-size: 15px;
@@ -57,23 +55,20 @@
 }
 
 .config {
-  display: flex;
-  flex: 1 1 640px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
   min-width: 0;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  padding: 4px;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .controlGroup {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   min-width: 0;
-  max-width: 100%;
+  align-content: flex-start;
   align-items: center;
   gap: var(--space-2);
-  padding-right: var(--space-2);
+  padding-right: var(--space-3);
   border-right: 1px solid var(--border);
 }
 
@@ -82,11 +77,10 @@
   border-right: 0;
 }
 .controlGroup label {
-  flex-wrap: wrap;
   max-width: 100%;
-  white-space: normal;
 }
 .controlGroup select {
+  min-width: 0;
   max-width: 100%;
 }
 .controlGroup :global(.qualityControl) {
@@ -97,21 +91,21 @@
 }
 .actions {
   display: flex;
-  flex: 0 1 auto;
   flex-wrap: wrap;
-  max-width: 100%;
-  margin-left: auto;
   align-items: center;
   gap: 6px;
-  justify-content: flex-end;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+.actions > label {
+  margin-left: auto;
 }
 .pauseButton {
   width: 86px;
 }
-.clearButton {
-  margin-inline: 2px;
-}
 .suffix {
+  flex: 1 1 10ch;
+  min-width: 0;
   width: 10ch;
 }
 .hint {
@@ -181,33 +175,97 @@
   line-height: 1.4;
 }
 
+@media (min-width: 1280px) {
+  .header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .config {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .actions {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+@media (min-width: 1600px) {
+  .header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .title {
+    display: block;
+    margin-right: var(--space-2);
+  }
+}
 @media (max-width: 768px) {
   .app {
     padding: var(--space-3);
   }
   .header {
     position: static;
-    gap: 4px;
-    padding: 4px;
-  }
-  .actions {
-    gap: 4px;
-  }
-  .actions button,
-  .actions > label {
-    padding-inline: 6px;
   }
 }
-@media (max-width: 1400px) {
-  .title {
-    display: none;
+@media (max-width: 1279px) {
+  .controlGroup > label:has(select),
+  .controlGroup > div:first-child,
+  .controlGroup > div:first-child > label {
+    width: 100%;
+  }
+  .controlGroup label select {
+    flex: 1;
+  }
+  .controlGroup :global(.qualityControl) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    width: 100%;
+  }
+  .controlGroup :global(.qualityControl) label,
+  .controlGroup :global(.qualityControl) [role="status"] {
+    grid-column: 1 / -1;
+  }
+  .controlGroup :global(.qualityControl) input[type="range"] {
+    width: 100%;
+    min-width: 0;
   }
 }
-@media (max-width: 640px) {
+@media (max-width: 700px) {
+  .config {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .controlGroup:nth-child(2) {
+    padding-right: 0;
+    border-right: 0;
+  }
+  .controlGroup:last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 480px) {
+  .config {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .controlGroup {
+    padding-right: 0;
+    border-right: 0;
+  }
+  .controlGroup:first-child > div:first-child {
+    width: auto;
+  }
+  .suffix {
+    flex: 1;
+  }
   .compactText {
     display: none;
   }
-  .pauseButton {
+  .pauseButton,
+  .clearButton {
     width: var(--control-height);
+    padding: 0;
+  }
+  .actions > button:first-child,
+  .actions > label {
+    flex: 1;
   }
 }

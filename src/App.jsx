@@ -540,9 +540,7 @@ function App() {
               onChange={handleFileInputChange}
             />
             <Upload size={15} aria-hidden="true" />
-            <span className={styles.compactText}>
-              {isEmpty ? "Load" : "Add"}
-            </span>
+            <span>{isEmpty ? "Load" : "Add"}</span>
           </label>
           <button
             className="buttonIcon"
