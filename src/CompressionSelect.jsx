@@ -8,7 +8,13 @@ const pngColorOptions = [
   [32, "32 colours"],
 ];
 
-function QualityControl({ format, value, onChange, idPrefix = "" }) {
+function QualityControl({
+  format,
+  value,
+  onChange,
+  idPrefix = "",
+  compact = false,
+}) {
   const [draft, setDraft] = useState(String(Math.round(value * 100)));
   useEffect(() => setDraft(String(Math.round(value * 100))), [value]);
   const percent = Number(draft);
@@ -29,34 +35,38 @@ function QualityControl({ format, value, onChange, idPrefix = "" }) {
   const title = `${format === "jpeg" ? "JPEG" : "WebP"} quality`;
   return (
     <div className="qualityControl">
-      <label htmlFor={`${idPrefix}${format}-quality-number`}>{title}</label>
-      <input
-        type="range"
-        min="30"
-        max="100"
-        step="1"
-        value={valid ? percent : Math.round(value * 100)}
-        aria-label={title}
-        onInput={(event) => setDraft(event.target.value)}
-        onPointerUp={commit}
-        onBlur={commit}
-        onKeyDown={cancel}
-        onKeyUp={(event) => {
-          if (
-            [
-              "ArrowLeft",
-              "ArrowRight",
-              "ArrowUp",
-              "ArrowDown",
-              "Home",
-              "End",
-              "PageUp",
-              "PageDown",
-            ].includes(event.key)
-          )
-            commit();
-        }}
-      />
+      <label htmlFor={`${idPrefix}${format}-quality-number`} title={title}>
+        {compact ? `${format === "jpeg" ? "JPG" : "WebP"} Q` : title}
+      </label>
+      {!compact && (
+        <input
+          type="range"
+          min="30"
+          max="100"
+          step="1"
+          value={valid ? percent : Math.round(value * 100)}
+          aria-label={title}
+          onInput={(event) => setDraft(event.target.value)}
+          onPointerUp={commit}
+          onBlur={commit}
+          onKeyDown={cancel}
+          onKeyUp={(event) => {
+            if (
+              [
+                "ArrowLeft",
+                "ArrowRight",
+                "ArrowUp",
+                "ArrowDown",
+                "Home",
+                "End",
+                "PageUp",
+                "PageDown",
+              ].includes(event.key)
+            )
+              commit();
+          }}
+        />
+      )}
       <input
         id={`${idPrefix}${format}-quality-number`}
         className="numeric qualityNumber"
@@ -65,6 +75,7 @@ function QualityControl({ format, value, onChange, idPrefix = "" }) {
         max="100"
         step="1"
         value={draft}
+        aria-label={title}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         aria-invalid={!valid}
@@ -91,6 +102,7 @@ export default function CompressionSelect({
   onPngColorsChange,
   sourceFormats = [],
   idPrefix = "",
+  compact = false,
 }) {
   const formats = format === "source" ? [...new Set(sourceFormats)] : [format];
   return (
@@ -101,6 +113,7 @@ export default function CompressionSelect({
           <QualityControl
             key={type}
             idPrefix={idPrefix}
+            compact={compact}
             format={type}
             value={qualityByFormat[type]}
             onChange={(quality) => onQualityChange(type, quality)}
@@ -108,7 +121,7 @@ export default function CompressionSelect({
         ))}
       {formats.includes("png") && (
         <label htmlFor={`${idPrefix}png-colors`}>
-          PNG colours
+          {compact ? "Palette" : "PNG colours"}
           <select
             id={`${idPrefix}png-colors`}
             onChange={(event) => onPngColorsChange(Number(event.target.value))}

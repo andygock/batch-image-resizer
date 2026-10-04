@@ -82,7 +82,7 @@ export default function SizeSelect({
         htmlFor="size"
         title="Maximum bounding size in pixels. Keeps proportions without cropping."
       >
-        Max size
+        Max
         <select
           id="size"
           className="numeric"
@@ -117,7 +117,7 @@ export default function SizeSelect({
                 key={`${size.width}x${size.height}`}
                 value={`${size.width}x${size.height}`}
               >
-                Recent: {size.width}×{size.height}
+                {size.width}×{size.height}
               </option>
             ))}
           <option value="custom">Custom</option>

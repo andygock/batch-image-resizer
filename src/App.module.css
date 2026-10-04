@@ -30,18 +30,39 @@
 }
 
 .header {
+  --control-height: 28px;
+  --button-height-sm: 28px;
   position: sticky;
   top: 0;
   z-index: 20;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
   margin-bottom: var(--space-2);
-  padding: var(--space-3);
+  padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
   box-shadow: var(--shadow-sm);
+  font-size: 12px;
+}
+
+.header button,
+.header input[type="number"],
+.header input[type="text"],
+.header select,
+.header :global(.button) {
+  padding-inline: 6px;
+}
+.header .clearButton,
+.header .pauseButton,
+.header :global(.buttonIcon) {
+  padding: 0;
+}
+.header label,
+.header :global(.qualityControl) {
+  gap: 4px;
 }
 
 .title {
@@ -49,16 +70,17 @@
   margin: 0;
   white-space: nowrap;
   color: var(--card-foreground);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.2;
 }
 
 .config {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   min-width: 0;
-  gap: var(--space-3);
+  gap: 6px 10px;
+  flex: 1 1 auto;
 }
 
 .controlGroup {
@@ -67,8 +89,8 @@
   min-width: 0;
   align-content: flex-start;
   align-items: center;
-  gap: var(--space-2);
-  padding-right: var(--space-3);
+  gap: 6px;
+  padding-right: 10px;
   border-right: 1px solid var(--border);
 }
 
@@ -93,18 +115,26 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .actions > label {
   margin-left: auto;
 }
 .pauseButton {
-  width: 86px;
+  width: var(--control-height);
+  padding: 0;
+}
+.clearButton {
+  width: var(--control-height);
+  padding: 0;
+}
+.compactText {
+  display: none;
 }
 .suffix {
-  flex: 1 1 10ch;
+  flex: 0 1 10ch;
   min-width: 0;
   width: 10ch;
 }
@@ -175,27 +205,10 @@
   line-height: 1.4;
 }
 
-@media (min-width: 1280px) {
-  .header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-  }
-  .config {
-    display: flex;
-    flex-wrap: wrap;
-  }
-  .actions {
-    padding-top: 0;
-    border-top: 0;
-  }
-}
 @media (min-width: 1600px) {
-  .header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
   .title {
     display: block;
-    margin-right: var(--space-2);
+    flex-shrink: 0;
   }
 }
 @media (max-width: 768px) {
@@ -205,67 +218,19 @@
   .header {
     position: static;
   }
-}
-@media (max-width: 1279px) {
-  .controlGroup > label:has(select),
-  .controlGroup > div:first-child,
-  .controlGroup > div:first-child > label {
+  .actions {
     width: 100%;
-  }
-  .controlGroup label select {
-    flex: 1;
-  }
-  .controlGroup :global(.qualityControl) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    width: 100%;
-  }
-  .controlGroup :global(.qualityControl) label,
-  .controlGroup :global(.qualityControl) [role="status"] {
-    grid-column: 1 / -1;
-  }
-  .controlGroup :global(.qualityControl) input[type="range"] {
-    width: 100%;
-    min-width: 0;
-  }
-}
-@media (max-width: 700px) {
-  .config {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .controlGroup:nth-child(2) {
-    padding-right: 0;
-    border-right: 0;
-  }
-  .controlGroup:last-child {
-    grid-column: 1 / -1;
   }
 }
 @media (max-width: 480px) {
-  .config {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
   .controlGroup {
     padding-right: 0;
     border-right: 0;
   }
-  .controlGroup:first-child > div:first-child {
-    width: auto;
-  }
-  .suffix {
-    flex: 1;
-  }
-  .compactText {
-    display: none;
-  }
-  .pauseButton,
-  .clearButton {
-    width: var(--control-height);
-    padding: 0;
-  }
-  .actions > button:first-child,
-  .actions > label {
-    flex: 1;
+}
+@media (pointer: coarse) {
+  .header {
+    --control-height: 44px;
+    --button-height-sm: 44px;
   }
 }

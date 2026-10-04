@@ -422,7 +422,7 @@ function App() {
                   changeSetting("disableUpscale")(!disableUpscale)
                 }
               />
-              Do not enlarge
+              No upscale
             </label>
           </div>
           <div className={styles.controlGroup}>
@@ -431,6 +431,7 @@ function App() {
               value={outputFormat}
             />
             <CompressionSelect
+              compact
               key={formResetKey}
               format={outputFormat}
               onQualityChange={(format, quality) =>
@@ -455,7 +456,7 @@ function App() {
                   setPreference("enableSuffix", !enableSuffix);
                 }}
               />
-              Add suffix
+              Suffix
             </label>
             <input
               type="text"

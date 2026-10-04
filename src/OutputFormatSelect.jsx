@@ -1,5 +1,5 @@
 const outputFormats = [
-  ["source", "Keep source format"],
+  ["source", "Source"],
   ["jpeg", "JPEG"],
   ["png", "PNG"],
   ["webp", "WebP"],
