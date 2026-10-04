@@ -1,5 +1,6 @@
 import { effectiveAdvanced } from "./advancedSettings.js";
 import { createJobOwner } from "./jobs.js";
+import { processingKey } from "./processingSettings.js";
 import { resizeImage } from "./resizeImage.js";
 
 export function resolveSettings(source, settings) {
@@ -25,6 +26,7 @@ export function settingsKey(settings) {
         ? null
         : settings.quality,
     advanced,
+    processing: processingKey(settings.processing),
     colours: settings.format === "png" ? settings.colours : null,
     disableUpscale: settings.disableUpscale,
   });

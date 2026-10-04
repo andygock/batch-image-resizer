@@ -1,5 +1,9 @@
 import { DEFAULT_ADVANCED, sanitiseAdvanced } from "./advancedSettings.js";
 import { validateSize } from "./imageUtils.js";
+import {
+  DEFAULT_PROCESSING,
+  sanitiseProcessing,
+} from "./processingSettings.js";
 
 export const PREFERENCES_STORAGE_KEY = "batch-image-resizer:preferences:v1";
 
@@ -9,6 +13,7 @@ export const DEFAULT_PREFERENCES = Object.freeze({
   qualityByFormat: Object.freeze({ jpeg: 0.8, webp: 0.8 }),
   pngColors: 0,
   advanced: DEFAULT_ADVANCED,
+  processing: DEFAULT_PROCESSING,
   enableSuffix: true,
   suffix: "_small",
   disableUpscale: true,
@@ -60,6 +65,7 @@ export function sanitisePreferences(value) {
 
   return {
     advanced: sanitiseAdvanced(input.advanced),
+    processing: sanitiseProcessing(input.processing),
     boundingBox,
     outputFormat: OUTPUT_FORMATS.has(input.outputFormat)
       ? input.outputFormat

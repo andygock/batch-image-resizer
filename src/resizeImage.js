@@ -1,6 +1,8 @@
 import { sanitiseAdvanced } from "./advancedSettings.js";
 import { decodeImage } from "./decodeImage.js";
 import { fitDimensions, outputFormats } from "./imageUtils.js";
+import { drawProcessed } from "./processImage.js";
+import { sanitiseProcessing } from "./processingSettings.js";
 
 function encodePng(canvas, colours, signal, advanced) {
   return new Promise((resolve, reject) => {
@@ -134,7 +136,14 @@ export async function resizeImage({ id, file }, settings, signal) {
       ctx.fillStyle = sanitiseAdvanced(settings.advanced).jpeg.background;
       ctx.fillRect(0, 0, size.width, size.height);
     }
-    ctx.drawImage(bitmap.image, 0, 0, size.width, size.height);
+    const processing = sanitiseProcessing(settings.processing);
+    if (processing.method === "lanczos3" || processing.method === "mitchell") {
+      await drawProcessed(ctx, bitmap, size, processing, signal);
+    } else {
+      ctx.imageSmoothingEnabled = processing.method !== "nearest";
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bitmap.image, 0, 0, size.width, size.height);
+    }
     stage = "encode";
     const { mimeType, extension } = outputFormats[settings.format];
     const encoded =

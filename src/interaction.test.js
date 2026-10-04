@@ -102,6 +102,22 @@ const labelledControl = (text, within = root) => {
   );
 };
 
+test("resize settings are staged in the processing modal and saved with the parent", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  await click(button("Advanced"));
+  await click(button("Image processing"));
+  await change(root.querySelector("#resize-method"), "lanczos3");
+  await click(button("Use processing settings"));
+  assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
+  await click(button("Apply settings"));
+  await settle();
+  assert.equal(
+    JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).processing.method,
+    "lanczos3",
+  );
+});
+
 test("advanced settings are staged, validated, saved per format and restored", async () => {
   await act(() => render(h(App), root));
   await settle();

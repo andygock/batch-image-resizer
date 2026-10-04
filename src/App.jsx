@@ -46,6 +46,7 @@ function App() {
     disableUpscale,
     recentSizes,
     advanced,
+    processing,
   } = preferences;
   const [cancelled, setCancelled] = useState(false);
   const [retry, setRetry] = useState({ ids: [] });
@@ -69,6 +70,7 @@ function App() {
       colours: pngColors,
       disableUpscale,
       advanced,
+      processing,
     }),
     [
       boundingBox,
@@ -77,6 +79,7 @@ function App() {
       pngColors,
       disableUpscale,
       advanced,
+      processing,
     ],
   );
   const { records, isProcessing, progress, processingTime, processor } =
@@ -539,6 +542,7 @@ function App() {
                 qualityByFormat: options.qualityByFormat,
                 pngColors: options.colours,
                 advanced: options.advanced,
+                processing: options.processing,
               }));
             }}
           />
@@ -573,6 +577,7 @@ function App() {
             applyPreferences((current) => ({
               ...current,
               advanced: options.advanced,
+              processing: options.processing,
               qualityByFormat: options.qualityByFormat,
               pngColors: options.colours,
             }));

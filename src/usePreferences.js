@@ -34,6 +34,7 @@ export default function usePreferences() {
       if (key !== "qualityByFormat")
         clean.qualityByFormat = current.qualityByFormat;
       if (key !== "advanced") clean.advanced = current.advanced;
+      if (key !== "processing") clean.processing = current.processing;
       return clean;
     });
   }, []);

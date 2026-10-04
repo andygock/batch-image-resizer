@@ -75,6 +75,16 @@ test("built PNG worker loads dithering, optimiser and interlacing chunks", async
   assert.ok(new Set(new Uint32Array(UPNG.toRGBA8(decoded)[0])).size <= 4);
 });
 
+test("built processing worker resizes RGBA pixels", async () => {
+  const [buffer] = await runWorker("processing.worker", [
+    {
+      target: { width: 8, height: 12 },
+      processing: { method: "lanczos3", linearRGB: true, premultiply: true },
+    },
+  ]);
+  assert.equal(buffer.byteLength, 8 * 12 * 4);
+});
+
 test("built JPEG and WebP worker loads bundled encoder assets", async () => {
   const buffers = await runWorker("encoder.worker", [
     {

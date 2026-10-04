@@ -57,6 +57,8 @@ If standard PNG encoding produces incomplete output, the browser's lossless PNG 
 
 ## Advanced output settings
 
+Open **Advanced → Image processing** for resize quality controls. Auto uses the browser's high-quality resizer; nearest-neighbour keeps pixel-art edges hard. Lanczos3 favours sharp detail and Mitchell gives softer edges. Both advanced methods support optional linear-light and alpha-aware filtering in a cancellable local worker, with a 33.5-megapixel source limit. Settings are saved with preferences and can be trialled in the comparison panel. Changes remain staged until the parent settings are applied.
+
 Choose **Advanced** next to the format controls. The modal keeps separate settings for WebP, JPEG and PNG. Changing the modal's format section does not change the batch output format. Edits take effect together with **Apply settings**; Cancel, Escape and closing the modal discard them. Each format has a reset button. Less common encoder controls are under **Fine tuning**.
 
 JPEG and WebP use the browser encoder by default. Select **Advanced** in the format's Encoder menu to use the additional controls. These encoders and their WebAssembly files load from the app's own assets on demand and run in cancellable workers. Images never leave the device. Higher effort settings can take substantially longer, especially for large batches.

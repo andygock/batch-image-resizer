@@ -75,6 +75,7 @@ export default function ImageInspector({
     preview.result?.id === source.id ? preview.result : batchResult;
   const viewport = useImagePan(actualSize, source.id, result ? split : 100);
   const changed =
+    JSON.stringify(draft.processing) !== JSON.stringify(settings.processing) ||
     JSON.stringify(draft.advanced) !== JSON.stringify(settings.advanced) ||
     draft.format !== settings.format ||
     draft.colours !== settings.colours ||

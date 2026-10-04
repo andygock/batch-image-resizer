@@ -8,6 +8,7 @@ import {
 } from "./advancedSettings.js";
 import CompressionSelect from "./CompressionSelect.jsx";
 import Modal from "./Modal.jsx";
+import ProcessingSettings from "./ProcessingSettings.jsx";
 import { DEFAULT_PREFERENCES } from "./preferences.js";
 
 const names = { webp: "WebP", jpeg: "JPEG", png: "PNG" };
@@ -113,6 +114,7 @@ export default function AdvancedSettings({
   initialFormat = settings.format === "source" ? "webp" : settings.format,
 }) {
   const [format, setFormat] = useState(initialFormat);
+  const [processingOpen, setProcessingOpen] = useState(false);
   const [draft, setDraft] = useState(() => ({
     ...settings,
     advanced: sanitiseAdvanced(settings.advanced),
@@ -231,6 +233,16 @@ export default function AdvancedSettings({
           </button>
         ))}
       </div>
+      <button onClick={() => setProcessingOpen(true)} aria-haspopup="dialog">
+        Image processing
+      </button>
+      {processingOpen && (
+        <ProcessingSettings
+          value={draft.processing}
+          onApply={(processing) => setDraft({ ...draft, processing })}
+          onClose={() => setProcessingOpen(false)}
+        />
+      )}
       <form
         onSubmit={(event) => {
           event.preventDefault();
