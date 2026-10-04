@@ -84,6 +84,9 @@
   cursor: ew-resize;
   touch-action: none;
 }
+.slider.slider:hover {
+  background: transparent;
+}
 .slider::before {
   content: "";
   position: absolute;
