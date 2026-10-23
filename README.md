@@ -28,7 +28,7 @@ Live app hosted on Vercel:
 - Batch summary showing output size and savings.
 - Pause and resume processing, with per-image progress, inline retries and reuse of unchanged outputs.
 - Keep source cards and completed images usable while other images process.
-- Compare an original and current output in place, with 100% inspection and single-image quality trials.
+- Compare an original and current output in place, with inspection at actual output size and single-image quality trials.
 - Switch between thumbnail grid and compact list views.
 - Remember menu preferences and recent dimensions in Local Storage.
 - Clear the current batch or saved preferences with dedicated controls.
@@ -52,9 +52,17 @@ Pause retains completed outputs and remains paused while you edit the batch. Res
 
 ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Deleting images cancels an active export so it cannot download deleted outputs. Individual images use native download links to their output blobs; ZIPs use FileSaver. Downloads do not add a success message to the page, and the app cannot verify where the browser saved them.
 
-Choose an image preview to compare it with the original. At 100%, drag either preview to pan both together; scrolling also keeps their relative positions synchronised across different image dimensions. Trial format and quality changes affect that image only until you choose Apply to batch.
+Choose an image preview to compare it with the original. **Actual output size** displays one output pixel per CSS pixel and scales the original to the same dimensions for alignment. Both images share one pan and scroll position; this is not native-resolution inspection of the original. Trial format and quality changes affect that image only until you choose Apply to batch.
 
 If standard PNG encoding produces incomplete output, the browser's lossless PNG encoder is used instead. The image card explains that the selected palette reduction was skipped.
+
+## Resource limits
+
+Each imported file is limited to 64 MiB. Source files and retained duplicate copies in a batch are limited to 256 MiB in total; outputs and codec memory are additional. Clear cancels active import work and allows a new import to start immediately. Duplicate detection indexes bounded-chunk SHA-256 fingerprints and confirms matches by comparing bytes.
+
+Sources are limited to 33,554,432 pixels. A bounded header check rejects oversized JPEG, PNG, WebP and AVIF dimensions when available before decoding. Decoded dimensions are checked again, including previews. Some files place metadata beyond the inspected prefix, so a decoder may allocate memory before that limit can be checked. These limits reduce memory pressure but do not guarantee that every supported image fits every device's available memory. Advanced processing also rejects estimated working-buffer allocations above 512 MiB; use Auto without sharpening or smaller dimensions when this limit is reached. Sharpening retains only the horizontal rows required by its blur kernel rather than a full-image float buffer.
+
+Displayed file sizes and WebP targets use decimal kilobytes (1 kB = 1000 bytes). Resource limits above use binary mebibytes (1 MiB = 1,048,576 bytes).
 
 ## Advanced output settings
 
@@ -64,7 +72,7 @@ Open **Advanced → Image processing** for resize quality controls. Auto uses th
 
 Choose **Advanced** next to the format controls. The modal keeps separate settings for WebP, JPEG and PNG. Changing the modal's format section does not change the batch output format. Edits take effect together with **Apply settings**; Cancel, Escape and closing the modal discard them. Each format has a reset button. Less common encoder controls are under **Fine tuning**.
 
-JPEG and WebP use the browser encoder by default. Select **Advanced** in the format's Encoder menu to use the additional controls. These encoders and their WebAssembly files load from the app's own assets on demand and run in cancellable workers. Images never leave the device. Higher effort settings can take substantially longer, especially for large batches.
+JPEG and WebP use the browser encoder by default. Select **Advanced** in the format's Encoder menu to use the additional controls. These encoders and their WebAssembly files load from the app's own assets on demand and run in cancellable workers. Successful encoding jobs reuse an idle worker and its codec initialisation; cancellation or failure terminates the active worker. Idle workers are released after ten seconds, on Clear or when the app unmounts. Images never leave the device. Higher effort settings can take substantially longer, especially for large batches.
 
 | Format | Available advanced controls |
 | --- | --- |
@@ -100,6 +108,10 @@ Storage failures are reported without blocking work in the current tab. These co
 
 ## Development
 
+Use Node.js 22.12 or later and pnpm 12.3.4 (the pinned package-manager version). Vite also supports Node.js 20.19 or later in the Node 20 line. Dependency installation must respect pnpm's configured minimum release age.
+
+The app requires HTTPS or localhost and a current browser with module workers, WebAssembly, OffscreenCanvas 2D encoding, Web Crypto, abort signals and native dialogs. Startup checks report missing core APIs. Native format support varies: unsupported WebP encoding is reported as an error, and AVIF has a local decoder fallback.
+
 Install dependencies:
 
 ```sh
@@ -134,10 +146,10 @@ Check formatting without changing files with `pnpm format:check`, or run linting
 formatting and import-order checks together with `pnpm check`.
 
 Biome uses two-space indentation and respects `.gitignore`. The configuration
-keeps the existing unused-variable and blank-target exceptions, and allows
+reports unused imports and variables, keeps the blank-target exception, and allows
 intentional hook dependencies that reset state when the selected image changes.
 Additional accessibility, callback-style and CSS specificity rules are disabled
-to keep this tooling migration focused on the existing behaviour.
+for the existing UI patterns.
 
 Preview the production build:
 
@@ -156,7 +168,7 @@ Run `pnpm test:build` to build the production app and execute its emitted worker
 - Canvas and `OffscreenCanvas`
 - `upng-js` for PNG encoding
 - `image-q` for PNG palette dithering
-- `@jsquash/webp`, `@jsquash/jpeg` and `@jsquash/oxipng` for local advanced encoding and optimisation
+- `@jsquash/webp`, `@jsquash/jpeg`, `@jsquash/avif` and `@jsquash/oxipng` for local advanced encoding and optimisation
 - `jszip` and `file-saver` for ZIP downloads
 
 ## Favicon

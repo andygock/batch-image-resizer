@@ -1,4 +1,9 @@
 import { decodeAvifImage } from "./decodeAvifImage.js";
+import {
+  ImageLimitError,
+  preflightImage,
+  validateSourceDimensions,
+} from "./imageLimits.js";
 
 function loadImage(file, signal) {
   return new Promise((resolve, reject) => {
@@ -33,12 +38,14 @@ function loadImage(file, signal) {
     };
     const abort = () => finish(signal.reason);
     signal.addEventListener("abort", abort, { once: true });
-    image.onload = () =>
-      finish(
-        image.naturalWidth && image.naturalHeight
-          ? null
-          : new Error("The loaded image has no usable dimensions."),
-      );
+    image.onload = () => {
+      try {
+        validateSourceDimensions(image.naturalWidth, image.naturalHeight);
+        finish();
+      } catch (error) {
+        finish(error);
+      }
+    };
     image.onerror = () => finish(new Error("The image could not be loaded."));
     try {
       image.src = url;
@@ -49,6 +56,7 @@ function loadImage(file, signal) {
 }
 
 export async function decodeImage(file, signal) {
+  await preflightImage(file, signal);
   let failure;
   // A successful manual retry should also succeed without user intervention.
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -59,6 +67,12 @@ export async function decodeImage(file, signal) {
         image.close();
         throw signal.reason;
       }
+      try {
+        validateSourceDimensions(image.width, image.height);
+      } catch (error) {
+        image.close();
+        throw error;
+      }
       return {
         image,
         width: image.width,
@@ -67,6 +81,7 @@ export async function decodeImage(file, signal) {
       };
     } catch (error) {
       signal.throwIfAborted();
+      if (error instanceof ImageLimitError) throw error;
       failure = error;
     }
   }
@@ -76,6 +91,7 @@ export async function decodeImage(file, signal) {
     return await loadImage(file, signal);
   } catch (error) {
     signal.throwIfAborted();
+    if (error instanceof ImageLimitError) throw error;
     if (file.type === "image/avif") return decodeAvifImage(file, signal);
     throw new Error(
       `Automatic decoding recovery failed: ${failure.message} ${error.message}`,

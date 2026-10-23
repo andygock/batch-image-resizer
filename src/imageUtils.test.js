@@ -141,3 +141,15 @@ test("a late job cannot publish after replacement or reset", async () => {
   assert.equal(second.isCurrent(), false);
   assert.equal(second.signal.aborted, true);
 });
+
+test("bounding dimensions remain exact despite floating-point scale rounding", () => {
+  for (const [width, height, expected] of [
+    [561, 561, { width: 512, height: 512 }],
+    [561, 1122, { width: 256, height: 512 }],
+    [1122, 561, { width: 512, height: 256 }],
+  ])
+    assert.deepEqual(
+      fitDimensions(width, height, { width: 512, height: 512 }, true),
+      expected,
+    );
+});

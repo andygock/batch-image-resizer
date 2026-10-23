@@ -1,9 +1,40 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { processingKey, sanitiseProcessing } from "./processingSettings.js";
 import { sharpenPixels } from "./sharpenPixels.js";
 
 const options = { sharpen: true, amount: 1, radius: 1, threshold: 0 };
+
+test("row buffering preserves established pixels across kernel sizes without full-image float allocations", (t) => {
+  const width = 7;
+  const height = 29;
+  const pixels = Uint8ClampedArray.from(
+    { length: width * height * 4 },
+    (_, i) => (i * 31 + Math.floor(i / 7) * 19) % 256,
+  );
+  const FloatArray = globalThis.Float32Array;
+  const allocations = [];
+  t.mock.method(globalThis, "Float32Array", function (length) {
+    allocations.push(length);
+    return new FloatArray(length);
+  });
+  // Golden hashes from the original full-image two-pass implementation.
+  for (const [radius, expected] of [
+    [0.3, "c13e894ca29c4cfeb263dd1b28bc986b2b4b8f0830adad77b35f5d141c3621fc"],
+    [1, "996aec66c8873e9b526b44c1458617bce36492d9544ced89edfe9471f0022482"],
+    [3, "c10e8726330c83b09c40606f7e9011e452041309437ca59752a5c279480f8624"],
+  ]) {
+    const output = sharpenPixels(pixels, width, height, {
+      sharpen: true,
+      amount: 1,
+      radius,
+      threshold: 2,
+    });
+    assert.equal(createHash("sha256").update(output).digest("hex"), expected);
+  }
+  assert.equal(Math.max(...allocations), width * 4);
+});
 test("sharpening is optional, preserves solids and increases edge contrast", () => {
   const solid = new Uint8ClampedArray(
     Array(9).fill([80, 120, 160, 128]).flat(),

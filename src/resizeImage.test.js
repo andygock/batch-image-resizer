@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resizeImage } from "./resizeImage.js";
+import { disposeWorkerPools } from "./workerTask.js";
+
+test.afterEach(disposeWorkerPools);
 
 const source = { id: "1", file: { name: "image.png", size: 12 } };
 const settings = {
@@ -268,6 +271,9 @@ test("cancellation while decoding closes the late bitmap without allocating canv
       }),
   );
   const work = resizeImage(source, settings, controller.signal);
+  for (let attempt = 0; attempt < 10 && !release; attempt++)
+    await Promise.resolve();
+  assert.ok(release);
   controller.abort();
   release({
     width: 10,
@@ -320,7 +326,7 @@ test("advanced encoding transfers pixels and settings and reports target-size mi
   assert.equal(result.blob.type, "image/webp");
   assert.equal(request.settings.advanced.webp.method, 6);
   assert.match(result.encodingWarning, /exceeds.*target/);
-  assert.equal(terminated, true);
+  assert.equal(terminated, false);
   assert.equal(state.canvas.width, 0);
 });
 

@@ -124,3 +124,23 @@ test("cancelling the first bitmap attempt does not start recovery", async (t) =>
   });
   assert.equal(globalThis.createImageBitmap.mock.callCount(), 1);
 });
+
+test("oversized decoded bitmaps are closed without retrying or allocating a fallback", async (t) => {
+  let closed = 0;
+  t.mock.method(globalThis, "createImageBitmap", async () => ({
+    width: 8192,
+    height: 8192,
+    close() {
+      closed++;
+    },
+  }));
+  t.mock.method(globalThis, "Image", function () {
+    assert.fail("Do not retry resource-limit failures");
+  });
+  await assert.rejects(
+    decodeImage(file, new AbortController().signal),
+    /33,554,432 pixels/,
+  );
+  assert.equal(closed, 1);
+  assert.equal(globalThis.createImageBitmap.mock.callCount(), 1);
+});

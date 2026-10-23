@@ -1,6 +1,7 @@
 import saveAs from "file-saver";
 import { Download, Pause, Play, Settings, Trash2, Upload } from "lucide-preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { disposeWorkerPools } from "./workerTask.js";
 import "./App.css";
 import AdvancedSettings from "./AdvancedSettings.jsx";
 import styles from "./App.module.css";
@@ -152,7 +153,10 @@ function App() {
 
   useEffect(() => {
     const exporter = zipExporter.current;
-    return () => exporter.cancel(false);
+    return () => {
+      exporter.cancel(false);
+      disposeWorkerPools();
+    };
   }, []);
 
   const changeSetting = (key) => (value) => {
@@ -232,6 +236,7 @@ function App() {
   const clearBatch = () => {
     cancelImports();
     processor.clear();
+    disposeWorkerPools();
     zipExporter.current.cancel(false);
     nameAssignments.current.clear();
     setImages([]);

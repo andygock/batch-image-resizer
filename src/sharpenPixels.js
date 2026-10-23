@@ -9,31 +9,41 @@ export function sharpenPixels(pixels, width, height, processing) {
   );
   const sum = kernel.reduce((total, weight) => total + weight, 0);
   const weights = kernel.map((weight) => weight / sum);
-  const horizontal = new Float32Array(pixels.length);
+  // Retain only the horizontal rows needed by the vertical kernel.
   // Blur premultiplied colour and opacity together so hidden RGB cannot bleed.
-  for (let y = 0; y < height; y++) {
+  const rows = new Map();
+  const rowAt = (y) => {
+    if (rows.has(y)) return rows.get(y);
+    const row = new Float32Array(width * 4);
     for (let x = 0; x < width; x++) {
-      const out = (y * width + x) * 4;
+      const out = x * 4;
       for (let k = -extent; k <= extent; k++) {
         const src = (y * width + Math.max(0, Math.min(width - 1, x + k))) * 4;
         const weight = weights[k + extent];
         const alpha = pixels[src + 3] / 255;
         for (let c = 0; c < 3; c++)
-          horizontal[out + c] += pixels[src + c] * alpha * weight;
-        horizontal[out + 3] += alpha * weight;
+          row[out + c] += pixels[src + c] * alpha * weight;
+        row[out + 3] += alpha * weight;
       }
     }
-  }
+    rows.set(y, row);
+    return row;
+  };
   const result = new Uint8ClampedArray(pixels);
   for (let y = 0; y < height; y++) {
+    rows.delete(y - extent - 1);
+    const neighbourhood = weights.map((_, k) =>
+      rowAt(Math.max(0, Math.min(height - 1, y + k - extent))),
+    );
     for (let x = 0; x < width; x++) {
       const out = (y * width + x) * 4;
       if (!pixels[out + 3]) continue;
       const blurred = [0, 0, 0, 0];
       for (let k = -extent; k <= extent; k++) {
-        const src = (Math.max(0, Math.min(height - 1, y + k)) * width + x) * 4;
+        const row = neighbourhood[k + extent];
+        const src = x * 4;
         for (let c = 0; c < 4; c++)
-          blurred[c] += horizontal[src + c] * weights[k + extent];
+          blurred[c] += row[src + c] * weights[k + extent];
       }
       for (let c = 0; c < 3; c++) {
         const difference = pixels[out + c] - blurred[c] / blurred[3];

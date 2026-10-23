@@ -1,3 +1,49 @@
+import {
+  ImageLimitError,
+  MAX_BATCH_BYTES,
+  preflightImage,
+  validateFileSize,
+} from "./imageLimits.js";
+
+const digests = new WeakMap();
+
+async function chunkDigest(bytes, signal) {
+  signal?.throwIfAborted();
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  signal?.throwIfAborted();
+  return digest;
+}
+
+async function finishDigest(parts, signal) {
+  const bytes = new Uint8Array(parts.length * 32);
+  parts.forEach((part, index) => {
+    bytes.set(part, index * 32);
+  });
+  return Array.from(await chunkDigest(bytes, signal), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function digestFile(file, signal) {
+  if (digests.has(file)) return digests.get(file);
+  const parts = [];
+  for (let start = 0; start < file.size; start += CHUNK_SIZE)
+    parts.push(
+      await chunkDigest(
+        await readRange(
+          file,
+          start,
+          Math.min(start + CHUNK_SIZE, file.size),
+          signal,
+        ),
+        signal,
+      ),
+    );
+  const digest = await finishDigest(parts, signal);
+  digests.set(file, digest);
+  return digest;
+}
+
 const CHUNK_SIZE = 64 * 1024;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -36,14 +82,19 @@ function identifyFormat(bytes) {
   return null;
 }
 
-async function readRange(file, start, end) {
+async function readRange(file, start, end, signal) {
+  signal?.throwIfAborted();
   if (typeof file?.slice !== "function")
     throw new Error("the file cannot be read in bounded chunks");
-  return new Uint8Array(await file.slice(start, end).arrayBuffer());
+  const bytes = new Uint8Array(await file.slice(start, end).arrayBuffer());
+  signal?.throwIfAborted();
+  return bytes;
 }
 
 /** Identify supported image data from its bytes; the declared MIME type is advisory. */
-export async function inspectImageFile(file) {
+export async function inspectImageFile(file, options = {}) {
+  const { signal } = options;
+  signal?.throwIfAborted();
   const filename = filenameOf(file);
   if (
     !file ||
@@ -58,10 +109,12 @@ export async function inspectImageFile(file) {
 
   let format;
   try {
+    await preflightImage(file, signal);
     format = identifyFormat(
-      await readRange(file, 0, Math.min(file.size, CHUNK_SIZE)),
+      await readRange(file, 0, Math.min(file.size, CHUNK_SIZE), signal),
     );
   } catch (error) {
+    signal?.throwIfAborted();
     throw new Error(`Could not read "${filename}": ${error.message}`);
   }
   if (!format) {
@@ -73,12 +126,14 @@ export async function inspectImageFile(file) {
   try {
     // Copy bytes, not Blob references: temporary files can change on disk after import.
     const chunks = [];
+    const hashes = [];
     for (let start = 0; start < file.size; start += CHUNK_SIZE) {
       const end = Math.min(start + CHUNK_SIZE, file.size);
-      const bytes = await readRange(file, start, end);
+      const bytes = await readRange(file, start, end, signal);
       if (bytes.length !== end - start)
         throw new Error("the file changed while it was being imported");
       chunks.push(bytes);
+      hashes.push(await chunkDigest(bytes, signal));
     }
     const copiedFormat = identifyFormat(chunks[0]);
     if (copiedFormat !== format)
@@ -87,19 +142,22 @@ export async function inspectImageFile(file) {
       type: format === "avif" ? "image/avif" : file.type,
       lastModified: file.lastModified,
     });
+    digests.set(copy, await finishDigest(hashes, signal));
+    await preflightImage(copy, signal);
     return { file: copy, sourceFormat: copiedFormat };
   } catch (error) {
+    signal?.throwIfAborted();
     throw new Error(`Could not read "${filename}": ${error.message}`);
   }
 }
 
-async function sameContent(left, right) {
+async function sameContent(left, right, signal) {
   if (left.size !== right.size) return false;
   for (let start = 0; start < left.size; start += CHUNK_SIZE) {
     const end = Math.min(start + CHUNK_SIZE, left.size);
     const [leftBytes, rightBytes] = await Promise.all([
-      readRange(left, start, end),
-      readRange(right, start, end),
+      readRange(left, start, end, signal),
+      readRange(right, start, end, signal),
     ]);
     if (
       leftBytes.length !== rightBytes.length ||
@@ -126,6 +184,8 @@ export async function partitionImageFiles(
   existingSources = [],
   options = {},
 ) {
+  const { signal } = options;
+  signal?.throwIfAborted();
   const accepted = [];
   const duplicates = [];
   const duplicateFiles = [];
@@ -133,17 +193,36 @@ export async function partitionImageFiles(
   const previousFiles = (existingSources ?? []).map(sourceFile).filter(Boolean);
   const allowDuplicates = options.allowDuplicates === true;
 
+  let retainedBytes = previousFiles.reduce((sum, file) => sum + file.size, 0);
+  const index = new Map();
+  const addToIndex = async (file) => {
+    const key = `${file.size}:${await digestFile(file, signal)}`;
+    const bucket = index.get(key) ?? [];
+    bucket.push(file);
+    index.set(key, bucket);
+  };
+  if (!allowDuplicates)
+    for (const file of previousFiles) await addToIndex(file);
+
   for (const file of files ?? []) {
+    signal?.throwIfAborted();
     const filename = filenameOf(file);
     try {
-      const inspected = await inspectImageFile(file);
+      validateFileSize(file);
+      if (retainedBytes + (file?.size ?? 0) > MAX_BATCH_BYTES)
+        throw new ImageLimitError(
+          "The batch and retained duplicates must fit within 256 MiB. Clear or remove images before adding more.",
+        );
+      const inspected = await inspectImageFile(file, { signal });
+      retainedBytes += inspected.file.size;
       if (!allowDuplicates) {
         let duplicate = false;
-        for (const previous of previousFiles) {
+        const key = `${inspected.file.size}:${await digestFile(inspected.file, signal)}`;
+        for (const previous of index.get(key) ?? []) {
           if (
             Number.isSafeInteger(previous?.size) &&
             previous.size === inspected.file.size &&
-            (await sameContent(inspected.file, previous))
+            (await sameContent(inspected.file, previous, signal))
           ) {
             duplicate = true;
             break;
@@ -156,9 +235,16 @@ export async function partitionImageFiles(
         }
       }
       accepted.push(inspected);
-      previousFiles.push(inspected.file);
+      if (!allowDuplicates) await addToIndex(inspected.file);
     } catch (error) {
-      errors.push({ filename, message: error.message });
+      signal?.throwIfAborted();
+      errors.push({
+        filename,
+        message:
+          error instanceof ImageLimitError
+            ? `Could not import "${filename}": ${error.message}`
+            : error.message,
+      });
     }
   }
 

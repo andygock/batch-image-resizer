@@ -3,114 +3,90 @@ import { decodeImage } from "./decodeImage.js";
 import { fitDimensions, outputFormats } from "./imageUtils.js";
 import { drawProcessed } from "./processImage.js";
 import { sanitiseProcessing } from "./processingSettings.js";
+import { createWorkerTask } from "./workerTask.js";
 
-function encodePng(canvas, colours, signal, advanced) {
-  return new Promise((resolve, reject) => {
-    signal.throwIfAborted();
-    const worker = new Worker(new URL("./png.worker.js", import.meta.url), {
+const pngTask = createWorkerTask(
+  () =>
+    new Worker(new URL("./png.worker.js", import.meta.url), { type: "module" }),
+  {
+    label: "PNG",
+    reuse: true,
+    validate: (data) => {
+      if (!data.fallback && !data.buffer?.byteLength)
+        throw new Error("PNG encoder returned no image.");
+    },
+  },
+);
+const encoderTask = createWorkerTask(
+  () =>
+    new Worker(new URL("./encoder.worker.js", import.meta.url), {
       type: "module",
-    });
-    const finish = (error, blob, metadata = { appliedColours: colours }) => {
-      signal.removeEventListener("abort", abort);
-      worker.terminate();
-      if (error) reject(error);
-      else resolve({ blob, ...metadata });
-    };
-    const abort = () => finish(signal.reason);
-    signal.addEventListener("abort", abort, { once: true });
-    worker.onmessage = ({ data }) => {
-      if (data.fallback) {
-        // Native lossless PNG remains client-side and avoids UPNG truncation.
-        canvas.convertToBlob({ type: "image/png" }).then(
-          (blob) =>
-            finish(null, blob, {
-              appliedColours: 0,
-              encodingWarning: colours
-                ? `The ${colours}-colour optimisation could not be completed. Saved a lossless PNG instead; palette reduction was skipped.`
-                : "",
-            }),
-          (error) => finish(error),
-        );
-        return;
-      }
-      finish(
-        data.error ? new Error(data.error) : null,
-        data.buffer
-          ? new Blob([data.buffer], { type: "image/png" })
-          : undefined,
-      );
-    };
-    worker.onerror = () => finish(new Error("PNG worker failed."));
-    worker.onmessageerror = () =>
-      finish(new Error("Invalid PNG worker response."));
-    try {
-      const { data } = canvas
-        .getContext("2d")
-        .getImageData(0, 0, canvas.width, canvas.height);
-      worker.postMessage(
-        {
-          buffer: data.buffer,
-          width: canvas.width,
-          height: canvas.height,
-          colours,
-          advanced,
-        },
-        [data.buffer],
-      );
-    } catch (error) {
-      finish(error);
-    }
-  });
+    }),
+  {
+    label: "Advanced encoder",
+    reuse: true,
+    validate: (data) => {
+      if (!data.buffer?.byteLength)
+        throw new Error("Advanced encoder returned no image.");
+    },
+  },
+);
+
+function canvasPixels(canvas) {
+  return canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height)
+    .data;
 }
 
-function encodeWithWorker(canvas, settings, signal) {
-  return new Promise((resolve, reject) => {
+async function encodePng(canvas, colours, signal, advanced) {
+  signal.throwIfAborted();
+  const pixels = canvasPixels(canvas);
+  const data = await pngTask(
+    {
+      buffer: pixels.buffer,
+      width: canvas.width,
+      height: canvas.height,
+      colours,
+      advanced,
+    },
+    signal,
+    [pixels.buffer],
+  );
+  if (data.fallback) {
+    // Native lossless PNG remains client-side and avoids UPNG truncation.
+    const blob = await canvas.convertToBlob({ type: "image/png" });
     signal.throwIfAborted();
-    const worker = new Worker(new URL("./encoder.worker.js", import.meta.url), {
-      type: "module",
-    });
-    const finish = (error, buffer) => {
-      signal.removeEventListener("abort", abort);
-      worker.terminate();
-      if (error) reject(error);
-      else
-        resolve({
-          blob: new Blob([buffer], {
-            type: outputFormats[settings.format].mimeType,
-          }),
-        });
+    return {
+      blob,
+      appliedColours: 0,
+      encodingWarning: colours
+        ? `The ${colours}-colour optimisation could not be completed. Saved a lossless PNG instead; palette reduction was skipped.`
+        : "",
     };
-    const abort = () => finish(signal.reason);
-    signal.addEventListener("abort", abort, { once: true });
-    worker.onmessage = ({ data }) =>
-      finish(
-        data.error
-          ? new Error(data.error)
-          : !data.buffer?.byteLength
-            ? new Error("Advanced encoder returned no image.")
-            : null,
-        data.buffer,
-      );
-    worker.onerror = () => finish(new Error("Advanced encoder worker failed."));
-    worker.onmessageerror = () =>
-      finish(new Error("Invalid advanced encoder response."));
-    try {
-      const { data } = canvas
-        .getContext("2d")
-        .getImageData(0, 0, canvas.width, canvas.height);
-      worker.postMessage(
-        {
-          buffer: data.buffer,
-          width: canvas.width,
-          height: canvas.height,
-          settings,
-        },
-        [data.buffer],
-      );
-    } catch (error) {
-      finish(error);
-    }
-  });
+  }
+  return {
+    blob: new Blob([data.buffer], { type: "image/png" }),
+    appliedColours: colours,
+  };
+}
+
+async function encodeWithWorker(canvas, settings, signal) {
+  signal.throwIfAborted();
+  const pixels = canvasPixels(canvas);
+  const data = await encoderTask(
+    {
+      buffer: pixels.buffer,
+      width: canvas.width,
+      height: canvas.height,
+      settings,
+    },
+    signal,
+    [pixels.buffer],
+  );
+  return {
+    blob: new Blob([data.buffer], {
+      type: outputFormats[settings.format].mimeType,
+    }),
+  };
 }
 
 export async function resizeImage({ id, file }, settings, signal) {

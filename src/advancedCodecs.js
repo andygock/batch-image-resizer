@@ -1,5 +1,18 @@
 import { jpegOptions, webpOptions } from "./advancedSettings.js";
 
+const initialisations = new Map();
+function initialise(key, load) {
+  if (!initialisations.has(key))
+    initialisations.set(
+      key,
+      load().catch((error) => {
+        initialisations.delete(key);
+        throw error;
+      }),
+    );
+  return initialisations.get(key);
+}
+
 // Explicit asset URLs let Vite serve and bundle WASM without a CDN or runtime paths.
 export async function encodeAdvanced(pixels, settings) {
   if (settings.format === "avif") {
@@ -12,16 +25,18 @@ export async function encodeAdvanced(pixels, settings) {
       import("@jsquash/webp/codec/enc/webp_enc.wasm?url"),
       import("@jsquash/webp/codec/enc/webp_enc_simd.wasm?url"),
     ]);
-    await init({
-      locateFile: (file) => (file.includes("simd") ? simd : scalar),
-    });
+    await initialise("webp", () =>
+      init({
+        locateFile: (file) => (file.includes("simd") ? simd : scalar),
+      }),
+    );
     return encode(pixels, webpOptions(settings));
   }
   const { default: encode, init } = await import("@jsquash/jpeg/encode.js");
   const { default: wasm } = await import(
     "@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm?url"
   );
-  await init({ locateFile: () => wasm });
+  await initialise("jpeg", () => init({ locateFile: () => wasm }));
   return encode(pixels, jpegOptions(settings));
 }
 
@@ -36,7 +51,7 @@ export async function optimisePng(buffer, options, pixels) {
   const { default: wasm } = await import(
     "@jsquash/oxipng/codec/pkg/squoosh_oxipng_bg.wasm?url"
   );
-  await init(wasm);
+  await initialise("oxipng", () => init(wasm));
   if (options.interlace) {
     // optimise() may retain the original if interlacing makes it larger.
     // Encoding decoded pixels honours an explicit interlacing request.

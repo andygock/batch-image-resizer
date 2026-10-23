@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { decodeAvifImage } from "./decodeAvifImage.js";
+import { validateSourceDimensions } from "./imageLimits.js";
 
 export default function useImageUrl(blob) {
   const [original, setOriginal] = useState(null);
@@ -41,6 +42,17 @@ export default function useImageUrl(blob) {
     url,
     previewUrl: fallback?.blob === blob && fallback.url ? fallback.url : url,
     error: fallback?.blob === blob ? fallback.error : "",
+    onLoad: (event) => {
+      try {
+        validateSourceDimensions(
+          event.currentTarget.naturalWidth,
+          event.currentTarget.naturalHeight,
+        );
+      } catch (error) {
+        event.currentTarget.removeAttribute("src");
+        setFallback({ blob, error: `Preview unavailable: ${error.message}` });
+      }
+    },
     onError: () => {
       if (blob.type === "image/avif" && fallbackFor !== blob)
         setFallbackFor(blob);

@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
-import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -32,10 +31,7 @@ export default defineConfig({
       "@jsquash/avif",
     ],
   },
-  plugins: [
-    preact(),
-    // visualizer({ filename: "dist/bundle-analysis.html", open: true }),
-  ],
+  plugins: [preact()],
   resolve: {
     alias: {
       react: "preact/compat",

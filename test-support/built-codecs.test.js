@@ -41,8 +41,8 @@ async function runWorker(prefix, messages) {
   let response;
   globalThis.self = {
     location: { href: url.href },
-    postMessage(value) {
-      response = value;
+    postMessage(value, transfer) {
+      response = structuredClone(value, { transfer });
     },
   };
   await import(url.href);
@@ -97,8 +97,8 @@ test("built processing worker resizes RGBA pixels", async () => {
     assert.equal(new Uint8ClampedArray(sharpened)[i], data[i]);
 });
 
-test("built JPEG and WebP worker loads bundled encoder assets", async () => {
-  const buffers = await runWorker("encoder.worker", [
+test("built JPEG, WebP and AVIF workers reuse codecs after transferring their previous outputs", async () => {
+  const messages = [
     {
       settings: {
         format: "jpeg",
@@ -124,7 +124,13 @@ test("built JPEG and WebP worker loads bundled encoder assets", async () => {
         advanced: sanitiseAdvanced({ avif: { speed: 8 } }),
       },
     },
-  ]);
+  ];
+  const buffers = await runWorker("encoder.worker", [...messages, ...messages]);
+  for (let index = 0; index < messages.length; index++)
+    assert.deepEqual(
+      new Uint8Array(buffers[index]),
+      new Uint8Array(buffers[index + messages.length]),
+    );
   assert.deepEqual([...new Uint8Array(buffers[0]).slice(0, 2)], [255, 216]);
   assert.equal(
     new TextDecoder().decode(new Uint8Array(buffers[1]).slice(0, 4)),

@@ -48,15 +48,18 @@ export function fitDimensions(width, height, bounds, disableUpscale) {
   if (![width, height].every((n) => Number.isInteger(n) && n > 0)) {
     throw new Error("Invalid source dimensions.");
   }
-  const scale = Math.min(
-    bounds.width / width,
-    bounds.height / height,
-    disableUpscale ? 1 : Infinity,
-  );
-  return {
-    width: Math.max(1, Math.floor(width * scale)),
-    height: Math.max(1, Math.floor(height * scale)),
-  };
+  const maxWidth = Math.min(bounds.width, disableUpscale ? width : Infinity);
+  const maxHeight = Math.min(bounds.height, disableUpscale ? height : Infinity);
+  // Keep the limiting axis exact instead of flooring a rounded scale product.
+  return maxWidth * height <= maxHeight * width
+    ? {
+        width: maxWidth,
+        height: Math.max(1, Math.floor((height * maxWidth) / width)),
+      }
+    : {
+        width: Math.max(1, Math.floor((width * maxHeight) / height)),
+        height: maxHeight,
+      };
 }
 
 export function nameOutputs(

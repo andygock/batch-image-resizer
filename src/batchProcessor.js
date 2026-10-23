@@ -84,12 +84,11 @@ export function createBatchProcessor(resize = resizeImage) {
       const pending = images.filter(
         ({ id }) => records[id].status === "pending",
       );
+      let progress = images.length - pending.length;
       const snapshot = (isProcessing) => ({
         records: { ...records },
         isProcessing,
-        progress: Object.values(records).filter(
-          ({ status }) => status === "ready" || status === "error",
-        ).length,
+        progress,
         processingTime: Number(
           ((performance.now() - started) / 1000).toFixed(2),
         ),
@@ -117,6 +116,7 @@ export function createBatchProcessor(resize = resizeImage) {
             error: error.message,
           };
         }
+        progress++;
         publish(snapshot(true));
       }
       if (job.isCurrent()) publish(snapshot(false));

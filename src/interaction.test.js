@@ -60,9 +60,14 @@ const root = document.createElement("div");
 document.body.append(root);
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const settle = async () => {
-  await act(async () => {
-    await tick();
-  });
+  const deadline = Date.now() + 3000;
+  do {
+    await act(async () => {
+      await tick();
+    });
+    if (!root.textContent.includes("Checking image files…")) return;
+  } while (Date.now() < deadline);
+  assert.fail("Image import did not settle");
 };
 const click = async (element) => {
   assert.ok(element, "Click target exists");
@@ -772,6 +777,12 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
     document.getElementById(dialog.getAttribute("aria-labelledby")).textContent,
     "Image comparison",
   );
+  for (
+    let attempt = 0;
+    attempt < 100 && !dialog.querySelector('[role="slider"]');
+    attempt++
+  )
+    await settle();
   const slider = dialog.querySelector('[role="slider"]');
   const comparison = dialog.querySelector(".comparison");
   const toolbar = dialog.querySelector(".toolbar");
@@ -848,7 +859,7 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
   assert.equal(document.activeElement, trigger);
 });
 
-test("100% comparison shares image dimensions and one pan position for both versions", async () => {
+test("actual output size comparison shares image dimensions and one pan position", async () => {
   await act(() => render(h(App), root));
   await settle();
   await upload([jpeg()]);
@@ -899,7 +910,7 @@ test("100% comparison shares image dimensions and one pan position for both vers
     );
   const position = () => [viewport.scrollLeft, viewport.scrollTop];
 
-  await click(button("View at 100%"));
+  await click(button("Actual output size"));
   assert.equal(canvas.style.width, `${images[0].width}px`);
   assert.equal(canvas.style.height, `${images[0].height}px`);
   await pointer(images[0], "pointerdown", 100, 100);
@@ -951,4 +962,45 @@ test("100% comparison shares image dimensions and one pan position for both vers
   await pointer(images[0], "pointerdown", 100, 100);
   await pointer(images[0], "pointermove", 0, 0);
   assert.deepEqual(position(), [0, 0]);
+});
+
+test("Clear starts a new import even while an old file read is unresolved", async () => {
+  await act(() => render(h(App), root));
+  await settle();
+  let release;
+  const slow = {
+    name: "slow.jpg",
+    size: 6,
+    slice() {
+      return {
+        arrayBuffer: () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      };
+    },
+  };
+  const input = root.querySelector("#add-images");
+  Object.defineProperty(input, "files", { configurable: true, value: [slow] });
+  await act(async () => {
+    input.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await tick();
+  });
+  assert.ok(release);
+  await click(root.querySelector("button[aria-label='Clear current batch']"));
+  await upload([jpeg("fresh.jpg")]);
+  assert.equal(root.querySelectorAll(".imageCard").length, 1);
+  assert.ok(root.querySelector("button[aria-label='Remove fresh.jpg']"));
+  await act(async () => {
+    release(new ArrayBuffer(0));
+    await tick();
+  });
+  assert.equal(root.querySelectorAll(".imageCard").length, 1);
+  assert.doesNotMatch(root.textContent, /Could not add images/);
+});
+
+test("displayed file sizes use the same decimal units as encoder targets", async () => {
+  const { formatKb } = await import("./formatBytes.js");
+  assert.equal(formatKb(102000), "102 kB");
+  assert.equal(formatKb(100000), "100 kB");
 });

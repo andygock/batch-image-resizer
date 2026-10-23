@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import AdvancedSettings from "./AdvancedSettings.jsx";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect.jsx";
+import { formatKb } from "./formatBytes.js";
 import styles from "./ImageInspector.module.css";
 import InspectorImage from "./InspectorImage.jsx";
 import Modal from "./Modal.jsx";
 import OutputFormatSelect from "./OutputFormatSelect.jsx";
-import { formatKb } from "./OutputImages.jsx";
 import useImagePan from "./useImagePan.js";
 
 export default function ImageInspector({
@@ -159,7 +159,7 @@ export default function ImageInspector({
             aria-pressed={actualSize}
             onClick={() => setActualSize(!actualSize)}
           >
-            {actualSize ? "Fit previews" : "View at 100%"}
+            {actualSize ? "Fit previews" : "Actual output size"}
           </button>
         </div>
       </div>
@@ -363,7 +363,7 @@ export default function ImageInspector({
         </div>
         <p className={styles.hint}>
           {actualSize
-            ? "Drag the divider to compare. Drag an image to pan, or scroll."
+            ? "Output pixels are shown at actual size. The original is scaled to align with the output. Drag an image to pan, or scroll."
             : "Drag the divider to compare, or use the arrow keys when focused."}
         </p>
       </div>

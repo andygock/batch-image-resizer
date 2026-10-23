@@ -1,8 +1,10 @@
 import { decodeAvif } from "./avifCodec.js";
+import { validateSourceDimensions } from "./imageLimits.js";
 
 self.onmessage = async ({ data: { buffer } }) => {
   try {
     const pixels = await decodeAvif(buffer);
+    validateSourceDimensions(pixels.width, pixels.height);
     self.postMessage(
       {
         buffer: pixels.data.buffer,

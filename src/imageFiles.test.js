@@ -165,3 +165,70 @@ test("incoming duplicates are reported in input order and allowDuplicates keeps 
   assert.deepEqual(allowed.duplicates, []);
   assert.deepEqual(allowed.errors, []);
 });
+
+test("cancelling a read stops import without converting cancellation into a file error", async () => {
+  const controller = new AbortController();
+  let reads = 0;
+  const file = {
+    name: "cancel.jpg",
+    size: 100000,
+    slice() {
+      reads++;
+      return {
+        async arrayBuffer() {
+          controller.abort();
+          return new ArrayBuffer(0);
+        },
+      };
+    },
+  };
+  await assert.rejects(
+    partitionImageFiles([file, file], [], { signal: controller.signal }),
+    { name: "AbortError" },
+  );
+  assert.equal(reads, 1);
+});
+
+test("cached fingerprints avoid re-reading distinct existing sources of the same size", async () => {
+  const first = (await partitionImageFiles([imageFile("one.jpg", jpeg)]))
+    .accepted;
+  let reads = 0;
+  const originalSlice = first[0].file.slice.bind(first[0].file);
+  first[0].file.slice = (...args) => {
+    reads++;
+    return originalSlice(...args);
+  };
+  const next = await partitionImageFiles(
+    [imageFile("two.jpg", jpegOther)],
+    first,
+  );
+  assert.equal(next.accepted.length, 1);
+  assert.equal(reads, 0);
+  const duplicate = await partitionImageFiles(
+    [imageFile("copy.jpg", jpeg)],
+    first,
+  );
+  assert.equal(duplicate.duplicates.length, 1);
+  assert.ok(
+    reads > 0,
+    "Fingerprint matches still receive an exact byte comparison",
+  );
+});
+
+test("aggregate budgets reject new copies before reading their bytes", async () => {
+  let reads = 0;
+  const file = {
+    name: "extra.jpg",
+    size: 1,
+    slice() {
+      reads++;
+      throw new Error("unexpected read");
+    },
+  };
+  const existing = [{ size: 256 * 1024 * 1024 }];
+  const result = await partitionImageFiles([file], existing, {
+    allowDuplicates: true,
+  });
+  assert.equal(reads, 0);
+  assert.match(result.errors[0].message, /256 MiB/);
+});

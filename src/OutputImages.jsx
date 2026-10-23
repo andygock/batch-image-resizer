@@ -1,48 +1,8 @@
-import { Download, ImagePlus, Trash2 } from "lucide-preact";
+import { ImagePlus } from "lucide-preact";
+import { useMemo, useRef } from "react";
+import { formatKb } from "./formatBytes.js";
+import ImageCard from "./ImageCard.jsx";
 import styles from "./OutputImages.module.css";
-import useImageUrl from "./useImageUrl.js";
-
-export const formatKb = (bytes) => `${Math.ceil(bytes / 1024)} kB`;
-
-export function OutputImage({
-  blob,
-  filename,
-  width,
-  height,
-  children,
-  onInspect,
-}) {
-  const { url, previewUrl, onError, error } = useImageUrl(blob);
-  const img = url && (
-    <img
-      src={previewUrl}
-      onError={onError}
-      alt={filename}
-      width={width}
-      height={height}
-      loading="lazy"
-      draggable={false}
-    />
-  );
-  return (
-    <>
-      {onInspect ? (
-        <button
-          className={styles.previewButton}
-          onClick={onInspect}
-          title="Compare original and output"
-          aria-label={`Compare ${filename}`}
-        >
-          {img}
-        </button>
-      ) : (
-        img
-      )}
-      {children?.(url)}
-      {error && <small role="status">{error}</small>}
-    </>
-  );
-}
 
 export default function OutputImages({
   images,
@@ -70,6 +30,18 @@ export default function OutputImages({
   onViewModeChange,
   onInspect,
 }) {
+  const callbacks = useRef(null);
+  callbacks.current = { onInspect, onSelectImage, onRetryImage, onRemoveImage };
+  // Stable delegates let unchanged cards skip renders while using current handlers.
+  const actions = useMemo(
+    () =>
+      Object.fromEntries(
+        ["onInspect", "onSelectImage", "onRetryImage", "onRemoveImage"].map(
+          (name) => [name, (...args) => callbacks.current[name](...args)],
+        ),
+      ),
+    [],
+  );
   if (!images.length)
     return (
       <div className={styles.empty}>
@@ -214,117 +186,18 @@ export default function OutputImages({
           }
         }}
       >
-        {images.map(({ id, file }) => {
-          const record = records[id];
-          const result = record?.result;
-          const output = outputs.get(id);
-          const status = record?.status ?? "pending";
-          return (
-            <div key={id} id={`image-${id}`} className={styles.imageCard}>
-              <label className={styles.selectImage}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(id)}
-                  onClick={(event) => onSelectImage(id, event.shiftKey)}
-                  onChange={() => {}}
-                />
-                <span className="visuallyHidden">Select {file.name}</span>
-              </label>
-              <OutputImage
-                blob={result?.blob ?? file}
-                filename={file.name}
-                width={result?.widthAfter}
-                height={result?.heightAfter}
-                onInspect={() => onInspect(id)}
-              >
-                {(url) => (
-                  <div className={styles.imageInfo}>
-                    <div
-                      className={styles.filename}
-                      title={outputNames.get(id)}
-                    >
-                      {outputNames.get(id)}
-                    </div>
-                    {file.name !== outputNames.get(id) && (
-                      <div className={styles.sourceName}>
-                        Source: {file.name}
-                      </div>
-                    )}
-                    <div className={`${styles.fileInfo} numeric`}>
-                      {result && (
-                        <>
-                          <span>
-                            {result.widthBefore}×{result.heightBefore} →{" "}
-                            {result.widthAfter}×{result.heightAfter}
-                          </span>
-                          <span>
-                            {formatKb(result.filesizeBefore)} →{" "}
-                            <strong>{formatKb(result.filesizeAfter)}</strong>
-                          </span>
-                        </>
-                      )}
-                      {status !== "ready" && (
-                        <span>
-                          {status === "processing"
-                            ? "Processing…"
-                            : status === "error"
-                              ? "Could not process"
-                              : "Waiting"}
-                          {result ? " · showing previous output" : ""}
-                        </span>
-                      )}
-                    </div>
-                    <div className={styles.imageActions}>
-                      {status === "error" && (
-                        <button onClick={() => onRetryImage(id)}>Retry</button>
-                      )}
-                      {output && (
-                        <a
-                          href={!downloadsBlocked && url ? url : undefined}
-                          download={output.downloadFilename}
-                          aria-disabled={downloadsBlocked || !url}
-                          title={
-                            downloadsBlocked
-                              ? "Fix the custom dimensions before downloading"
-                              : `Download "${output.downloadFilename}"`
-                          }
-                          className="button buttonIcon"
-                          aria-label={`Download ${output.downloadFilename}`}
-                        >
-                          <Download size={14} aria-hidden="true" />
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        className="buttonIcon buttonDanger"
-                        onClick={() => onRemoveImage(id)}
-                        title={`Remove "${file.name}"`}
-                        aria-label={`Remove ${file.name}`}
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
-                    </div>
-                    {status === "error" && (
-                      <div className={styles.error}>
-                        <p>{record.error}</p>
-                        <p>
-                          {record.error.includes("decode")
-                            ? "Automatic recovery could not read this image. Retry, or add the original file again."
-                            : "Try a smaller size or another output format, then retry."}
-                        </p>
-                      </div>
-                    )}
-                    {result?.encodingWarning && (
-                      <p className={styles.encodingNotice}>
-                        {result.encodingWarning}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </OutputImage>
-            </div>
-          );
-        })}
+        {images.map((source) => (
+          <ImageCard
+            key={source.id}
+            source={source}
+            record={records[source.id]}
+            output={outputs.has(source.id)}
+            downloadFilename={outputNames.get(source.id)}
+            selected={selected.has(source.id)}
+            downloadsBlocked={downloadsBlocked}
+            actions={actions}
+          />
+        ))}
       </div>
     </>
   );

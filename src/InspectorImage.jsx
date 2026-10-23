@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createAlphaPreview } from "./alphaPreview.js";
-import { OutputImage } from "./OutputImages.jsx";
+import OutputImage from "./OutputImage.jsx";
 
 export default function InspectorImage({
   blob,

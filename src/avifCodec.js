@@ -1,5 +1,7 @@
 import { sanitiseAdvanced } from "./advancedSettings.js";
 
+let encoder;
+
 export async function encodeAvif(pixels, settings) {
   const [{ default: factory }, { default: wasm }, { defaultOptions }] =
     await Promise.all([
@@ -8,7 +10,13 @@ export async function encodeAvif(pixels, settings) {
       import("@jsquash/avif/meta.js"),
     ]);
   // One encoder thread per cancellable worker avoids host isolation requirements.
-  const codec = await factory({ noInitialRun: true, locateFile: () => wasm });
+  encoder ??= factory({ noInitialRun: true, locateFile: () => wasm }).catch(
+    (error) => {
+      encoder = undefined;
+      throw error;
+    },
+  );
+  const codec = await encoder;
   const options = sanitiseAdvanced(settings.advanced).avif;
   const result = codec.encode(pixels.data, pixels.width, pixels.height, {
     ...defaultOptions,
