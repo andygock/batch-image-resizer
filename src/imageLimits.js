@@ -56,6 +56,14 @@ export function headerDimensions(bytes) {
     String.fromCharCode(...bytes.subarray(at, at + length));
   if (bytes.length >= 24 && text(1, 3) === "PNG" && text(12, 4) === "IHDR")
     return [view.getUint32(16), view.getUint32(20)];
+  if (bytes.length >= 26 && text(0, 2) === "BM") {
+    const headerSize = view.getUint32(14, true);
+    if (headerSize === 12)
+      return [view.getUint16(18, true), view.getUint16(20, true)];
+    // Windows DIB headers use signed dimensions; negative height means top-down.
+    if (headerSize >= 40)
+      return [view.getInt32(18, true), Math.abs(view.getInt32(22, true))];
+  }
   if (bytes[0] === 255 && bytes[1] === 216) {
     let at = 2;
     while (at + 4 <= bytes.length) {

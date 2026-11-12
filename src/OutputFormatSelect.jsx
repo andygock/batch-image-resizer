@@ -18,7 +18,7 @@ export default function OutputFormatSelect({
       title={
         value === "jpeg"
           ? "JPEG uses the selected background colour. PNG, WebP and AVIF preserve transparency."
-          : "Keep source format to resize without converting image types."
+          : "Keep the source format; BMP inputs are converted to PNG."
       }
     >
       Format

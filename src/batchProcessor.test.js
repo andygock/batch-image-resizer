@@ -20,12 +20,13 @@ test("keep source format resolves each image independently", async () => {
     [
       { id: "a", sourceFormat: "png" },
       { id: "b", sourceFormat: "webp" },
+      { id: "c", sourceFormat: "bmp" },
     ],
     { ...settings, format: "source" },
     {},
     () => {},
   );
-  assert.deepEqual(seen, ["png", "webp"]);
+  assert.deepEqual(seen, ["png", "webp", "png"]);
   assert.equal(
     resolveSettings({ sourceFormat: "png" }, settings).format,
     "jpeg",

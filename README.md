@@ -1,6 +1,6 @@
 # Batch Image Resizer
 
-A minimalist browser app for resizing batches of JPG, PNG, WebP and AVIF images. Drop images into the page, choose a maximum bounding size and output format, then download the resized files individually or as a ZIP.
+A minimalist browser app for resizing batches of JPG, PNG, WebP, AVIF and BMP images. Drop images into the page, choose a maximum bounding size and output format, then download the resized files individually or as a ZIP.
 
 All processing happens locally in the browser using Canvas and browser-side encoders. Images are not uploaded to a server.
 
@@ -17,7 +17,7 @@ Live app hosted on Vercel:
 - Check image signatures and skip identical files, with an option to add duplicates anyway.
 - Resize into a bounding box while preserving aspect ratio.
 - Optional setting to avoid enlarging smaller source images.
-- Keep each source format by default, or convert to JPEG, PNG or WebP.
+- Keep each source format by default (BMP inputs use PNG), or convert to JPEG, PNG or WebP.
 - Import and export still AVIF images with independent quality, speed and transparency settings.
 - Independent JPEG/WebP quality sliders and percentage fields.
 - PNG colour optimisation options.
@@ -60,7 +60,7 @@ If standard PNG encoding produces incomplete output, the browser's lossless PNG 
 
 Each imported file is limited to 64 MiB. Source files and retained duplicate copies in a batch are limited to 256 MiB in total; outputs and codec memory are additional. Clear cancels active import work and allows a new import to start immediately. Duplicate detection indexes bounded-chunk SHA-256 fingerprints and confirms matches by comparing bytes.
 
-Sources are limited to 33,554,432 pixels. A bounded header check rejects oversized JPEG, PNG, WebP and AVIF dimensions when available before decoding. Decoded dimensions are checked again, including previews. Some files place metadata beyond the inspected prefix, so a decoder may allocate memory before that limit can be checked. These limits reduce memory pressure but do not guarantee that every supported image fits every device's available memory. Advanced processing also rejects estimated working-buffer allocations above 512 MiB; use Auto without sharpening or smaller dimensions when this limit is reached. Sharpening retains only the horizontal rows required by its blur kernel rather than a full-image float buffer.
+Sources are limited to 33,554,432 pixels. A bounded header check rejects oversized JPEG, PNG, WebP, AVIF and BMP dimensions when available before decoding. Decoded dimensions are checked again, including previews. Some files place metadata beyond the inspected prefix, so a decoder may allocate memory before that limit can be checked. These limits reduce memory pressure but do not guarantee that every supported image fits every device's available memory. Advanced processing also rejects estimated working-buffer allocations above 512 MiB; use Auto without sharpening or smaller dimensions when this limit is reached. Sharpening retains only the horizontal rows required by its blur kernel rather than a full-image float buffer.
 
 Displayed file sizes and WebP targets use decimal kilobytes (1 kB = 1000 bytes). Resource limits above use binary mebibytes (1 MiB = 1,048,576 bytes).
 

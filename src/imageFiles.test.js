@@ -97,7 +97,7 @@ test("invalid bytes are rejected with the filename even when MIME is supported",
   const file = imageFile("broken.webp", [0, 1, 2, 3], "image/webp");
   await assert.rejects(
     inspectImageFile(file),
-    /broken\.webp.*not a supported JPEG, PNG, WebP or AVIF/,
+    /broken\.webp.*not a supported JPEG, PNG, WebP, AVIF or BMP/,
   );
   const result = await partitionImageFiles([file]);
   assert.deepEqual(result.accepted, []);
@@ -231,4 +231,30 @@ test("aggregate budgets reject new copies before reading their bytes", async () 
   });
   assert.equal(reads, 0);
   assert.match(result.errors[0].message, /256 MiB/);
+});
+
+test("BMP signatures are accepted and MIME is normalised regardless of filename", async () => {
+  const bytes = new Uint8Array(58);
+  const view = new DataView(bytes.buffer);
+  bytes.set([0x42, 0x4d]);
+  view.setUint32(2, bytes.length, true);
+  view.setUint32(10, 54, true);
+  view.setUint32(14, 40, true);
+  view.setInt32(18, 1, true);
+  view.setInt32(22, 1, true);
+  view.setUint16(26, 1, true);
+  view.setUint16(28, 24, true);
+  view.setUint32(34, 4, true);
+  const result = await partitionImageFiles([
+    new File([bytes], "bitmap.bin", { type: "image/jpeg" }),
+    new File([bytes], "copy.bmp"),
+  ]);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.accepted[0].sourceFormat, "bmp");
+  assert.equal(result.accepted[0].file.type, "image/bmp");
+  assert.deepEqual(result.duplicates, ["copy.bmp"]);
+  await assert.rejects(
+    inspectImageFile(imageFile("fake.bmp", [0, 1, 2, 3], "image/bmp")),
+    /not a supported/,
+  );
 });

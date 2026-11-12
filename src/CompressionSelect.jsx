@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { resolveOutputFormat } from "./imageUtils.js";
 
 const pngColorOptions = [
   [0, "Lossless"],
@@ -115,7 +116,14 @@ export default function CompressionSelect({
   idPrefix = "",
   compact = false,
 }) {
-  const formats = format === "source" ? [...new Set(sourceFormats)] : [format];
+  const formats =
+    format === "source"
+      ? [
+          ...new Set(
+            sourceFormats.map((source) => resolveOutputFormat(format, source)),
+          ),
+        ]
+      : [format];
   const webp = advanced?.webp;
   const webpQualityInactive =
     webp?.encoder === "advanced" &&

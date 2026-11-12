@@ -121,3 +121,29 @@ test("processing budgets reject large intermediate buffers before allocation", (
     ),
   );
 });
+
+test("BMP dimensions cover Windows, top-down and OS/2 headers", async () => {
+  const bytes = new Uint8Array(54);
+  bytes.set([0x42, 0x4d]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(14, 40, true);
+  view.setInt32(18, 512, true);
+  view.setInt32(22, -341, true);
+  assert.deepEqual(headerDimensions(bytes), [512, 341]);
+  assert.equal(headerDimensions(bytes.subarray(0, 25)), null);
+  view.setInt32(18, 8192, true);
+  view.setInt32(22, -8192, true);
+  await assert.rejects(
+    preflightImage(new File([bytes], "large.bmp")),
+    /33,554,432 pixels/,
+  );
+  view.setInt32(18, -1, true);
+  await assert.rejects(
+    preflightImage(new File([bytes], "invalid.bmp")),
+    /invalid dimensions/,
+  );
+  view.setUint32(14, 12, true);
+  view.setUint16(18, 100, true);
+  view.setUint16(20, 50, true);
+  assert.deepEqual(headerDimensions(bytes.subarray(0, 26)), [100, 50]);
+});

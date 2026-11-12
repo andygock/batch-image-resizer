@@ -8,6 +8,12 @@ export const outputFormats = {
   avif: { mimeType: "image/avif", extension: "avif" },
 };
 
+export function resolveOutputFormat(format, sourceFormat) {
+  if (format !== "source") return format;
+  // BMP is input-only; PNG preserves the decoded pixels without lossy encoding.
+  return sourceFormat === "bmp" ? "png" : sourceFormat;
+}
+
 export function validateSize({ width, height }) {
   if (
     ![width, height].every(

@@ -1,11 +1,11 @@
 import { effectiveAdvanced } from "./advancedSettings.js";
+import { resolveOutputFormat } from "./imageUtils.js";
 import { createJobOwner } from "./jobs.js";
 import { processingKey } from "./processingSettings.js";
 import { resizeImage } from "./resizeImage.js";
 
 export function resolveSettings(source, settings) {
-  const format =
-    settings.format === "source" ? source.sourceFormat : settings.format;
+  const format = resolveOutputFormat(settings.format, source.sourceFormat);
   return {
     ...settings,
     format,

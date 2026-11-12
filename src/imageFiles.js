@@ -73,6 +73,7 @@ function identifyFormat(bytes) {
   }
   if (hasBytes(bytes, [0xff, 0xd8, 0xff])) return "jpeg";
   if (hasBytes(bytes, PNG_SIGNATURE)) return "png";
+  if (hasBytes(bytes, [0x42, 0x4d])) return "bmp";
   if (
     hasBytes(bytes, [0x52, 0x49, 0x46, 0x46]) &&
     hasBytes(bytes, [0x57, 0x45, 0x42, 0x50], 8)
@@ -120,7 +121,7 @@ export async function inspectImageFile(file, options = {}) {
   if (!format) {
     const typeHint = file.type ? ` (declared as ${file.type})` : "";
     throw new Error(
-      `"${filename}"${typeHint} is not a supported JPEG, PNG, WebP or AVIF image.`,
+      `"${filename}"${typeHint} is not a supported JPEG, PNG, WebP, AVIF or BMP image.`,
     );
   }
   try {
@@ -139,7 +140,8 @@ export async function inspectImageFile(file, options = {}) {
     if (copiedFormat !== format)
       throw new Error("the file changed while it was being imported");
     const copy = new File(chunks, filename, {
-      type: format === "avif" ? "image/avif" : file.type,
+      type:
+        format === "avif" || format === "bmp" ? `image/${format}` : file.type,
       lastModified: file.lastModified,
     });
     digests.set(copy, await finishDigest(hashes, signal));

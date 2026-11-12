@@ -1004,3 +1004,34 @@ test("displayed file sizes use the same decimal units as encoder targets", async
   assert.equal(formatKb(102000), "102 kB");
   assert.equal(formatKb(100000), "100 kB");
 });
+
+test("BMP inputs use PNG controls and download names in Source mode", async (t) => {
+  const worker = globalThis.Worker;
+  globalThis.Worker = class {
+    postMessage() {
+      this.onmessage({ data: { fallback: true } });
+    }
+    terminate() {}
+  };
+  t.after(() => {
+    if (worker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = worker;
+  });
+  await act(() => render(h(App), root));
+  await settle();
+  assert.match(root.querySelector("#add-images").accept, /image\/bmp/);
+  await upload([new File([new Uint8Array([0x42, 0x4d])], "bitmap.bmp")]);
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await settle();
+    if (root.querySelector("a[download$='.png']")) break;
+  }
+  assert.equal(root.querySelector("#output-format").value, "source");
+  assert.ok(root.querySelector("#png-colors"));
+  assert.ok(root.querySelector("a[download$='.png']"));
+  await change(root.querySelector("#output-format"), "jpeg");
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await settle();
+    if (root.querySelector("a[download$='.jpg']")) break;
+  }
+  assert.ok(root.querySelector("a[download$='.jpg']"));
+});

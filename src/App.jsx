@@ -10,7 +10,11 @@ import CompressionSelect from "./CompressionSelect";
 import { archiveFilename } from "./downloads.js";
 import Errors from "./Errors";
 import ImageInspector from "./ImageInspector.jsx";
-import { nameOutputs, outputFormats } from "./imageUtils.js";
+import {
+  nameOutputs,
+  outputFormats,
+  resolveOutputFormat,
+} from "./imageUtils.js";
 import OutputFormatSelect from "./OutputFormatSelect";
 import OutputImages from "./OutputImages";
 import SizeSelect from "./SizeSelect";
@@ -111,9 +115,8 @@ function App() {
           id,
           filename: file.name,
           outputExtension:
-            outputFormats[
-              outputFormat === "source" ? sourceFormat : outputFormat
-            ]?.extension,
+            outputFormats[resolveOutputFormat(outputFormat, sourceFormat)]
+              ?.extension,
         })),
         enableSuffix,
         suffix,
@@ -388,7 +391,7 @@ function App() {
               type="file"
               id="add-images"
               aria-label={isEmpty ? "Load images" : "Add images"}
-              accept="image/jpeg, image/png, image/webp, image/avif"
+              accept="image/jpeg, image/png, image/webp, image/avif, image/bmp, .bmp"
               multiple
               onChange={handleFileInputChange}
             />
@@ -573,9 +576,10 @@ function App() {
       {advancedOpen && (
         <AdvancedSettings
           settings={settings}
-          initialFormat={
-            outputFormat === "source" ? images[0]?.sourceFormat : outputFormat
-          }
+          initialFormat={resolveOutputFormat(
+            outputFormat,
+            images[0]?.sourceFormat,
+          )}
           onClose={() => setAdvancedOpen(false)}
           onApply={(options) => {
             invalidate();

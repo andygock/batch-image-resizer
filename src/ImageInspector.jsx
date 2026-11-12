@@ -421,9 +421,7 @@ export default function ImageInspector({
       {advancedOpen && (
         <AdvancedSettings
           settings={draft}
-          initialFormat={
-            draft.format === "source" ? source.sourceFormat : draft.format
-          }
+          initialFormat={resolveSettings(source, draft).format}
           trial
           onClose={() => setAdvancedOpen(false)}
           onApply={setDraft}
