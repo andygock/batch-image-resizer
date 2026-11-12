@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { tiffFixture } from "../test-support/inputFixtures.js";
 import {
   headerDimensions,
   MAX_FILE_BYTES,
@@ -146,4 +147,31 @@ test("BMP dimensions cover Windows, top-down and OS/2 headers", async () => {
   view.setUint16(18, 100, true);
   view.setUint16(20, 50, true);
   assert.deepEqual(headerDimensions(bytes.subarray(0, 26)), [100, 50]);
+});
+
+test("GIF and both TIFF byte orders are checked before decoding", async () => {
+  const gif = new Uint8Array(10);
+  gif.set(new TextEncoder().encode("GIF89a"));
+  new DataView(gif.buffer).setUint16(6, 8192, true);
+  new DataView(gif.buffer).setUint16(8, 8192, true);
+  await assert.rejects(
+    preflightImage(new File([gif], "huge.gif")),
+    /33,554,432/,
+  );
+  for (const little of [true, false]) {
+    assert.deepEqual(headerDimensions(tiffFixture({ little })), [2, 1]);
+    assert.equal(
+      headerDimensions(tiffFixture({ little }).subarray(0, 20)),
+      null,
+    );
+    await assert.rejects(
+      preflightImage(
+        new File(
+          [tiffFixture({ little, width: 8192, height: 8192 })],
+          "huge.tif",
+        ),
+      ),
+      /33,554,432/,
+    );
+  }
 });

@@ -1,9 +1,11 @@
 import { decodeAvifImage } from "./decodeAvifImage.js";
+import { decodeInputImage } from "./decodeInputImage.js";
 import {
   ImageLimitError,
   preflightImage,
   validateSourceDimensions,
 } from "./imageLimits.js";
+import { prepareSvg } from "./svgInput.js";
 
 function loadImage(file, signal) {
   return new Promise((resolve, reject) => {
@@ -55,8 +57,15 @@ function loadImage(file, signal) {
   });
 }
 
-export async function decodeImage(file, signal) {
+export async function decodeImage(file, signal, options) {
   await preflightImage(file, signal);
+  if (["image/heic", "image/heif", "image/tiff"].includes(file.type))
+    return decodeInputImage(file, signal);
+  if (file.type === "image/svg+xml") {
+    const prepared = await prepareSvg(file, signal, options);
+    const decoded = await loadImage(prepared.file, signal);
+    return { ...decoded, width: prepared.width, height: prepared.height };
+  }
   let failure;
   // A successful manual retry should also succeed without user intervention.
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -85,6 +94,10 @@ export async function decodeImage(file, signal) {
       failure = error;
     }
   }
+  // An animated image element can advance while loading. Bitmap decoding fixes
+  // GIF output to its first frame rather than capturing an arbitrary later frame.
+  if (file.type === "image/gif")
+    throw new Error(`GIF decoding failed: ${failure.message}`);
   // Draw the image element directly; converting it back to a bitmap would reuse
   // the API that failed and lose the benefit of this alternative loading path.
   try {

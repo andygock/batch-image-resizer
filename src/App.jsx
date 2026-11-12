@@ -15,6 +15,7 @@ import {
   outputFormats,
   resolveOutputFormat,
 } from "./imageUtils.js";
+import { inputAccept } from "./inputFormats.js";
 import OutputFormatSelect from "./OutputFormatSelect";
 import OutputImages from "./OutputImages";
 import SizeSelect from "./SizeSelect";
@@ -391,7 +392,7 @@ function App() {
               type="file"
               id="add-images"
               aria-label={isEmpty ? "Load images" : "Add images"}
-              accept="image/jpeg, image/png, image/webp, image/avif, image/bmp, .bmp"
+              accept={inputAccept}
               multiple
               onChange={handleFileInputChange}
             />
@@ -598,7 +599,8 @@ function App() {
           Your images are resized directly in your browser using the HTML5
           Canvas API and browser-side encoders, ensuring privacy and speed. No
           data is uploaded to any server. Source code on{" "}
-          <a href="https://github.com/andygock/batch-image-resizer/">GitHub</a>.
+          <a href="https://github.com/andygock/batch-image-resizer/">GitHub</a>.{" "}
+          <a href="./input-codecs-notices.txt">Input codec licences</a>.
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { decodeAvifImage } from "./decodeAvifImage.js";
+import { decodeImage } from "./decodeImage.js";
 import { validateSourceDimensions } from "./imageLimits.js";
+import { needsStaticPreview } from "./inputFormats.js";
 
 export default function useImageUrl(blob) {
   const [original, setOriginal] = useState(null);
@@ -14,14 +15,21 @@ export default function useImageUrl(blob) {
     return () => URL.revokeObjectURL(url);
   }, [blob]);
   useEffect(() => {
-    if (fallbackFor !== blob) return;
+    if (fallbackFor !== blob && !needsStaticPreview(blob.type)) return;
     const controller = new AbortController();
     let url;
     void (async () => {
       let decoded;
       try {
-        decoded = await decodeAvifImage(blob, controller.signal);
-        const png = await decoded.image.convertToBlob({ type: "image/png" });
+        decoded = await decodeImage(blob, controller.signal);
+        const canvas = new OffscreenCanvas(decoded.width, decoded.height);
+        let png;
+        try {
+          canvas.getContext("2d").drawImage(decoded.image, 0, 0);
+          png = await canvas.convertToBlob({ type: "image/png" });
+        } finally {
+          canvas.width = canvas.height = 0;
+        }
         controller.signal.throwIfAborted();
         url = URL.createObjectURL(png);
         setFallback({ blob, url });
@@ -40,7 +48,12 @@ export default function useImageUrl(blob) {
   const url = original?.blob === blob ? original.url : "";
   return {
     url,
-    previewUrl: fallback?.blob === blob && fallback.url ? fallback.url : url,
+    previewUrl:
+      fallback?.blob === blob && fallback.url
+        ? fallback.url
+        : needsStaticPreview(blob.type)
+          ? ""
+          : url,
     error: fallback?.blob === blob ? fallback.error : "",
     onLoad: (event) => {
       try {

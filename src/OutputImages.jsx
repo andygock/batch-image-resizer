@@ -2,6 +2,7 @@ import { ImagePlus } from "lucide-preact";
 import { useMemo, useRef } from "react";
 import { formatKb } from "./formatBytes.js";
 import ImageCard from "./ImageCard.jsx";
+import { inputAccept } from "./inputFormats.js";
 import styles from "./OutputImages.module.css";
 
 export default function OutputImages({
@@ -51,11 +52,18 @@ export default function OutputImages({
           strokeWidth={1.5}
           aria-hidden="true"
         />
-        <p>Drop JPG, PNG, WebP or AVIF files here, or paste an image.</p>
+        <p>
+          Drop JPG, PNG, WebP, AVIF, BMP, GIF, HEIC/HEIF, TIFF or SVG files
+          here, or paste an image.
+        </p>
+        <p>
+          GIFs use the first frame, TIFFs the first page. Input-only formats use
+          PNG output by default.
+        </p>
         <label className="button buttonPrimary">
           <input
             type="file"
-            accept="image/jpeg, image/png, image/webp, image/avif"
+            accept={inputAccept}
             multiple
             onChange={onFileInputChange}
             disabled={inputDisabled}

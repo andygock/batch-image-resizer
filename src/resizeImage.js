@@ -95,7 +95,7 @@ export async function resizeImage({ id, file }, settings, signal) {
   let stage = "decode";
   try {
     signal.throwIfAborted();
-    bitmap = await decodeImage(file, signal);
+    bitmap = await decodeImage(file, signal, settings);
     signal.throwIfAborted();
     stage = "resize";
     const size = fitDimensions(

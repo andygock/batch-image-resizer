@@ -10,7 +10,7 @@ export default function OutputImage({
   onInspect,
 }) {
   const { url, previewUrl, onError, onLoad, error } = useImageUrl(blob);
-  const img = url && !error && (
+  const img = previewUrl && !error && (
     <img
       src={previewUrl}
       onError={onError}

@@ -10,8 +10,10 @@ export const outputFormats = {
 
 export function resolveOutputFormat(format, sourceFormat) {
   if (format !== "source") return format;
-  // BMP is input-only; PNG preserves the decoded pixels without lossy encoding.
-  return sourceFormat === "bmp" ? "png" : sourceFormat;
+  // Input-only formats use PNG to avoid introducing lossy encoding by default.
+  return ["bmp", "gif", "heic", "tiff", "svg"].includes(sourceFormat)
+    ? "png"
+    : sourceFormat;
 }
 
 export function validateSize({ width, height }) {

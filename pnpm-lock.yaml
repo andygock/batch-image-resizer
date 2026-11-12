@@ -133,6 +133,9 @@ importers:
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
+      libheif-js:
+        specifier: 1.23.5
+        version: 1.23.5
       lucide-preact:
         specifier: ^1.38.0
         version: 1.38.0(preact@10.29.1)
@@ -148,6 +151,9 @@ importers:
       upng-js:
         specifier: ^2.1.0
         version: 2.1.0
+      utif:
+        specifier: 3.1.0
+        version: 3.1.0
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.14
@@ -666,6 +672,10 @@ packages:
   kolorist@1.8.0:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
+  libheif-js@1.23.5:
+    resolution: {integrity: sha512-umXZPthnWZtF3iG/5mQG+AZ2V6i0UeYpo3z2CkggTEgL8dKmIIwJT6TDuAMuabXa1yTW8uJ1ZAgR+CxNTklYYw==}
+    engines: {node: '>=8.0.0'}
+
   lie@3.3.0:
     resolution: {integrity: sha512-UaiMJzeWRlEujzAuw5LokY1L5ecNQYZKfmyZ9L7wDHb/p5etKaxXhohBcrw0EYby+G/NA52vRSN4N39dxHAIwQ==}
 
@@ -853,6 +863,9 @@ packages:
 
   upng-js@2.1.0:
     resolution: {integrity: sha512-d3xzZzpMP64YkjP5pr8gNyvBt7dLk/uGI67EctzDuVp4lCZyVMo0aJO6l/VDlgbInJYDY6cnClLoBp29eKWI6g==}
+
+  utif@3.1.0:
+    resolution: {integrity: sha512-WEo4D/xOvFW53K5f5QTaTbbiORcm2/pCL9P6qmJnup+17eYfKaEhDeX9PeQkuyEoIxlbGklDuGl8xwuXYMrrXQ==}
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -1406,6 +1419,8 @@ snapshots:
 
   kolorist@1.8.0: {}
 
+  libheif-js@1.23.5: {}
+
   lie@3.3.0:
     dependencies:
       immediate: 3.0.6
@@ -1577,6 +1592,10 @@ snapshots:
       picocolors: 1.1.1
 
   upng-js@2.1.0:
+    dependencies:
+      pako: 1.0.11
+
+  utif@3.1.0:
     dependencies:
       pako: 1.0.11
 

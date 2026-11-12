@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { tiffFixture } from "../test-support/inputFixtures.js";
 import { inspectImageFile, partitionImageFiles } from "./imageFiles.js";
 
 function imageFile(name, bytes, type = "") {
@@ -23,6 +24,7 @@ test("AVIF brands are detected in bounded file-type boxes and MIME is normalised
   );
   assert.equal(source.sourceFormat, "avif");
   assert.equal(source.file.type, "image/avif");
+  bytes.set(new TextEncoder().encode("xxxx"), 8);
   new DataView(bytes.buffer).setUint32(0, 16);
   await assert.rejects(
     inspectImageFile(new File([bytes], "not-avif.bin")),
@@ -97,7 +99,7 @@ test("invalid bytes are rejected with the filename even when MIME is supported",
   const file = imageFile("broken.webp", [0, 1, 2, 3], "image/webp");
   await assert.rejects(
     inspectImageFile(file),
-    /broken\.webp.*not a supported JPEG, PNG, WebP, AVIF or BMP/,
+    /broken\.webp.*not a supported JPEG, PNG, WebP, AVIF, BMP, GIF, HEIC\/HEIF, TIFF or SVG/,
   );
   const result = await partitionImageFiles([file]);
   assert.deepEqual(result.accepted, []);
@@ -257,4 +259,49 @@ test("BMP signatures are accepted and MIME is normalised regardless of filename"
     inspectImageFile(imageFile("fake.bmp", [0, 1, 2, 3], "image/bmp")),
     /not a supported/,
   );
+});
+
+test("GIF, TIFF, SVG and HEIF imports are detected from content and normalised", async () => {
+  const heif = (brand, compatible = "") => {
+    const bytes = new Uint8Array(16 + compatible.length);
+    new DataView(bytes.buffer).setUint32(0, bytes.length);
+    bytes.set(new TextEncoder().encode(`ftyp${brand}`), 4);
+    bytes.set(new TextEncoder().encode(compatible), 16);
+    return bytes;
+  };
+  for (const [format, type, bytes] of [
+    [
+      "gif",
+      "image/gif",
+      new TextEncoder().encode("GIF89a\u0001\u0000\u0001\u0000"),
+    ],
+    ["tiff", "image/tiff", tiffFixture()],
+    ["tiff", "image/tiff", tiffFixture({ little: false })],
+    [
+      "svg",
+      "image/svg+xml",
+      new TextEncoder().encode(
+        '\uFEFF<?xml version="1.0"?>\n<!-- example --><svg xmlns="http://www.w3.org/2000/svg"/>',
+      ),
+    ],
+    ["heic", "image/heic", heif("heic")],
+    ["heic", "image/heic", heif("mif1", "heix")],
+    ["avif", "image/avif", heif("mif1", "avif")],
+  ]) {
+    const inspected = await inspectImageFile(
+      new File([bytes], "image.bin", { type: "application/octet-stream" }),
+    );
+    assert.equal(inspected.sourceFormat, format);
+    assert.equal(inspected.file.type, type);
+  }
+  for (const text of [
+    "GIF90a",
+    "<html><svg></svg></html>",
+    "<!-- <svg/> -->",
+    "<svg-lookalike/>",
+  ])
+    await assert.rejects(
+      inspectImageFile(new File([text], "fake.svg", { type: "image/svg+xml" })),
+      /not a supported/,
+    );
 });

@@ -40,6 +40,17 @@ test("keep source format resolves each image independently", async () => {
   assert.equal(resolveSettings({ sourceFormat: "webp" }, options).quality, 0.7);
 });
 
+test("input-only formats resolve to PNG without overriding explicit output choices", () => {
+  for (const sourceFormat of ["gif", "heic", "tiff", "svg"]) {
+    assert.equal(
+      resolveSettings({ sourceFormat }, { ...settings, format: "source" })
+        .format,
+      "png",
+    );
+    assert.equal(resolveSettings({ sourceFormat }, settings).format, "jpeg");
+  }
+});
+
 test("ready images remain accessible while another image processes", async () => {
   let complete;
   const processor = createBatchProcessor(async ({ id }) =>

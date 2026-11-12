@@ -56,6 +56,35 @@ export function headerDimensions(bytes) {
     String.fromCharCode(...bytes.subarray(at, at + length));
   if (bytes.length >= 24 && text(1, 3) === "PNG" && text(12, 4) === "IHDR")
     return [view.getUint32(16), view.getUint32(20)];
+  if (bytes.length >= 10 && ["GIF87a", "GIF89a"].includes(text(0, 6)))
+    return [view.getUint16(6, true), view.getUint16(8, true)];
+  if (bytes.length >= 8 && ["II", "MM"].includes(text(0, 2))) {
+    const little = text(0, 2) === "II";
+    if (view.getUint16(2, little) === 42) {
+      const offset = view.getUint32(4, little);
+      if (offset >= 8 && offset + 2 <= bytes.length) {
+        const count = view.getUint16(offset, little);
+        const dimensions = [];
+        for (let i = 0; i < count; i++) {
+          const at = offset + 2 + i * 12;
+          if (at + 12 > bytes.length) break;
+          const tag = view.getUint16(at, little);
+          const type = view.getUint16(at + 2, little);
+          if (
+            (tag === 256 || tag === 257) &&
+            view.getUint32(at + 4, little) === 1 &&
+            [3, 4].includes(type)
+          )
+            dimensions[tag - 256] =
+              type === 3
+                ? view.getUint16(at + 8, little)
+                : view.getUint32(at + 8, little);
+        }
+        if (dimensions[0] !== undefined && dimensions[1] !== undefined)
+          return dimensions;
+      }
+    }
+  }
   if (bytes.length >= 26 && text(0, 2) === "BM") {
     const headerSize = view.getUint32(14, true);
     if (headerSize === 12)

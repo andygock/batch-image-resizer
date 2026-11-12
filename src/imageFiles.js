@@ -5,6 +5,8 @@ import {
   validateFileSize,
 } from "./imageLimits.js";
 
+import { inputMimeTypes, isSvgPrefix } from "./inputFormats.js";
+
 const digests = new WeakMap();
 
 async function chunkDigest(bytes, signal) {
@@ -65,10 +67,19 @@ function identifyFormat(bytes) {
       bytes.byteLength,
     ).getUint32(0);
     if (size >= 16 && size <= bytes.length && size % 4 === 0) {
+      let heic = false;
       for (let offset = 8; offset < size; offset += 4) {
         if (offset !== 12 && hasBytes(bytes, [0x61, 0x76, 0x69, 0x66], offset))
           return "avif";
+        if (
+          offset !== 12 &&
+          ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(
+            new TextDecoder().decode(bytes.subarray(offset, offset + 4)),
+          )
+        )
+          heic = true;
       }
+      if (heic) return "heic";
     }
   }
   if (hasBytes(bytes, [0xff, 0xd8, 0xff])) return "jpeg";
@@ -80,6 +91,17 @@ function identifyFormat(bytes) {
   ) {
     return "webp";
   }
+  if (
+    hasBytes(bytes, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+    hasBytes(bytes, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+  )
+    return "gif";
+  if (
+    hasBytes(bytes, [0x49, 0x49, 0x2a, 0]) ||
+    hasBytes(bytes, [0x4d, 0x4d, 0, 0x2a])
+  )
+    return "tiff";
+  if (isSvgPrefix(bytes)) return "svg";
   return null;
 }
 
@@ -121,7 +143,7 @@ export async function inspectImageFile(file, options = {}) {
   if (!format) {
     const typeHint = file.type ? ` (declared as ${file.type})` : "";
     throw new Error(
-      `"${filename}"${typeHint} is not a supported JPEG, PNG, WebP, AVIF or BMP image.`,
+      `"${filename}"${typeHint} is not a supported JPEG, PNG, WebP, AVIF, BMP, GIF, HEIC/HEIF, TIFF or SVG image.`,
     );
   }
   try {
@@ -140,8 +162,9 @@ export async function inspectImageFile(file, options = {}) {
     if (copiedFormat !== format)
       throw new Error("the file changed while it was being imported");
     const copy = new File(chunks, filename, {
-      type:
-        format === "avif" || format === "bmp" ? `image/${format}` : file.type,
+      type: ["avif", "bmp", "gif", "heic", "tiff", "svg"].includes(format)
+        ? inputMimeTypes[format]
+        : file.type,
       lastModified: file.lastModified,
     });
     digests.set(copy, await finishDigest(hashes, signal));

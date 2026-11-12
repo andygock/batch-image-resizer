@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 import UPNG from "upng-js";
 import { sanitiseAdvanced } from "../src/advancedSettings.js";
+import { tiffFixture } from "./inputFixtures.js";
 
 // Execute the emitted worker modules and lazy chunks directly in Node. This
 // catches bundler/asset-link failures that source-level codec tests cannot.
@@ -140,4 +141,33 @@ test("built JPEG, WebP and AVIF workers reuse codecs after transferring their pr
     { buffer: buffers[2] },
   ]);
   assert.equal(decoded.byteLength, 32 * 32 * 4);
+});
+
+test("built input decoder loads local HEIC WASM and TIFF chunks", async () => {
+  const bytes = await readFile(
+    new URL("./fixtures/basic-8bit-srgb.heic", import.meta.url),
+  );
+  const buffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  );
+  const [heic, tiff] = await runWorker("inputDecode.worker", [
+    { type: "image/heic", buffer },
+    { type: "image/tiff", buffer: tiffFixture().buffer },
+  ]);
+  assert.equal(heic.byteLength, 1600 * 1200 * 4);
+  assert.deepEqual([...new Uint8Array(tiff)], [255, 0, 0, 255, 0, 255, 0, 255]);
+  const module = files.find(
+    (name) => name.startsWith("libheif-bundle-") && name.endsWith(".mjs"),
+  );
+  assert.ok(module, "HEIC decoder remains a separately loadable module");
+  assert.deepEqual(
+    await readFile(new URL(module, assets)),
+    await readFile(
+      new URL(
+        "../node_modules/libheif-js/libheif-wasm/libheif-bundle.mjs",
+        import.meta.url,
+      ),
+    ),
+  );
 });

@@ -144,3 +144,19 @@ test("oversized decoded bitmaps are closed without retrying or allocating a fall
   assert.equal(closed, 1);
   assert.equal(globalThis.createImageBitmap.mock.callCount(), 1);
 });
+
+test("GIF bitmap failures never capture an arbitrary animation frame via Image", async (t) => {
+  t.mock.method(globalThis, "createImageBitmap", async () => {
+    throw new Error("Invalid GIF");
+  });
+  t.mock.method(globalThis, "Image", function () {
+    assert.fail("GIF fallback must not animate");
+  });
+  await assert.rejects(
+    decodeImage(
+      new File(["GIF89a"], "bad.gif", { type: "image/gif" }),
+      new AbortController().signal,
+    ),
+    /GIF decoding failed/,
+  );
+});

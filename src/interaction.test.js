@@ -4,6 +4,7 @@ import test from "node:test";
 import { Window } from "happy-dom";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+import { tiffFixture } from "../test-support/inputFixtures.js";
 import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
 
 const window = new Window({
@@ -1005,11 +1006,15 @@ test("displayed file sizes use the same decimal units as encoder targets", async
   assert.equal(formatKb(100000), "100 kB");
 });
 
-test("BMP inputs use PNG controls and download names in Source mode", async (t) => {
+test("input-only formats use PNG controls and download names in Source mode", async (t) => {
   const worker = globalThis.Worker;
   globalThis.Worker = class {
-    postMessage() {
-      this.onmessage({ data: { fallback: true } });
+    postMessage(message) {
+      this.onmessage({
+        data: message.type
+          ? { buffer: new ArrayBuffer(8), width: 2, height: 1 }
+          : { fallback: true },
+      });
     }
     terminate() {}
   };
@@ -1017,21 +1022,61 @@ test("BMP inputs use PNG controls and download names in Source mode", async (t) 
     if (worker === undefined) delete globalThis.Worker;
     else globalThis.Worker = worker;
   });
+  const originals = Object.fromEntries(
+    ["DOMParser", "XMLSerializer", "Image", "ImageData"].map((key) => [
+      key,
+      globalThis[key],
+    ]),
+  );
+  globalThis.DOMParser = window.DOMParser;
+  globalThis.XMLSerializer = window.XMLSerializer;
+  globalThis.ImageData = class {
+    constructor(data, width, height) {
+      Object.assign(this, { data, width, height });
+    }
+  };
+  globalThis.Image = class {
+    naturalWidth = 2;
+    naturalHeight = 1;
+    set src(value) {
+      this.url = value;
+      queueMicrotask(() => this.onload?.());
+    }
+    removeAttribute() {}
+  };
+  t.after(() => {
+    for (const [key, value] of Object.entries(originals)) {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    }
+  });
   await act(() => render(h(App), root));
   await settle();
   assert.match(root.querySelector("#add-images").accept, /image\/bmp/);
-  await upload([new File([new Uint8Array([0x42, 0x4d])], "bitmap.bmp")]);
+  const heic = new Uint8Array(16);
+  new DataView(heic.buffer).setUint32(0, 16);
+  heic.set(new TextEncoder().encode("ftypheic"), 4);
+  await upload([
+    new File([new Uint8Array([0x42, 0x4d])], "bitmap.bmp"),
+    new File(["GIF89a"], "animation.gif"),
+    new File([heic], "photo.heif"),
+    new File([tiffFixture()], "scan.tiff"),
+    new File(
+      ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 1"/>'],
+      "logo.svg",
+    ),
+  ]);
   for (let attempt = 0; attempt < 20; attempt++) {
     await settle();
-    if (root.querySelector("a[download$='.png']")) break;
+    if (root.querySelectorAll("a[download$='.png']").length === 5) break;
   }
   assert.equal(root.querySelector("#output-format").value, "source");
   assert.ok(root.querySelector("#png-colors"));
-  assert.ok(root.querySelector("a[download$='.png']"));
+  assert.equal(root.querySelectorAll("a[download$='.png']").length, 5);
   await change(root.querySelector("#output-format"), "jpeg");
   for (let attempt = 0; attempt < 20; attempt++) {
     await settle();
-    if (root.querySelector("a[download$='.jpg']")) break;
+    if (root.querySelectorAll("a[download$='.jpg']").length === 5) break;
   }
-  assert.ok(root.querySelector("a[download$='.jpg']"));
+  assert.equal(root.querySelectorAll("a[download$='.jpg']").length, 5);
 });

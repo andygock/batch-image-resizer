@@ -1,6 +1,6 @@
 # Batch Image Resizer
 
-A minimalist browser app for resizing batches of JPG, PNG, WebP, AVIF and BMP images. Drop images into the page, choose a maximum bounding size and output format, then download the resized files individually or as a ZIP.
+A minimalist browser app for resizing batches of JPG, PNG, WebP, AVIF, BMP, GIF, HEIC/HEIF, TIFF and SVG images. Drop images into the page, choose a maximum bounding size and output format, then download the resized files individually or as a ZIP.
 
 All processing happens locally in the browser using Canvas and browser-side encoders. Images are not uploaded to a server.
 
@@ -17,7 +17,10 @@ Live app hosted on Vercel:
 - Check image signatures and skip identical files, with an option to add duplicates anyway.
 - Resize into a bounding box while preserving aspect ratio.
 - Optional setting to avoid enlarging smaller source images.
-- Keep each source format by default (BMP inputs use PNG), or convert to JPEG, PNG or WebP.
+- Keep each encodable source format by default; BMP, GIF, HEIC/HEIF, TIFF and SVG inputs use PNG.
+- Import the first frame of GIFs, the primary HEIC/HEIF image and the first TIFF page.
+- Rasterise SVGs with native browser rendering at the requested output size.
+- Convert any input to JPEG, PNG, WebP or AVIF.
 - Import and export still AVIF images with independent quality, speed and transparency settings.
 - Independent JPEG/WebP quality sliders and percentage fields.
 - PNG colour optimisation options.
@@ -56,11 +59,21 @@ Choose an image preview to compare it with the original. **Actual output size** 
 
 If standard PNG encoding produces incomplete output, the browser's lossless PNG encoder is used instead. The image card explains that the selected palette reduction was skipped.
 
+## Input formats
+
+GIFs produce a still image of the first frame; animation is not preserved. TIFFs import the first page and apply its orientation. HEIC/HEIF imports the primary image (or the first image if none is marked primary); auxiliary images and sequences are not exported. These formats and BMP use PNG when output is set to Source.
+
+HEIC/HEIF uses a local `libheif-js` WebAssembly decoder; TIFF uses `utif` and its `pako` decompressor. They load only when required and run in cancellable workers. Previews use the same decoded still image as processing. HEIF codec support depends on the bundled decoder; a HEIF container with an unsupported codec reports an error. Classic TIFF is supported; BigTIFF is not. Decoding uses 8-bit RGBA, so higher bit depth, HDR, source metadata and colour profiles are not preserved as original data.
+
+SVG is loaded as an image, never inserted into the page. Scripts do not run and external images, fonts and stylesheets are not fetched in this image context; keep required resources embedded. Dimensions come from explicit lengths or the viewBox, with a 300×150 fallback when neither supplies dimensions. Entity declarations are rejected. SVG output is rasterised, not vector. GIF and SVG use the browser's existing decoder and renderer without additional libraries.
+
+Input decoder licence texts and upstream source/build links are included in [public/input-codecs-notices.txt](public/input-codecs-notices.txt), also linked from the app. The LGPL HEIC module is shipped unchanged as a separately loadable asset.
+
 ## Resource limits
 
 Each imported file is limited to 64 MiB. Source files and retained duplicate copies in a batch are limited to 256 MiB in total; outputs and codec memory are additional. Clear cancels active import work and allows a new import to start immediately. Duplicate detection indexes bounded-chunk SHA-256 fingerprints and confirms matches by comparing bytes.
 
-Sources are limited to 33,554,432 pixels. A bounded header check rejects oversized JPEG, PNG, WebP, AVIF and BMP dimensions when available before decoding. Decoded dimensions are checked again, including previews. Some files place metadata beyond the inspected prefix, so a decoder may allocate memory before that limit can be checked. These limits reduce memory pressure but do not guarantee that every supported image fits every device's available memory. Advanced processing also rejects estimated working-buffer allocations above 512 MiB; use Auto without sharpening or smaller dimensions when this limit is reached. Sharpening retains only the horizontal rows required by its blur kernel rather than a full-image float buffer.
+Sources are limited to 33,554,432 pixels. A bounded header check rejects oversized JPEG, PNG, WebP, AVIF/HEIF, BMP, GIF and TIFF dimensions when available before decoding. Decoded dimensions are checked again, including previews. Some files place metadata beyond the inspected prefix, so a decoder may allocate memory before that limit can be checked. These limits reduce memory pressure but do not guarantee that every supported image fits every device's available memory. Advanced processing also rejects estimated working-buffer allocations above 512 MiB; use Auto without sharpening or smaller dimensions when this limit is reached. Sharpening retains only the horizontal rows required by its blur kernel rather than a full-image float buffer.
 
 Displayed file sizes and WebP targets use decimal kilobytes (1 kB = 1000 bytes). Resource limits above use binary mebibytes (1 MiB = 1,048,576 bytes).
 
@@ -169,6 +182,7 @@ Run `pnpm test:build` to build the production app and execute its emitted worker
 - `upng-js` for PNG encoding
 - `image-q` for PNG palette dithering
 - `@jsquash/webp`, `@jsquash/jpeg`, `@jsquash/avif` and `@jsquash/oxipng` for local advanced encoding and optimisation
+- `libheif-js` for local HEIC/HEIF decoding, and `utif` with `pako` for TIFF decoding
 - `jszip` and `file-saver` for ZIP downloads
 
 ## Favicon
