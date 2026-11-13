@@ -16,6 +16,11 @@ export default function useImageImports(onImport, images) {
   );
   const pending = useRef(0);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({
+    completed: 0,
+    total: 0,
+    filename: "",
+  });
   const [errors, setErrors] = useState([]);
   const [duplicates, setDuplicates] = useState([]);
   const addFiles = useCallback((files, allowDuplicates = false) => {
@@ -32,7 +37,13 @@ export default function useImageImports(onImport, images) {
         const result = await partitionImageFiles(
           incoming,
           current.current.images,
-          { allowDuplicates, signal },
+          {
+            allowDuplicates,
+            signal,
+            onProgress: (progress) => {
+              if (request === generation.current) setImportProgress(progress);
+            },
+          },
         );
         if (request !== generation.current) return;
         setErrors(result.errors.map(({ message }) => message));
@@ -70,6 +81,7 @@ export default function useImageImports(onImport, images) {
     addFiles,
     cancelImports,
     isImporting,
+    importProgress,
     errors,
     duplicates,
     dismissDuplicates: () => setDuplicates([]),

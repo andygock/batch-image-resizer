@@ -134,6 +134,10 @@
 .clearButton {
   min-width: var(--control-height);
 }
+.zipButton {
+  min-width: 12ch;
+  font-variant-numeric: tabular-nums;
+}
 .compactText {
   display: none;
 }

@@ -55,6 +55,18 @@
 .summary > * {
   flex-shrink: 0;
 }
+.batchActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-2);
+}
+.batchActions button {
+  white-space: normal;
+  max-width: 100%;
+  padding-block: 6px;
+}
 
 .grid {
   display: grid;

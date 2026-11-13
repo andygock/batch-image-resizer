@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import styles from "./AdvancedSettings.module.css";
 import {
   ADVANCED_FIELDS,
@@ -29,7 +29,7 @@ const primary = new Set([
   "alphaQuality",
 ]);
 
-function Field({ field, value, onChange, disabled }) {
+function Field({ field, value, onChange, disabled, fieldKey }) {
   const id = useId();
   const valid = validAdvancedValue(field, value);
   const props = {
@@ -37,6 +37,7 @@ function Field({ field, value, onChange, disabled }) {
     disabled,
     "aria-describedby": `${id}-hint`,
     "aria-invalid": !disabled && !valid,
+    "data-field": fieldKey,
   };
   return (
     <div className={styles.field}>
@@ -117,6 +118,16 @@ export default function AdvancedSettings({
 }) {
   const [format, setFormat] = useState(initialFormat);
   const [processingOpen, setProcessingOpen] = useState(false);
+  const form = useRef(null);
+  const [focusField, setFocusField] = useState(null);
+  useEffect(() => {
+    if (!focusField) return;
+    const input = form.current?.querySelector(`[data-field="${focusField}"]`);
+    const details = input?.closest("details");
+    if (details) details.open = true;
+    input?.focus();
+    setFocusField(null);
+  }, [format, focusField]);
   const [draft, setDraft] = useState(() => ({
     ...settings,
     advanced: sanitiseAdvanced(settings.advanced),
@@ -131,14 +142,17 @@ export default function AdvancedSettings({
         [format]: { ...current.advanced[format], [key]: value },
       },
     }));
-  const valid = Object.entries(draft.advanced).every(([type, values]) =>
-    Object.entries(ADVANCED_FIELDS[type]).every(
-      ([key, field]) =>
-        !visible(key, field, values) ||
-        (type === "png" && key === "dither" && !draft.colours) ||
-        validAdvancedValue(field, values[key]),
-    ),
+  const errors = Object.entries(draft.advanced).flatMap(([type, values]) =>
+    Object.entries(ADVANCED_FIELDS[type])
+      .filter(
+        ([key, field]) =>
+          visible(key, field, values) &&
+          !(type === "png" && key === "dither" && !draft.colours) &&
+          !validAdvancedValue(field, values[key]),
+      )
+      .map(([key, field]) => ({ format: type, key, label: field.label })),
   );
+  const valid = errors.length === 0;
   const renderFields = (main) =>
     Object.entries(fields)
       .filter(
@@ -148,6 +162,7 @@ export default function AdvancedSettings({
       .map(([key, field]) => (
         <Field
           key={key}
+          fieldKey={key}
           field={field}
           value={options[key]}
           onChange={(value) => change(key, value)}
@@ -229,6 +244,14 @@ export default function AdvancedSettings({
           <button
             key={key}
             aria-pressed={format === key}
+            data-invalid={
+              errors.some((error) => error.format === key) || undefined
+            }
+            aria-describedby={
+              errors.some((error) => error.format === key)
+                ? "advanced-errors"
+                : undefined
+            }
             onClick={() => setFormat(key)}
           >
             {name}
@@ -246,6 +269,7 @@ export default function AdvancedSettings({
         />
       )}
       <form
+        ref={form}
         onSubmit={(event) => {
           event.preventDefault();
           if (valid) {
@@ -324,10 +348,24 @@ export default function AdvancedSettings({
           )}
         </div>
         {!valid && (
-          <p role="alert">
-            Correct the invalid advanced settings before applying. Check each
-            format if needed.
-          </p>
+          <div id="advanced-errors" role="alert">
+            <p>Correct these settings before applying:</p>
+            <ul>
+              {errors.map((error) => (
+                <li key={`${error.format}-${error.key}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormat(error.format);
+                      setFocusField(error.key);
+                    }}
+                  >
+                    {names[error.format]} · {error.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         <div className={styles.actions}>
           <button

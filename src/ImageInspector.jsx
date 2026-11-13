@@ -152,8 +152,8 @@ export default function ImageInspector({
           >
             <ChevronRight size={16} />
           </button>
-          <h3>{source.file.name}</h3>
         </div>
+        <h3 className={styles.filename}>{source.file.name}</h3>
         <div className={`${styles.controls} ${styles.compareControls}`}>
           <button
             aria-pressed={actualSize}
@@ -198,7 +198,8 @@ export default function ImageInspector({
       <p className={styles.hint}>
         {savedA
           ? "A is saved independently. Adjust the controls below to create B, then apply your preferred output to the batch."
-          : "Save an output as A to compare two formats or quality settings."}
+          : "Save an output as A to compare two formats or quality settings."}{" "}
+        Candidates are kept only while this comparison is open.
       </p>
       <div className={styles.controls}>
         <label htmlFor="preview-background">Preview background</label>

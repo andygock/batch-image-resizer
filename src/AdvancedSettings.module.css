@@ -12,6 +12,11 @@
 .formats button {
   flex: 1;
 }
+.formats button[data-invalid]::after {
+  content: "!";
+  color: var(--destructive);
+  font-weight: 700;
+}
 .formats button[aria-pressed="true"] {
   background: var(--primary);
   color: var(--primary-foreground);

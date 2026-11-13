@@ -229,9 +229,12 @@ export async function partitionImageFiles(
   if (!allowDuplicates)
     for (const file of previousFiles) await addToIndex(file);
 
-  for (const file of files ?? []) {
+  const incoming = Array.from(files ?? []);
+  let completed = 0;
+  for (const file of incoming) {
     signal?.throwIfAborted();
     const filename = filenameOf(file);
+    options.onProgress?.({ completed, total: incoming.length, filename });
     try {
       validateFileSize(file);
       if (retainedBytes + (file?.size ?? 0) > MAX_BATCH_BYTES)
@@ -270,6 +273,9 @@ export async function partitionImageFiles(
             ? `Could not import "${filename}": ${error.message}`
             : error.message,
       });
+    } finally {
+      completed++;
+      options.onProgress?.({ completed, total: incoming.length, filename });
     }
   }
 

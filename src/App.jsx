@@ -133,6 +133,7 @@ function App() {
     addFiles: handleImageUpload,
     cancelImports,
     isImporting,
+    importProgress,
     errors: uploadErrors,
     clearErrors,
     duplicates,
@@ -335,7 +336,7 @@ function App() {
             disabled={
               !outputs.length || isZipping || isEmpty || sizeDraft.invalid
             }
-            className={outputs.length ? "buttonPrimary" : undefined}
+            className={`${styles.zipButton} ${outputs.length ? "buttonPrimary" : ""}`}
             title={`Download ${outputs.length} ready images as ZIP`}
             aria-label={`Download ${outputs.length} ready images as ZIP`}
           >
@@ -446,7 +447,16 @@ function App() {
         }}
         errors={[...uploadErrors, ...(zipError ? [zipError] : [])]}
       />
-      {isImporting && <p role="status">Checking image files…</p>}
+      {isImporting && (
+        <div className={styles.statusBar}>
+          <span role="status">
+            Checking image files… {importProgress.completed} of{" "}
+            {importProgress.total}
+            {importProgress.filename ? ` · ${importProgress.filename}` : ""}
+          </span>
+          <button onClick={cancelImports}>Cancel import</button>
+        </div>
+      )}
       {duplicates.length > 0 && (
         <div className={styles.statusBar}>
           <span role="status">

@@ -185,6 +185,26 @@ test("advanced settings are staged, validated, saved per format and restored", a
   assert.equal(labelledControl("Dithering strength (%)").value, "75");
 });
 
+test("advanced errors link to fields in another format and reveal fine tuning", async () => {
+  await act(() => render(h(App), root));
+  await click(button("Advanced"));
+  await change(labelledControl("Encoder"), "advanced");
+  const details = root.querySelector("details");
+  details.open = true;
+  const number = details.querySelector('input[type="number"]');
+  const label = root.querySelector(`label[for="${number.id}"]`).textContent;
+  await change(number, "");
+  await click(button("PNG"));
+  assert.equal(button("Apply settings").disabled, true);
+  assert.ok(button("WebP").hasAttribute("data-invalid"));
+  await click(button(`WebP · ${label}`));
+  const invalid = root.querySelector('[data-field][aria-invalid="true"]');
+  assert.equal(document.activeElement, invalid);
+  assert.equal(invalid.closest("details").open, true);
+  await change(invalid, invalid.min);
+  assert.equal(button("Apply settings").disabled, false);
+});
+
 test("advanced trial settings stay isolated and nested dismissal retains the comparison", async () => {
   await act(() => render(h(App), root));
   await settle();

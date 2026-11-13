@@ -10,15 +10,14 @@
 }
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
 }
 .compareControls {
   justify-content: flex-end;
 }
-.controls h3 {
-  flex: 1;
+.filename {
   min-width: 0;
   margin: 0 0 0 8px;
   font-size: 14px;
@@ -143,7 +142,12 @@
 }
 @media (max-width: 600px) {
   .toolbar {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .filename {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin: 0;
   }
   .inspector.inspector {
     width: calc(100% - 16px);
