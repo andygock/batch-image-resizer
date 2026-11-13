@@ -51,7 +51,7 @@ The selected size is a maximum bounding box, not a crop. For example, a 1200x800
 
 Custom dimensions must be whole numbers from 1 to 8192, with a maximum bounding area of 16,777,216 pixels. Edit both dimensions, then apply them with Enter or by leaving the dimension group. Escape restores the applied values. Invalid drafts explain the correction and block downloads until fixed. Transparent images exported to JPEG use a configurable background, white by default; PNG and WebP retain transparency. Encoder failures are reported rather than downloading files with misleading extensions.
 
-Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch and keeps your preferences. Deleting an image or a selection removes its source, output and selection state. Deletion cannot be undone.
+Pause retains completed outputs and remains paused while you edit the batch. Resume reuses matching outputs and processes the remaining images. Clear removes the current batch and keeps your preferences. Deleting an image or a selection removes its source, output and selection state. Remove and Clear offer Undo for 30 seconds. Only the most recent removal is retained; dismissing Undo releases its files. Retained sources share the 256 MiB import budget. Undo keeps up to 32 MiB of outputs and regenerates larger ones.
 
 ZIP exports use a snapshot of the ready images at the time of the click. You can keep working while an archive is created, track its progress or cancel that export. Deleting images cancels an active export so it cannot download deleted outputs. Individual images use native download links to their output blobs; ZIPs use FileSaver. Downloads do not add a success message to the page, and the app cannot verify where the browser saved them.
 
@@ -81,7 +81,7 @@ Displayed file sizes and WebP targets use decimal kilobytes (1 kB = 1000 bytes).
 
 AVIF uses a local worker encoder with quality from 0–100%, speed from 0–10, independent alpha quality, chroma subsampling, quality tuning, denoising and codec sharpness. Lower speed values spend longer compressing. Its encoder and decoder load only when needed. If native AVIF decoding or display fails, a local decoder supplies pixels and a PNG preview while downloads retain the original AVIF bytes. The processing pipeline uses 8-bit RGBA; it does not preserve HDR or higher-bit-depth source data.
 
-Open **Advanced → Image processing** for resize quality controls. Auto uses the browser's high-quality resizer; nearest-neighbour keeps pixel-art edges hard. Lanczos3 favours sharp detail and Mitchell gives softer edges. Both advanced methods support optional linear-light and alpha-aware filtering in a cancellable local worker, with a 33.5-megapixel source limit. Settings are saved with preferences and can be trialled in the comparison panel. Changes remain staged until the parent settings are applied.
+Open **Advanced → Image processing** for resize quality controls. Auto uses the browser's high-quality resizer; nearest-neighbour keeps pixel-art edges hard. Lanczos3 favours sharp detail and Mitchell gives softer edges. Both advanced methods support optional linear-light and alpha-aware filtering in a cancellable local worker, with a 33.5-megapixel source limit. Settings are saved with preferences and can be trialled in the comparison panel. Processing controls are an expandable section in Advanced and share its Apply/Cancel transaction.
 
 Choose **Advanced** next to the format controls. The modal keeps separate settings for WebP, JPEG and PNG. Changing the modal's format section does not change the batch output format. Edits take effect together with **Apply settings**; Cancel, Escape and closing the modal discard them. Each format has a reset button. Less common encoder controls are under **Fine tuning**.
 
@@ -188,3 +188,11 @@ Run `pnpm test:build` to build the production app and execute its emitted worker
 ## Favicon
 
 Favicon is from Fluent UI Emoji artwork © Microsoft Corporation: https://github.com/microsoft/fluentui-emoji · Licence: MIT https://github.com/microsoft/fluentui-emoji/blob/main/LICENSE
+
+## Interaction continuity
+
+Settings changes retain the last successful preview and metadata while replacements are processed, paused or fail. Downloads use only outputs matching the current settings. Removing existing images does not cancel incoming imports; Clear and Cancel import do.
+
+Import feedback shows checked-file counts and the current filename. Advanced validation links identify the format and field requiring correction, including collapsed fine-tuning fields. Batch actions wrap separately from statistics on narrow screens.
+
+A reserved, keyboard-scrollable activity area keeps routine progress, recovery and warning messages from displacing image cards. The app requests the browser standard departure warning while a batch, import, export or Undo snapshot is active; browser restrictions may suppress that warning. Images remain tab-only.

@@ -70,7 +70,7 @@ export default memo(function ImageCard({
               {status === "error" && (
                 <button onClick={() => actions.onRetryImage(id)}>Retry</button>
               )}
-              {output && (
+              {output ? (
                 <a
                   href={!downloadsBlocked && url ? url : undefined}
                   download={downloadFilename}
@@ -85,6 +85,11 @@ export default memo(function ImageCard({
                 >
                   <Download size={14} aria-hidden="true" />
                 </a>
+              ) : (
+                <span
+                  className={styles.downloadPlaceholder}
+                  aria-hidden="true"
+                />
               )}
               <button
                 type="button"

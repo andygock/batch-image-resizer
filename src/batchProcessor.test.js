@@ -176,7 +176,7 @@ test("changing settings back regenerates outputs without retaining variants", as
   await processor.run(sources, { ...settings, quality: 0.7 }, {}, publish);
   await processor.run(sources, settings, { paused: true }, publish);
   assert.equal(state.records.a.status, "pending");
-  assert.equal(state.records.a.result, undefined);
+  assert.equal(state.records.a.result.id, "a");
   await processor.run(sources, settings, {}, publish);
   assert.deepEqual(qualities, [0.8, 0.8, 0.7, 0.7, 0.8, 0.8]);
 });
@@ -196,4 +196,53 @@ test("trial previews are regenerated and do not become batch outputs", async () 
     state = next;
   });
   assert.equal(state.records.a.result.attempt, 3);
+});
+
+test("replacement failures retain the last successful output and Undo restores ready records", async () => {
+  let fail;
+  const processor = createBatchProcessor(async ({ id }, options) => {
+    if (options.quality === 0.7)
+      return new Promise((_, reject) => {
+        fail = reject;
+      });
+    return { id, blob: new Blob(["original output"]) };
+  });
+  let state;
+  const publish = (next) => {
+    state = next;
+  };
+  await processor.run(sources.slice(0, 1), settings, {}, publish);
+  const previous = state.records.a.result;
+  const replacement = processor.run(
+    sources.slice(0, 1),
+    { ...settings, quality: 0.7 },
+    {},
+    publish,
+  );
+  assert.equal(state.records.a.result, previous);
+  fail(new Error("encoder failed"));
+  await replacement;
+  assert.equal(state.records.a.status, "error");
+  assert.equal(state.records.a.result, previous);
+  const removed = processor.remove(["a"]);
+  processor.restore(removed);
+  await processor.run(
+    sources.slice(0, 1),
+    { ...settings, quality: 0.7 },
+    { paused: true },
+    publish,
+  );
+  assert.equal(state.records.a.result, previous);
+});
+
+test("Undo bounds retained output bytes and regenerates oversized results", async () => {
+  const processor = createBatchProcessor(async ({ id }) => ({
+    id,
+    blob: { size: 33 * 1024 * 1024 },
+  }));
+  await processor.run(sources, settings, {}, () => {});
+  const removed = processor.remove(["a", "b"]);
+  assert.equal(removed.a.result, undefined);
+  assert.equal(removed.b.result, undefined);
+  assert.equal(removed.a.status, "pending");
 });

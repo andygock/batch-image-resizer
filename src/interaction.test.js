@@ -115,20 +115,30 @@ const labelledControl = (text, within = root) => {
   );
 };
 
-test("resize settings are staged in the processing modal and saved with the parent", async () => {
+test("resize settings are staged inline and saved with the parent", async () => {
   await act(() => render(h(App), root));
   await settle();
   await click(button("Advanced"));
-  await click(button("Image processing"));
+  await click(
+    [...root.querySelectorAll("summary")].find(
+      (element) => element.textContent === "Image processing",
+    ),
+  );
   await change(root.querySelector("#resize-method"), "lanczos3");
   await click(labelledControl("Sharpen after resizing"));
   await change(root.querySelector("#sharpen-radius"), "9");
-  assert.equal(button("Use processing settings").disabled, true);
+  assert.equal(button("Apply settings").disabled, true);
   await change(root.querySelector("#sharpen-radius"), "1.5");
   await change(root.querySelector("#sharpen-amount"), "0.8");
-  await click(button("Use processing settings"));
   assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
-  await click(button("Apply settings"));
+  // Happy DOM miscalculates decimal step validity for radius 1.5 with min 0.3.
+  await act(() =>
+    root
+      .querySelector("form")
+      .dispatchEvent(
+        new window.Event("submit", { bubbles: true, cancelable: true }),
+      ),
+  );
   await settle();
   assert.equal(
     JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY)).processing.method,
@@ -189,7 +199,9 @@ test("advanced errors link to fields in another format and reveal fine tuning", 
   await act(() => render(h(App), root));
   await click(button("Advanced"));
   await change(labelledControl("Encoder"), "advanced");
-  const details = root.querySelector("details");
+  const details = [...root.querySelectorAll("details")].find(
+    (element) => element.querySelector("summary").textContent === "Fine tuning",
+  );
   details.open = true;
   const number = details.querySelector('input[type="number"]');
   const label = root.querySelector(`label[for="${number.id}"]`).textContent;
@@ -443,7 +455,7 @@ test("clearing preferences keeps images and reports storage failures for retry",
   );
 });
 
-test("deletion cannot be undone and paused edits stay paused", async (t) => {
+test("Undo restores removed outputs and paused edits stay paused", async (t) => {
   let release;
   t.mock.method(globalThis, "createImageBitmap", async (file) =>
     file.name === "later.jpg"
@@ -461,7 +473,7 @@ test("deletion cannot be undone and paused edits stay paused", async (t) => {
   await click(root.querySelector("button[aria-label='Pause processing']"));
   await click(root.querySelector("button[aria-label='Remove photo.jpg']"));
   assert.ok(root.querySelector("button[aria-label='Resume processing']"));
-  assert.equal(button("Undo removal"), undefined);
+  assert.ok(button("Undo removal"));
   await act(() =>
     document.dispatchEvent(
       new window.KeyboardEvent("keydown", {
@@ -471,8 +483,9 @@ test("deletion cannot be undone and paused edits stay paused", async (t) => {
       }),
     ),
   );
-  assert.equal(root.querySelectorAll(".imageCard").length, 1);
-  assert.equal(root.querySelectorAll(".imageCard a[download]").length, 0);
+  await click(button("Undo removal"));
+  assert.equal(root.querySelectorAll(".imageCard").length, 2);
+  assert.equal(root.querySelectorAll(".imageCard a[download]").length, 1);
   assert.ok(root.querySelector("button[aria-label='Resume processing']"));
   assert.equal(
     root.querySelector(".imageCard input[type=checkbox]").checked,
@@ -1018,6 +1031,66 @@ test("Clear starts a new import even while an old file read is unresolved", asyn
   });
   assert.equal(root.querySelectorAll(".imageCard").length, 1);
   assert.doesNotMatch(root.textContent, /Could not add images/);
+});
+
+test("removal preserves an in-flight import and Undo restores order and selection", async () => {
+  await act(() => render(h(App), root));
+  await upload([jpeg()]);
+  for (let i = 0; i < 50 && !root.querySelector(".imageCard a[download]"); i++)
+    await act(tick);
+  await click(root.querySelector('.imageCard input[type="checkbox"]'));
+  const originalName = root.querySelector(".imageCard a[download]").download;
+  const slow = new File(
+    [new Uint8Array([255, 216, 255, 9, 8, 7])],
+    "slow.jpg",
+    { type: "image/jpeg" },
+  );
+  const slice = slow.slice.bind(slow);
+  let release;
+  let held = false;
+  slow.slice = (...args) => {
+    const blob = slice(...args);
+    if (held) return blob;
+    held = true;
+    return {
+      arrayBuffer: () =>
+        new Promise((resolve) => {
+          release = async () => resolve(await blob.arrayBuffer());
+        }),
+    };
+  };
+  const input = root.querySelector("#add-images");
+  Object.defineProperty(input, "files", { configurable: true, value: [slow] });
+  await act(async () => {
+    input.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await tick();
+  });
+  assert.ok(release);
+  await click(root.querySelector("button[aria-label='Remove photo.jpg']"));
+  assert.ok(button("Cancel import"));
+  await act(release);
+  await settle();
+  assert.ok(root.querySelector("button[aria-label='Remove slow.jpg']"));
+  await click(button("Undo removal"));
+  await settle();
+  const cards = root.querySelectorAll(".imageCard");
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].querySelector('input[type="checkbox"]').checked, true);
+  assert.equal(cards[0].querySelector("a[download]").download, originalName);
+  assert.ok(cards[1].querySelector("button[aria-label='Remove slow.jpg']"));
+});
+
+test("Clear can be undone and dismissing Undo releases its action", async () => {
+  await act(() => render(h(App), root));
+  await upload([jpeg()]);
+  await click(root.querySelector("button[aria-label='Clear current batch']"));
+  assert.equal(root.querySelectorAll(".imageCard").length, 0);
+  await click(button("Undo removal"));
+  await settle();
+  assert.equal(root.querySelectorAll(".imageCard a[download]").length, 1);
+  await click(root.querySelector("button[aria-label='Clear current batch']"));
+  await click(button("Dismiss Undo"));
+  assert.equal(button("Undo removal"), undefined);
 });
 
 test("displayed file sizes use the same decimal units as encoder targets", async () => {

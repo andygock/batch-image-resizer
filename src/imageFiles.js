@@ -215,19 +215,48 @@ export async function partitionImageFiles(
   const duplicates = [];
   const duplicateFiles = [];
   const errors = [];
-  const previousFiles = (existingSources ?? []).map(sourceFile).filter(Boolean);
   const allowDuplicates = options.allowDuplicates === true;
-
-  let retainedBytes = previousFiles.reduce((sum, file) => sum + file.size, 0);
+  const currentFiles = () => [
+    ...new Set(
+      [
+        ...(options.getExistingSources?.() ?? existingSources ?? []).map(
+          sourceFile,
+        ),
+        ...accepted.map(sourceFile),
+      ].filter(Boolean),
+    ),
+  ];
+  const retainedBytes = () =>
+    [
+      ...new Set([
+        ...currentFiles(),
+        ...duplicateFiles,
+        ...(options.getRetainedFiles?.() ?? []),
+      ]),
+    ].reduce((sum, file) => sum + file.size, 0);
   const index = new Map();
+  const indexed = new Set();
   const addToIndex = async (file) => {
     const key = `${file.size}:${await digestFile(file, signal)}`;
     const bucket = index.get(key) ?? [];
     bucket.push(file);
     index.set(key, bucket);
   };
-  if (!allowDuplicates)
-    for (const file of previousFiles) await addToIndex(file);
+  const refreshIndex = async () => {
+    if (allowDuplicates) return;
+    const files = new Set(currentFiles());
+    for (const [key, bucket] of index) {
+      const live = bucket.filter((file) => files.has(file));
+      if (live.length) index.set(key, live);
+      else index.delete(key);
+    }
+    for (const file of indexed) if (!files.has(file)) indexed.delete(file);
+    for (const file of files)
+      if (!indexed.has(file)) {
+        await addToIndex(file);
+        indexed.add(file);
+      }
+  };
 
   const incoming = Array.from(files ?? []);
   let completed = 0;
@@ -237,12 +266,17 @@ export async function partitionImageFiles(
     options.onProgress?.({ completed, total: incoming.length, filename });
     try {
       validateFileSize(file);
-      if (retainedBytes + (file?.size ?? 0) > MAX_BATCH_BYTES)
+      if (retainedBytes() + (file?.size ?? 0) > MAX_BATCH_BYTES)
         throw new ImageLimitError(
-          "The batch and retained duplicates must fit within 256 MiB. Clear or remove images before adding more.",
+          "The batch, retained duplicates and Undo files must fit within 256 MiB. Clear the batch or dismiss Undo before adding more.",
         );
       const inspected = await inspectImageFile(file, { signal });
-      retainedBytes += inspected.file.size;
+      await refreshIndex();
+      signal?.throwIfAborted();
+      if (retainedBytes() + inspected.file.size > MAX_BATCH_BYTES)
+        throw new ImageLimitError(
+          "The batch, retained duplicates and Undo files must fit within 256 MiB.",
+        );
       if (!allowDuplicates) {
         let duplicate = false;
         const key = `${inspected.file.size}:${await digestFile(inspected.file, signal)}`;
@@ -263,7 +297,6 @@ export async function partitionImageFiles(
         }
       }
       accepted.push(inspected);
-      if (!allowDuplicates) await addToIndex(inspected.file);
     } catch (error) {
       signal?.throwIfAborted();
       errors.push({

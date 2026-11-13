@@ -117,7 +117,6 @@ export default function AdvancedSettings({
   initialFormat = settings.format === "source" ? "webp" : settings.format,
 }) {
   const [format, setFormat] = useState(initialFormat);
-  const [processingOpen, setProcessingOpen] = useState(false);
   const form = useRef(null);
   const [focusField, setFocusField] = useState(null);
   useEffect(() => {
@@ -152,7 +151,20 @@ export default function AdvancedSettings({
       )
       .map(([key, field]) => ({ format: type, key, label: field.label })),
   );
-  const valid = errors.length === 0;
+  const processingValid =
+    !draft.processing?.sharpen ||
+    [
+      ["amount", 0, 2],
+      ["radius", 0.3, 3],
+      ["threshold", 0, 255],
+    ].every(
+      ([key, min, max]) =>
+        Number.isFinite(draft.processing[key]) &&
+        draft.processing[key] >= min &&
+        draft.processing[key] <= max &&
+        (key !== "threshold" || Number.isInteger(draft.processing[key])),
+    );
+  const valid = errors.length === 0 && processingValid;
   const renderFields = (main) =>
     Object.entries(fields)
       .filter(
@@ -258,16 +270,6 @@ export default function AdvancedSettings({
           </button>
         ))}
       </div>
-      <button onClick={() => setProcessingOpen(true)} aria-haspopup="dialog">
-        Image processing
-      </button>
-      {processingOpen && (
-        <ProcessingSettings
-          value={draft.processing}
-          onApply={(processing) => setDraft({ ...draft, processing })}
-          onClose={() => setProcessingOpen(false)}
-        />
-      )}
       <form
         ref={form}
         onSubmit={(event) => {
@@ -278,6 +280,16 @@ export default function AdvancedSettings({
           }
         }}
       >
+        <details
+          className={styles.details}
+          open={!processingValid || undefined}
+        >
+          <summary>Image processing</summary>
+          <ProcessingSettings
+            value={draft.processing}
+            onChange={(processing) => setDraft({ ...draft, processing })}
+          />
+        </details>
         <div className={styles.body} key={format}>
           <p className={styles.intro}>
             Editing {names[format]} settings does not change the selected output
@@ -347,7 +359,7 @@ export default function AdvancedSettings({
             </>
           )}
         </div>
-        {!valid && (
+        {errors.length > 0 && (
           <div id="advanced-errors" role="alert">
             <p>Correct these settings before applying:</p>
             <ul>
@@ -366,6 +378,12 @@ export default function AdvancedSettings({
               ))}
             </ul>
           </div>
+        )}
+        {!processingValid && (
+          <p role="alert">
+            Correct image processing settings: amount 0–2, radius 0.3–3, and a
+            whole-number threshold 0–255.
+          </p>
         )}
         <div className={styles.actions}>
           <button

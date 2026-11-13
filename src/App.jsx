@@ -25,6 +25,7 @@ import useBatchProcessor from "./useBatchProcessor.js";
 import { useDragAndDrop } from "./useDragAndDrop";
 import useImageImports from "./useImageImports.js";
 import usePreferences from "./usePreferences.js";
+import useRemovalUndo, { restoreImageOrder } from "./useRemovalUndo.js";
 import { createZipExporter } from "./zipExporter.js";
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
   const [retry, setRetry] = useState({ ids: [] });
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const nameAssignments = useRef(new Map());
+  const removal = useRemovalUndo();
   const [selected, setSelected] = useState(new Set());
   const [inspectedId, setInspectedId] = useState(null);
   const [dataMessage, setDataMessage] = useState("");
@@ -138,13 +140,36 @@ function App() {
     clearErrors,
     duplicates,
     dismissDuplicates,
-  } = useImageImports((accepted) => {
-    invalidate();
-    setImages((current) => [
-      ...current,
-      ...accepted.map((source) => ({ ...source, id: crypto.randomUUID() })),
-    ]);
-  }, images);
+  } = useImageImports(
+    (accepted) => {
+      invalidate();
+      setImages((current) => [
+        ...current,
+        ...accepted.map((source) => ({ ...source, id: crypto.randomUUID() })),
+      ]);
+    },
+    images,
+    removal.getFiles,
+  );
+
+  useEffect(() => {
+    const retained = new Set(
+      [...images, ...(removal.snapshot?.images ?? [])].map(({ id }) => id),
+    );
+    for (const id of nameAssignments.current.keys())
+      if (!retained.has(id)) nameAssignments.current.delete(id);
+  }, [images, removal.snapshot]);
+
+  useEffect(() => {
+    if (!images.length && !isImporting && !isZipping && !removal.snapshot)
+      return;
+    const warnBeforeLeaving = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [images.length, isImporting, isZipping, removal.snapshot]);
 
   const handleFileInputChange = (event) => {
     if (event.target.files) {
@@ -173,10 +198,17 @@ function App() {
   const handleRemoveImages = (ids) => {
     invalidate();
     const removed = new Set(ids);
-    processor.remove(ids);
+    const removedImages = images.filter(({ id }) => removed.has(id));
+    if (!removedImages.length) return;
+    removal.remember({
+      images: removedImages,
+      order: images.map(({ id }) => id),
+      records: processor.remove(ids),
+      selected: new Set([...selected].filter((id) => removed.has(id))),
+      anchor: selectionAnchor.current,
+      paused: cancelled,
+    });
     zipExporter.current.cancel();
-    cancelImports();
-    for (const id of ids) nameAssignments.current.delete(id);
     if (removed.has(inspectedId)) setInspectedId(null);
     if (removed.has(selectionAnchor.current)) selectionAnchor.current = null;
     const restoreFocus = ids.some((id) =>
@@ -240,10 +272,18 @@ function App() {
   const isEmpty = images.length === 0;
   const clearBatch = () => {
     cancelImports();
+    if (images.length)
+      removal.remember({
+        images,
+        order: images.map(({ id }) => id),
+        records: processor.remove(images.map(({ id }) => id)),
+        selected,
+        anchor: selectionAnchor.current,
+        paused: cancelled,
+      });
     processor.clear();
     disposeWorkerPools();
     zipExporter.current.cancel(false);
-    nameAssignments.current.clear();
     setImages([]);
     setSelected(new Set());
     selectionAnchor.current = null;
@@ -252,6 +292,22 @@ function App() {
     setRetry({ ids: [] });
     setZipState({ isZipping: false, progress: 0, error: "" });
     setDataMessage("");
+  };
+
+  const undoRemoval = () => {
+    const snapshot = removal.take();
+    if (!snapshot) return;
+    processor.restore(snapshot.records);
+    setImages((current) => restoreImageOrder(current, snapshot));
+    setSelected((current) => new Set([...current, ...snapshot.selected]));
+    selectionAnchor.current = snapshot.anchor;
+    setCancelled(snapshot.paused);
+    requestAnimationFrame(() =>
+      document
+        .getElementById(`image-${snapshot.images[0].id}`)
+        ?.querySelector("input")
+        ?.focus({ preventScroll: true }),
+    );
   };
 
   return (
@@ -411,78 +467,112 @@ function App() {
           </button>
         </div>
       </div>
-      {dataMessage && !storageOpen && <p role="status">{dataMessage}</p>}
-      {isZipping && (
-        <div className={styles.statusBar}>
-          <span role="status">
-            Creating {zipState.filename} from {zipState.count} images ·{" "}
-            {zipState.progress}%
-          </span>
-          <progress
-            aria-label="ZIP creation"
-            value={zipState.progress}
-            max="100"
-          />
-          <button onClick={() => zipExporter.current.cancel()}>
-            Cancel export
-          </button>
-        </div>
-      )}
-      {!isZipping && zipState.message && (
-        <p role="status">{zipState.message}</p>
-      )}
-      {sizeDraft.dirty && (
-        <p role="status">
-          {sizeDraft.message ||
-            "Press Enter in a dimension field to apply the new size."}{" "}
-          Current output: {boundingBox.width}×{boundingBox.height}px. Escape
-          restores the applied dimensions.
-        </p>
-      )}
-      {storageError && <p role="alert">{storageError}</p>}
-      <Errors
-        onDismiss={() => {
-          clearErrors();
-          setZipState((current) => ({ ...current, error: "" }));
-        }}
-        errors={[...uploadErrors, ...(zipError ? [zipError] : [])]}
-      />
-      {isImporting && (
-        <div className={styles.statusBar}>
-          <span role="status">
-            Checking image files… {importProgress.completed} of{" "}
-            {importProgress.total}
-            {importProgress.filename ? ` · ${importProgress.filename}` : ""}
-          </span>
-          <button onClick={cancelImports}>Cancel import</button>
-        </div>
-      )}
-      {duplicates.length > 0 && (
-        <div className={styles.statusBar}>
-          <span role="status">
-            Skipped {duplicates.length} identical{" "}
-            {duplicates.length === 1 ? "image" : "images"} already in the batch.
-          </span>
-          <button
-            onClick={() => {
-              handleImageUpload(duplicates, true);
-              dismissDuplicates();
-            }}
-          >
-            Add duplicates anyway
-          </button>
-          <button onClick={dismissDuplicates}>Dismiss</button>
-        </div>
-      )}
-      {cancelled && (
-        <div className={styles.status} role="status">
-          Paused. Changes will wait until you resume.{" "}
-          <span className="numeric">
-            {progress} of {images.length}
-          </span>{" "}
-          images processed.
-        </div>
-      )}
+      <div
+        className={styles.feedback}
+        role="region"
+        aria-label="Batch activity"
+        tabIndex={0}
+      >
+        {!removal.snapshot &&
+          !dataMessage &&
+          !isZipping &&
+          !zipState.message &&
+          !sizeDraft.dirty &&
+          !storageError &&
+          !uploadErrors.length &&
+          !zipError &&
+          !isImporting &&
+          !duplicates.length &&
+          !cancelled && (
+            <p className={styles.hint}>
+              Images stay in this tab. Closing or reloading it discards the
+              batch.
+            </p>
+          )}
+        {removal.snapshot && (
+          <div className={styles.statusBar}>
+            <span role="status">
+              Removed {removal.snapshot.images.length} images. Undo is available
+              for 30 seconds.
+            </span>
+            <button onClick={undoRemoval}>Undo removal</button>
+            <button onClick={removal.discard}>Dismiss Undo</button>
+          </div>
+        )}
+        {dataMessage && !storageOpen && <p role="status">{dataMessage}</p>}
+        {isZipping && (
+          <div className={styles.statusBar}>
+            <span role="status">
+              Creating {zipState.filename} from {zipState.count} images ·{" "}
+              {zipState.progress}%
+            </span>
+            <progress
+              aria-label="ZIP creation"
+              value={zipState.progress}
+              max="100"
+            />
+            <button onClick={() => zipExporter.current.cancel()}>
+              Cancel export
+            </button>
+          </div>
+        )}
+        {!isZipping && zipState.message && (
+          <p role="status">{zipState.message}</p>
+        )}
+        {sizeDraft.dirty && (
+          <p role="status">
+            {sizeDraft.message ||
+              "Press Enter in a dimension field to apply the new size."}{" "}
+            Current output: {boundingBox.width}×{boundingBox.height}px. Escape
+            restores the applied dimensions.
+          </p>
+        )}
+        {storageError && <p role="alert">{storageError}</p>}
+        <Errors
+          onDismiss={() => {
+            clearErrors();
+            setZipState((current) => ({ ...current, error: "" }));
+          }}
+          errors={[...uploadErrors, ...(zipError ? [zipError] : [])]}
+        />
+        {isImporting && (
+          <div className={styles.statusBar}>
+            <span role="status">
+              Checking image files… {importProgress.completed} of{" "}
+              {importProgress.total}
+              {importProgress.filename ? ` · ${importProgress.filename}` : ""}
+            </span>
+            <button onClick={cancelImports}>Cancel import</button>
+          </div>
+        )}
+        {duplicates.length > 0 && (
+          <div className={styles.statusBar}>
+            <span role="status">
+              Skipped {duplicates.length} identical{" "}
+              {duplicates.length === 1 ? "image" : "images"} already in the
+              batch.
+            </span>
+            <button
+              onClick={() => {
+                handleImageUpload(duplicates, true);
+                dismissDuplicates();
+              }}
+            >
+              Add duplicates anyway
+            </button>
+            <button onClick={dismissDuplicates}>Dismiss</button>
+          </div>
+        )}
+        {cancelled && (
+          <div className={styles.status} role="status">
+            Paused. Changes will wait until you resume.{" "}
+            <span className="numeric">
+              {progress} of {images.length}
+            </span>{" "}
+            images processed.
+          </div>
+        )}
+      </div>
       <div className={styles.workspace}>
         <section className={styles.results}>
           <OutputImages

@@ -172,6 +172,24 @@
   border: 1px solid var(--border);
   background: var(--card);
 }
+.feedback {
+  height: 80px;
+  margin-bottom: var(--space-2);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
+}
+.feedback p {
+  margin-block: 4px;
+}
+.feedback .status,
+.feedback .statusBar {
+  margin-bottom: 4px;
+  padding: 4px;
+}
+.feedback:focus-visible {
+  outline: 2px solid var(--ring);
+}
 
 .footer {
   max-width: 760px;
@@ -237,6 +255,9 @@
   }
 }
 @media (pointer: coarse) {
+  .feedback {
+    height: 128px;
+  }
   .header {
     --control-height: 44px;
     --button-height-sm: 44px;

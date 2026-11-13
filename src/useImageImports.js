@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { partitionImageFiles } from "./imageFiles.js";
 
-export default function useImageImports(onImport, images) {
-  const current = useRef({ onImport, images });
-  current.current = { onImport, images };
+export default function useImageImports(
+  onImport,
+  images,
+  getRetainedFiles = () => [],
+) {
+  const current = useRef({ onImport, images, getRetainedFiles });
+  current.current = { onImport, images, getRetainedFiles };
   const queue = useRef(Promise.resolve());
   const generation = useRef(0);
   const controller = useRef(new AbortController());
@@ -40,6 +44,8 @@ export default function useImageImports(onImport, images) {
           {
             allowDuplicates,
             signal,
+            getExistingSources: () => current.current.images,
+            getRetainedFiles: () => current.current.getRetainedFiles(),
             onProgress: (progress) => {
               if (request === generation.current) setImportProgress(progress);
             },

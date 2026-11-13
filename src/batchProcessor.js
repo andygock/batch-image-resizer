@@ -40,7 +40,24 @@ export function createBatchProcessor(resize = resizeImage) {
     cancel: () => owner.cancel(),
     remove(ids) {
       owner.cancel();
+      const removed = {};
+      let bytes = 0;
+      // Undo retains at most 32 MiB of outputs; larger outputs are regenerated.
+      for (const id of ids) {
+        const record = records[id];
+        if (!record) continue;
+        bytes += record.result?.blob?.size ?? 0;
+        removed[id] =
+          bytes <= 32 * 1024 * 1024
+            ? record
+            : { key: record.key, status: "pending" };
+      }
       for (const id of ids) delete records[id];
+      return removed;
+    },
+    restore(restored) {
+      owner.cancel();
+      records = { ...records, ...restored };
     },
     clear() {
       owner.cancel();
@@ -77,7 +94,7 @@ export function createBatchProcessor(resize = resizeImage) {
             !retry.has(id)
           )
             return [id, previous];
-          return [id, { key, status: "pending" }];
+          return [id, { key, status: "pending", result: previous?.result }];
         }),
       );
       const started = performance.now();

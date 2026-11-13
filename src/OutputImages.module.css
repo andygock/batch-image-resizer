@@ -41,6 +41,7 @@
 
 .summary {
   display: flex;
+  min-height: 48px;
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px 14px;
@@ -167,6 +168,13 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+.downloadPlaceholder {
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
+}
+.fileInfo {
+  min-height: 2.5em;
 }
 .selectImage {
   min-width: 32px;

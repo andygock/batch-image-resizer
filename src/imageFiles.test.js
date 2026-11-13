@@ -235,6 +235,14 @@ test("aggregate budgets reject new copies before reading their bytes", async () 
   assert.match(result.errors[0].message, /256 MiB/);
 });
 
+test("Undo files count towards the aggregate source budget", async () => {
+  const result = await partitionImageFiles([imageFile("extra.jpg", jpeg)], [], {
+    getRetainedFiles: () => [{ size: 256 * 1024 * 1024 }],
+  });
+  assert.equal(result.accepted.length, 0);
+  assert.match(result.errors[0].message, /Undo/);
+});
+
 test("BMP signatures are accepted and MIME is normalised regardless of filename", async () => {
   const bytes = new Uint8Array(58);
   const view = new DataView(bytes.buffer);
