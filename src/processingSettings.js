@@ -8,6 +8,37 @@ export const DEFAULT_PROCESSING = Object.freeze({
   threshold: 2,
 });
 
+export const SHARPENING_FIELDS = [
+  { key: "amount", label: "Sharpening amount", min: 0, max: 2, step: 0.1 },
+  {
+    key: "radius",
+    label: "Radius (output pixels)",
+    min: 0.3,
+    max: 3,
+    step: 0.1,
+  },
+  { key: "threshold", label: "Threshold (0–255)", min: 0, max: 255, step: 1 },
+];
+
+export function validProcessingField(field, value) {
+  const steps = (value - field.min) / field.step;
+  return (
+    Number.isFinite(value) &&
+    value >= field.min &&
+    value <= field.max &&
+    Math.abs(steps - Math.round(steps)) < 1e-6
+  );
+}
+
+export function validProcessingDraft(value) {
+  return (
+    !value?.sharpen ||
+    SHARPENING_FIELDS.every((field) =>
+      validProcessingField(field, value[field.key]),
+    )
+  );
+}
+
 function bounded(value, fallback, min, max) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(min, Math.min(max, value))

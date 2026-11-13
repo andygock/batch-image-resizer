@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-preact";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import AdvancedSettings from "./AdvancedSettings.jsx";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect.jsx";
@@ -10,7 +10,7 @@ import Modal from "./Modal.jsx";
 import OutputFormatSelect from "./OutputFormatSelect.jsx";
 import useImagePan from "./useImagePan.js";
 
-export default function ImageInspector({
+function ComparisonContent({
   source,
   batchResult,
   settings,
@@ -18,38 +18,94 @@ export default function ImageInspector({
   index,
   total,
   onNavigate,
-  onClose,
   onApply,
+  sessions,
+  saved,
+  isOpen,
 }) {
-  const [draft, setDraft] = useState(settings);
+  const [draft, setDraft] = useState(() =>
+    saved?.draft
+      ? {
+          ...saved.draft,
+          bounds: settings.bounds,
+          disableUpscale: settings.disableUpscale,
+        }
+      : settings,
+  );
   const [preview, setPreview] = useState({
-    result: batchResult,
+    result: saved?.result ?? batchResult,
     busy: false,
     error: "",
   });
-  const [actualSize, setActualSize] = useState(false);
+  const [actualSize, setActualSize] = useState(saved?.actualSize ?? false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [candidateA, setCandidateA] = useState(null);
-  const [compareOutputs, setCompareOutputs] = useState(false);
-  const [split, setSplit] = useState(50);
-  const [background, setBackground] = useState("checkerboard");
-  const [customBackground, setCustomBackground] = useState("#808080");
-  const [alphaOnly, setAlphaOnly] = useState(false);
+  const [candidateA, setCandidateA] = useState(saved?.candidateA ?? null);
+  const [compareOutputs, setCompareOutputs] = useState(
+    saved?.compareOutputs ?? false,
+  );
+  const [split, setSplit] = useState(saved?.split ?? 50);
+  const [background, setBackground] = useState(
+    saved?.background ?? "checkerboard",
+  );
+  const [customBackground, setCustomBackground] = useState(
+    saved?.customBackground ?? "#808080",
+  );
+  const [alphaOnly, setAlphaOnly] = useState(saved?.alphaOnly ?? false);
+  const [pan, setPan] = useState(saved?.pan ?? { left: 0, top: 0 });
+  const [scrollTop, setScrollTop] = useState(saved?.scrollTop ?? 0);
   const comparison = useRef(null);
   const slider = useRef(null);
   const drag = useRef(null);
-  useEffect(() => setDraft(settings), [settings]);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const dialog = comparison.current.closest("dialog");
+    dialog.scrollTop = saved?.scrollTop ?? 0;
+    const rememberScroll = () => setScrollTop(dialog.scrollTop);
+    dialog.addEventListener("scroll", rememberScroll);
+    return () => dialog.removeEventListener("scroll", rememberScroll);
+  }, [saved?.scrollTop, isOpen]);
+  const previousSettings = useRef(settings);
   useEffect(() => {
-    setSplit(50);
-    setCandidateA((current) =>
-      current?.result.id === source.id ? current : null,
-    );
-  }, [source.id]);
+    if (previousSettings.current !== settings) setDraft(settings);
+    previousSettings.current = settings;
+  }, [settings]);
+  useLayoutEffect(() => {
+    sessions.set(source.id, {
+      draft,
+      result: preview.result,
+      actualSize,
+      candidateA,
+      compareOutputs,
+      split,
+      background,
+      customBackground,
+      alphaOnly,
+      pan,
+      scrollTop,
+    });
+  }, [
+    sessions,
+    source.id,
+    draft,
+    preview.result,
+    actualSize,
+    candidateA,
+    compareOutputs,
+    split,
+    background,
+    customBackground,
+    alphaOnly,
+    pan,
+    scrollTop,
+  ]);
   useEffect(() => {
     const controller = new AbortController();
     const key = settingsKey(resolveSettings(source, draft));
-    if (batchResult && settingsKey(batchResult.settings) === key) {
-      setPreview({ result: batchResult, busy: false, error: "" });
+    const matching = [batchResult, saved?.result].find(
+      (result) => result && settingsKey(result.settings) === key,
+    );
+    if (matching) {
+      setPreview({ result: matching, busy: false, error: "" });
       return () => controller.abort();
     }
     setPreview((current) => ({
@@ -79,7 +135,7 @@ export default function ImageInspector({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [source, draft, processor, batchResult]);
+  }, [source, draft, processor, batchResult, saved?.result]);
   const result =
     preview.result?.id === source.id ? preview.result : batchResult;
   const savedA = candidateA?.result.id === source.id ? candidateA : null;
@@ -90,7 +146,14 @@ export default function ImageInspector({
       settingsKey(resolveSettings(source, draft));
   const details = (output) =>
     `${output.settings?.format?.toUpperCase() || ""} · ${formatKb(output.filesizeAfter)} · ${output.widthAfter}×${output.heightAfter}px${Number.isFinite(output.encodingTimeMs) ? ` · ${(output.encodingTimeMs / 1000).toFixed(2)} s encoding` : ""}`;
-  const viewport = useImagePan(actualSize, source.id, result ? split : 100);
+  const viewport = useImagePan(
+    actualSize,
+    source.id,
+    result ? split : 100,
+    pan,
+    setPan,
+    isOpen,
+  );
   const changed =
     JSON.stringify(draft.processing) !== JSON.stringify(settings.processing) ||
     JSON.stringify(draft.advanced) !== JSON.stringify(settings.advanced) ||
@@ -116,23 +179,7 @@ export default function ImageInspector({
   };
 
   return (
-    <Modal
-      title="Image comparison"
-      onClose={onClose}
-      className={styles.inspector}
-      onKeyDown={(event) => {
-        if (event.target.closest?.('input, select, textarea, [role="slider"]'))
-          return;
-        if (event.key === "ArrowLeft" && index > 0) {
-          event.preventDefault();
-          onNavigate(-1);
-        }
-        if (event.key === "ArrowRight" && index < total - 1) {
-          event.preventDefault();
-          onNavigate(1);
-        }
-      }}
-    >
+    <>
       <div className={styles.toolbar}>
         <div className={styles.controls}>
           <button
@@ -199,7 +246,8 @@ export default function ImageInspector({
         {savedA
           ? "A is saved independently. Adjust the controls below to create B, then apply your preferred output to the batch."
           : "Save an output as A to compare two formats or quality settings."}{" "}
-        Candidates are kept only while this comparison is open.
+        Recent comparisons stay in this tab; older or large previews may be
+        released to limit memory.
       </p>
       <div className={styles.controls}>
         <label htmlFor="preview-background">Preview background</label>
@@ -428,6 +476,69 @@ export default function ImageInspector({
           onApply={setDraft}
         />
       )}
+    </>
+  );
+}
+
+export default function ImageInspector(props) {
+  const { source, sessions, index, total, onNavigate, onClose } = props;
+  const saved = useRef(sessions.get(source.id));
+  const previousId = useRef(source.id);
+  const navigationFocus = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const navigate = (direction) => {
+    navigationFocus.current =
+      document.activeElement?.getAttribute("aria-label") ||
+      (direction > 0 ? "Next image" : "Previous image");
+    onNavigate(direction);
+  };
+  useLayoutEffect(() => {
+    if (!navigationFocus.current) return;
+    const label = ["Next image", "Previous image"].includes(
+      navigationFocus.current,
+    )
+      ? navigationFocus.current
+      : "Close image comparison";
+    const target =
+      document.querySelector(
+        `dialog button[aria-label="${label}"]:not(:disabled)`,
+      ) ??
+      document.querySelector(
+        'dialog button[aria-label="Close image comparison"]',
+      );
+    target?.focus({ preventScroll: true });
+    navigationFocus.current = null;
+  }, [source.id]);
+  if (previousId.current !== source.id) {
+    saved.current = sessions.get(source.id);
+    previousId.current = source.id;
+  }
+  return (
+    <Modal
+      title="Image comparison"
+      onClose={onClose}
+      className={styles.inspector}
+      onOpen={() => setIsOpen(true)}
+      onKeyDown={(event) => {
+        if (event.target.closest?.('input, select, textarea, [role="slider"]'))
+          return;
+        if (event.key === "ArrowLeft" && index > 0) {
+          event.preventDefault();
+          navigate(-1);
+        }
+        if (event.key === "ArrowRight" && index < total - 1) {
+          event.preventDefault();
+          navigate(1);
+        }
+      }}
+    >
+      <ComparisonContent
+        key={source.id}
+        {...props}
+        onNavigate={navigate}
+        saved={saved.current}
+        isOpen={isOpen}
+      />
     </Modal>
   );
 }

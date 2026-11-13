@@ -12,7 +12,7 @@ Live app hosted on Vercel:
 
 - Resize multiple images at once.
 - Add more images without clearing the current batch.
-- Permanently delete individual images or a selection.
+- Remove individual images or a selection, with a 30-second Undo window.
 - Drag and drop files anywhere on the page or paste images.
 - Check image signatures and skip identical files, with an option to add duplicates anyway.
 - Resize into a bounding box while preserving aspect ratio.
@@ -102,7 +102,7 @@ The comparison panel has its own **Advanced** button. **Apply to trial** updates
 
 ## Keyboard and selection
 
-In the comparison panel, **Save output as A** freezes the current result and its settings. Adjust the controls to generate B, then compare both outputs using the shared divider, zoom and pan. Captions show format, dimensions, file size and encoding time. Apply either candidate to the batch, switch back to the original, replace A, or discard it. A is cleared when navigating to another image or closing the panel.
+In the comparison panel, **Save output as A** freezes the current result and its settings. Adjust the controls to generate B, then compare both outputs using the shared divider, zoom and pan. Captions show format, dimensions, file size and encoding time. Apply either candidate to the batch, switch back to the original, replace A, or discard it. Recent trials, A/B candidates, divider position, preview controls and pan/scroll positions survive closing the panel and navigating between images. The session store retains up to eight images and 64 MiB of output blobs; shared blobs count once. Least-recently-used entries are evicted. An individual comparison above the byte budget retains its settings but releases cached outputs. Removing a source or clearing the batch releases its comparison state, including when the removal is later undone.
 
 - Shift-click an image checkbox to select a range.
 - With focus in the image batch, use Ctrl/Cmd+A to select all, Delete to remove the selection and Escape to clear it.
@@ -196,3 +196,5 @@ Settings changes retain the last successful preview and metadata while replaceme
 Import feedback shows checked-file counts and the current filename. Advanced validation links identify the format and field requiring correction, including collapsed fine-tuning fields. Batch actions wrap separately from statistics on narrow screens.
 
 A reserved, keyboard-scrollable activity area keeps routine progress, recovery and warning messages from displacing image cards. The app requests the browser standard departure warning while a batch, import, export or Undo snapshot is active; browser restrictions may suppress that warning. Images remain tab-only.
+
+Accepted files appear and start processing as validation continues. Adding more files queues compatible work without restarting an active encode. Cancel import keeps already accepted images and prevents late files from appearing. Overlapping imports retain duplicate and error notifications until dismissed. Comparison state is session-only and is never written to Local Storage.

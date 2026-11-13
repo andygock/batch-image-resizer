@@ -21,7 +21,7 @@ export default function useBatchProcessor(
     const retryIds = lastAttempt.current === attempt ? [] : attempt.ids;
     lastAttempt.current = attempt;
     void current.run(images, settings, { paused, retryIds }, setState);
-    return () => current.cancel();
   }, [images, settings, paused, attempt]);
+  useLayoutEffect(() => () => processor.current.cancel(), []);
   return { ...state, processor: processor.current };
 }

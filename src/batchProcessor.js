@@ -35,11 +35,16 @@ export function settingsKey(settings) {
 export function createBatchProcessor(resize = resizeImage) {
   const owner = createJobOwner();
   let records = {};
+  let active = null;
+  const cancel = () => {
+    owner.cancel();
+    active = null;
+  };
 
   return {
-    cancel: () => owner.cancel(),
+    cancel,
     remove(ids) {
-      owner.cancel();
+      cancel();
       const removed = {};
       let bytes = 0;
       // Undo retains at most 32 MiB of outputs; larger outputs are regenerated.
@@ -56,11 +61,11 @@ export function createBatchProcessor(resize = resizeImage) {
       return removed;
     },
     restore(restored) {
-      owner.cancel();
+      cancel();
       records = { ...records, ...restored };
     },
     clear() {
-      owner.cancel();
+      cancel();
       records = {};
     },
     async preview(source, settings, signal) {
@@ -79,6 +84,37 @@ export function createBatchProcessor(resize = resizeImage) {
       { paused = false, retryIds = [] } = {},
       publish,
     ) {
+      const incoming = new Map(images.map((source) => [source.id, source]));
+      if (
+        active?.job.isCurrent() &&
+        !paused &&
+        !retryIds.length &&
+        [...active.sources].every(
+          ([id, source]) => incoming.get(id) === source,
+        ) &&
+        images.every(
+          (source) =>
+            !records[source.id] ||
+            records[source.id].key ===
+              settingsKey(resolveSettings(source, settings)),
+        )
+      ) {
+        // Appending imports must not restart an image that is already encoding.
+        for (const source of images)
+          if (!active.sources.has(source.id)) {
+            records[source.id] = {
+              key: settingsKey(resolveSettings(source, settings)),
+              status: "pending",
+            };
+            active.pending.push(source);
+          }
+        active.sources = incoming;
+        active.settings = settings;
+        active.publish = publish;
+        publish(active.snapshot(true));
+        return active.promise;
+      }
+      cancel();
       const job = owner.start();
       const retry = new Set(retryIds);
       records = Object.fromEntries(
@@ -101,42 +137,58 @@ export function createBatchProcessor(resize = resizeImage) {
       const pending = images.filter(
         ({ id }) => records[id].status === "pending",
       );
-      let progress = images.length - pending.length;
+      const run = {
+        job,
+        pending,
+        sources: incoming,
+        settings,
+        publish,
+        promise: null,
+      };
       const snapshot = (isProcessing) => ({
         records: { ...records },
         isProcessing,
-        progress,
+        progress: Object.values(records).filter(
+          ({ status }) => status === "ready" || status === "error",
+        ).length,
         processingTime: Number(
           ((performance.now() - started) / 1000).toFixed(2),
         ),
       });
       publish(snapshot(!paused && pending.length > 0));
-      if (paused) return;
-      for (const source of pending) {
-        if (!job.isCurrent()) return;
-        const options = resolveSettings(source, settings);
-        const key = settingsKey(options);
-        records[source.id] = { ...records[source.id], status: "processing" };
-        publish(snapshot(true));
-        try {
-          const result = {
-            ...(await resize(source, options, job.signal)),
-            settings: options,
-          };
+      if (paused || !pending.length) return;
+      run.snapshot = snapshot;
+      active = run;
+      run.promise = (async () => {
+        for (const source of pending) {
           if (!job.isCurrent()) return;
-          records[source.id] = { key, status: "ready", result };
-        } catch (error) {
-          if (!job.isCurrent()) return;
-          records[source.id] = {
-            ...records[source.id],
-            status: "error",
-            error: error.message,
-          };
+          const options = resolveSettings(source, run.settings);
+          const key = settingsKey(options);
+          records[source.id] = { ...records[source.id], status: "processing" };
+          run.publish(snapshot(true));
+          try {
+            const result = {
+              ...(await resize(source, options, job.signal)),
+              settings: options,
+            };
+            if (!job.isCurrent()) return;
+            records[source.id] = { key, status: "ready", result };
+          } catch (error) {
+            if (!job.isCurrent()) return;
+            records[source.id] = {
+              ...records[source.id],
+              status: "error",
+              error: error.message,
+            };
+          }
+          run.publish(snapshot(true));
         }
-        progress++;
-        publish(snapshot(true));
-      }
-      if (job.isCurrent()) publish(snapshot(false));
+        if (job.isCurrent()) {
+          active = null;
+          run.publish(snapshot(false));
+        }
+      })();
+      return run.promise;
     },
   };
 }

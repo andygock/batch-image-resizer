@@ -731,6 +731,87 @@ test("saved output A stays independent while B changes format and either can be 
   assert.match(root.querySelector(".before img").alt, /Original/);
 });
 
+test("comparison candidates, trial settings and divider survive navigation and reopening", async () => {
+  await act(() => render(h(App), root));
+  await upload([
+    jpeg(),
+    new File([new Uint8Array([255, 216, 255, 8])], "next.jpg"),
+  ]);
+  await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
+  for (let i = 0; i < 50 && button("Save output as A").disabled; i++)
+    await act(tick);
+  await click(button("Save output as A"));
+  await change(root.querySelector("#trial-format"), "webp");
+  await change(root.querySelector("#preview-background"), "#000000");
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 230));
+  });
+  await act(() =>
+    root
+      .querySelector('[role="slider"]')
+      .dispatchEvent(
+        new window.KeyboardEvent("keydown", { key: "Home", bubbles: true }),
+      ),
+  );
+  const next = root.querySelector("button[aria-label='Next image']");
+  next.focus();
+  await click(next);
+  assert.equal(root.querySelector("dialog h3").textContent, "next.jpg");
+  assert.ok(root.querySelector("dialog").contains(document.activeElement));
+  await click(root.querySelector("button[aria-label='Previous image']"));
+  assert.equal(root.querySelector("#trial-format").value, "webp");
+  assert.ok(button("Discard A"));
+  assert.equal(
+    root.querySelector('[role="slider"]').getAttribute("aria-valuenow"),
+    "0",
+  );
+  await click(
+    root.querySelector("button[aria-label='Close image comparison']"),
+  );
+  await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
+  assert.equal(root.querySelector("#preview-background").value, "#000000");
+  assert.equal(root.querySelector("#trial-format").value, "webp");
+  assert.ok(button("Apply A to batch"));
+  assert.equal(button("Apply B to batch").disabled, false);
+  assert.equal(root.querySelector("#output-format").value, "source");
+  assert.equal(localStorage.getItem(PREFERENCES_STORAGE_KEY), null);
+});
+
+test("Undo expiry releases recovery controls and preserves keyboard focus", async (t) => {
+  const schedule = globalThis.setTimeout;
+  let expire;
+  t.mock.method(globalThis, "setTimeout", (callback, delay, ...args) => {
+    if (delay === 30_000) expire = callback;
+    return schedule(callback, delay, ...args);
+  });
+  await act(() => render(h(App), root));
+  await upload([jpeg()]);
+  await click(root.querySelector("button[aria-label='Clear current batch']"));
+  button("Undo removal").focus();
+  await act(expire);
+  assert.equal(button("Undo removal"), undefined);
+  assert.equal(
+    document.activeElement.getAttribute("aria-label"),
+    "Batch activity",
+  );
+});
+
+test("departure protection is installed only while workspace work is at risk", async () => {
+  await act(() => render(h(App), root));
+  const leaving = () => {
+    const event = new window.Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  assert.equal(leaving(), false);
+  await upload([jpeg()]);
+  assert.equal(leaving(), true);
+  await click(root.querySelector("button[aria-label='Clear current batch']"));
+  assert.equal(leaving(), true);
+  await click(button("Dismiss Undo"));
+  assert.equal(leaving(), false);
+});
+
 test("transparency controls change both previews without changing output settings or downloads", async () => {
   await act(() => render(h(App), root));
   await settle();
@@ -885,7 +966,10 @@ test("comparison modal supports pointer and keyboard sliding, navigation and dis
   await click(dialog.querySelector("button[aria-label='Next image']"));
   await settle();
   assert.equal(dialog.querySelector("h3").textContent, "next.jpg");
-  assert.equal(slider.getAttribute("aria-valuenow"), "50");
+  assert.equal(
+    dialog.querySelector('[role="slider"]').getAttribute("aria-valuenow"),
+    "50",
+  );
   await act(() =>
     dialog.dispatchEvent(new window.Event("cancel", { cancelable: true })),
   );
@@ -1091,6 +1175,71 @@ test("Clear can be undone and dismissing Undo releases its action", async () => 
   await click(root.querySelector("button[aria-label='Clear current batch']"));
   await click(button("Dismiss Undo"));
   assert.equal(button("Undo removal"), undefined);
+});
+
+test("incremental imports publish early files and cancellation suppresses late files", async () => {
+  await act(() => render(h(App), root));
+  const slow = new File([new Uint8Array([255, 216, 255, 9])], "slow.jpg");
+  const slice = slow.slice.bind(slow);
+  let release;
+  let held = false;
+  slow.slice = (...args) => {
+    const blob = slice(...args);
+    if (held) return blob;
+    held = true;
+    return {
+      arrayBuffer: () =>
+        new Promise((resolve) => {
+          release = async () => resolve(await blob.arrayBuffer());
+        }),
+    };
+  };
+  const input = root.querySelector("#add-images");
+  Object.defineProperty(input, "files", {
+    configurable: true,
+    value: [jpeg("early.jpg"), slow],
+  });
+  await act(async () => {
+    input.dispatchEvent(new window.Event("change", { bubbles: true }));
+    for (let i = 0; i < 100 && !release; i++) await tick();
+  });
+  assert.ok(release);
+  assert.ok(root.querySelector("button[aria-label='Compare early.jpg']"));
+  assert.match(root.textContent, /1 of 2/);
+  await click(button("Cancel import"));
+  await act(release);
+  await settle();
+  assert.equal(root.querySelectorAll(".imageCard").length, 1);
+  assert.equal(
+    root.querySelector("button[aria-label='Compare slow.jpg']"),
+    null,
+  );
+});
+
+test("comparison restores actual-size pan and dialog scroll after reopening", async () => {
+  await act(() => render(h(App), root));
+  await upload([jpeg()]);
+  for (let i = 0; i < 50 && !root.querySelector("a[download]"); i++)
+    await act(tick);
+  await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
+  await click(button("Actual output size"));
+  const viewport = root.querySelector(".imageViewport");
+  const dialog = root.querySelector("dialog");
+  await act(() => {
+    viewport.scrollLeft = 80;
+    viewport.scrollTop = 40;
+    viewport.dispatchEvent(new window.Event("scroll"));
+    dialog.scrollTop = 120;
+    dialog.dispatchEvent(new window.Event("scroll"));
+  });
+  await click(
+    root.querySelector("button[aria-label='Close image comparison']"),
+  );
+  await click(root.querySelector("button[aria-label='Compare photo.jpg']"));
+  assert.ok(button("Fit previews"));
+  assert.equal(root.querySelector(".imageViewport").scrollLeft, 80);
+  assert.equal(root.querySelector(".imageViewport").scrollTop, 40);
+  assert.equal(root.querySelector("dialog").scrollTop, 120);
 });
 
 test("displayed file sizes use the same decimal units as encoder targets", async () => {

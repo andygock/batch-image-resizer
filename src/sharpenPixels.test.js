@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { processingKey, sanitiseProcessing } from "./processingSettings.js";
+import {
+  processingKey,
+  sanitiseProcessing,
+  validProcessingDraft,
+} from "./processingSettings.js";
 import { sharpenPixels } from "./sharpenPixels.js";
 
 const options = { sharpen: true, amount: 1, radius: 1, threshold: 0 };
+
+test("processing validation matches numeric steps without decimal rounding errors", () => {
+  assert.equal(
+    validProcessingDraft({ ...options, radius: 1.5, amount: 0.8 }),
+    true,
+  );
+  assert.equal(validProcessingDraft({ ...options, amount: 0.05 }), false);
+  assert.equal(validProcessingDraft({ ...options, radius: "" }), false);
+  assert.equal(validProcessingDraft({ ...options, threshold: 2.5 }), false);
+});
 
 test("row buffering preserves established pixels across kernel sizes without full-image float allocations", (t) => {
   const width = 7;

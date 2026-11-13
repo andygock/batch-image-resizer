@@ -8,9 +8,19 @@ function updateReveal(viewport, split) {
   );
 }
 
-export default function useImagePan(enabled, sourceId, split) {
+export default function useImagePan(
+  enabled,
+  sourceId,
+  split,
+  initialPosition = { left: 0, top: 0 },
+  onPositionChange,
+  isOpen = true,
+) {
   const viewportRef = useRef(null);
   const splitRef = useRef(split);
+  const position = useRef(initialPosition);
+  const notify = useRef(onPositionChange);
+  notify.current = onPositionChange;
 
   useLayoutEffect(() => {
     splitRef.current = split;
@@ -19,9 +29,20 @@ export default function useImagePan(enabled, sourceId, split) {
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
-    if (!viewport) return;
+    if (!viewport || !isOpen) return;
     let drag = null;
-    const refresh = () => updateReveal(viewport, splitRef.current);
+    const refresh = () => {
+      updateReveal(viewport, splitRef.current);
+      if (!enabled) return;
+      const next = { left: viewport.scrollLeft, top: viewport.scrollTop };
+      if (
+        next.left === position.current.left &&
+        next.top === position.current.top
+      )
+        return;
+      position.current = next;
+      notify.current?.(next);
+    };
     const stopDrag = () => {
       if (!drag) return;
       const { pointerId } = drag;
@@ -82,8 +103,8 @@ export default function useImagePan(enabled, sourceId, split) {
       if (event.pointerId === drag?.pointerId) stopDrag();
     };
 
-    viewport.scrollLeft = 0;
-    viewport.scrollTop = 0;
+    viewport.scrollLeft = enabled ? position.current.left : 0;
+    viewport.scrollTop = enabled ? position.current.top : 0;
     refresh();
     const observer =
       typeof ResizeObserver === "function" ? new ResizeObserver(refresh) : null;
@@ -108,7 +129,7 @@ export default function useImagePan(enabled, sourceId, split) {
       viewport.removeEventListener("pointercancel", onPointerEnd);
       viewport.removeEventListener("lostpointercapture", onPointerEnd);
     };
-  }, [enabled, sourceId]);
+  }, [enabled, sourceId, isOpen]);
 
   return viewportRef;
 }

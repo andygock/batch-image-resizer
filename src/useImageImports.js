@@ -27,46 +27,81 @@ export default function useImageImports(
   });
   const [errors, setErrors] = useState([]);
   const [duplicates, setDuplicates] = useState([]);
+  const notifications = useRef({ errors: [], duplicates: [] });
+  const verified = useRef(new WeakMap());
+  const retainedRequests = useRef(new Map());
+  const dismissDuplicates = useCallback(() => {
+    notifications.current.duplicates = [];
+    setDuplicates([]);
+  }, []);
+  const clearErrors = useCallback(() => {
+    notifications.current.errors = [];
+    setErrors([]);
+  }, []);
   const addFiles = useCallback((files, allowDuplicates = false) => {
     const incoming = Array.from(files);
     if (!incoming.length) return;
     const request = generation.current;
     const signal = controller.current.signal;
+    const reservation = Symbol();
+    retainedRequests.current.set(
+      reservation,
+      incoming.filter((file) => verified.current.has(file)),
+    );
     pending.current++;
     setIsImporting(true);
-    setDuplicates([]);
     queue.current = queue.current
       .then(async () => {
         if (request !== generation.current) return;
-        const result = await partitionImageFiles(
-          incoming,
-          current.current.images,
-          {
-            allowDuplicates,
-            signal,
-            getExistingSources: () => current.current.images,
-            getRetainedFiles: () => current.current.getRetainedFiles(),
-            onProgress: (progress) => {
-              if (request === generation.current) setImportProgress(progress);
-            },
+        await partitionImageFiles(incoming, current.current.images, {
+          allowDuplicates,
+          signal,
+          getExistingSources: () => current.current.images,
+          getRetainedFiles: () => [
+            ...current.current.getRetainedFiles(),
+            ...notifications.current.duplicates,
+            ...[...retainedRequests.current.values()].flat(),
+          ],
+          // Reuse immutable copies already validated by this import session.
+          getVerifiedSource: (file) => verified.current.get(file),
+          onAccepted: (source) => {
+            if (request !== generation.current) return;
+            current.current.images = [...current.current.images, source];
+            current.current.onImport([source]);
           },
-        );
-        if (request !== generation.current) return;
-        setErrors(result.errors.map(({ message }) => message));
-        setDuplicates(result.duplicateFiles);
-        if (result.accepted.length) {
-          current.current.images = [
-            ...current.current.images,
-            ...result.accepted,
-          ];
-          current.current.onImport(result.accepted);
-        }
+          onDuplicate: (file, source) => {
+            if (request !== generation.current) return;
+            verified.current.set(file, source);
+            notifications.current.duplicates = [
+              ...notifications.current.duplicates,
+              file,
+            ];
+            setDuplicates(notifications.current.duplicates);
+          },
+          onError: ({ message }) => {
+            if (request !== generation.current) return;
+            notifications.current.errors = [
+              ...notifications.current.errors,
+              message,
+            ];
+            setErrors(notifications.current.errors);
+          },
+          onProgress: (progress) => {
+            if (request === generation.current) setImportProgress(progress);
+          },
+        });
       })
       .catch((error) => {
-        if (request === generation.current)
-          setErrors([`Could not add images: ${error.message}`]);
+        if (request === generation.current) {
+          notifications.current.errors = [
+            ...notifications.current.errors,
+            `Could not add images: ${error.message}`,
+          ];
+          setErrors(notifications.current.errors);
+        }
       })
       .finally(() => {
+        retainedRequests.current.delete(reservation);
         if (request === generation.current) {
           pending.current--;
           setIsImporting(pending.current > 0);
@@ -82,6 +117,8 @@ export default function useImageImports(
     setIsImporting(false);
     setErrors([]);
     setDuplicates([]);
+    notifications.current = { errors: [], duplicates: [] };
+    retainedRequests.current.clear();
   }, []);
   return {
     addFiles,
@@ -90,7 +127,7 @@ export default function useImageImports(
     importProgress,
     errors,
     duplicates,
-    dismissDuplicates: () => setDuplicates([]),
-    clearErrors: () => setErrors([]),
+    dismissDuplicates,
+    clearErrors,
   };
 }

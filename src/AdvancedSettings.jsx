@@ -10,6 +10,7 @@ import CompressionSelect from "./CompressionSelect.jsx";
 import Modal from "./Modal.jsx";
 import ProcessingSettings from "./ProcessingSettings.jsx";
 import { DEFAULT_PREFERENCES } from "./preferences.js";
+import { validProcessingDraft } from "./processingSettings.js";
 
 const names = { webp: "WebP", jpeg: "JPEG", png: "PNG", avif: "AVIF" };
 const primary = new Set([
@@ -151,19 +152,7 @@ export default function AdvancedSettings({
       )
       .map(([key, field]) => ({ format: type, key, label: field.label })),
   );
-  const processingValid =
-    !draft.processing?.sharpen ||
-    [
-      ["amount", 0, 2],
-      ["radius", 0.3, 3],
-      ["threshold", 0, 255],
-    ].every(
-      ([key, min, max]) =>
-        Number.isFinite(draft.processing[key]) &&
-        draft.processing[key] >= min &&
-        draft.processing[key] <= max &&
-        (key !== "threshold" || Number.isInteger(draft.processing[key])),
-    );
+  const processingValid = validProcessingDraft(draft.processing);
   const valid = errors.length === 0 && processingValid;
   const renderFields = (main) =>
     Object.entries(fields)
@@ -381,8 +370,8 @@ export default function AdvancedSettings({
         )}
         {!processingValid && (
           <p role="alert">
-            Correct image processing settings: amount 0–2, radius 0.3–3, and a
-            whole-number threshold 0–255.
+            Correct image processing settings: amount 0–2 and radius 0.3–3 in
+            steps of 0.1, and a whole-number threshold 0–255.
           </p>
         )}
         <div className={styles.actions}>

@@ -203,6 +203,8 @@ function sourceFile(source) {
 /**
  * Validate files and optionally remove exact-content duplicates while preserving input order.
  * Existing sources may be File/Blob values or objects containing a `file` property.
+ * With onAccepted, callers own each published source; accepted is empty on return.
+ * getExistingSources must include those publications and reflect later removals.
  */
 export async function partitionImageFiles(
   files,
@@ -210,6 +212,8 @@ export async function partitionImageFiles(
   options = {},
 ) {
   const { signal } = options;
+  if (options.onAccepted && !options.getExistingSources)
+    throw new Error("Incremental imports require current batch membership.");
   signal?.throwIfAborted();
   const accepted = [];
   const duplicates = [];
@@ -226,12 +230,13 @@ export async function partitionImageFiles(
       ].filter(Boolean),
     ),
   ];
-  const retainedBytes = () =>
+  const retainedBytes = (extra) =>
     [
       ...new Set([
         ...currentFiles(),
         ...duplicateFiles,
         ...(options.getRetainedFiles?.() ?? []),
+        ...(extra ? [extra] : []),
       ]),
     ].reduce((sum, file) => sum + file.size, 0);
   const index = new Map();
@@ -266,14 +271,20 @@ export async function partitionImageFiles(
     options.onProgress?.({ completed, total: incoming.length, filename });
     try {
       validateFileSize(file);
-      if (retainedBytes() + (file?.size ?? 0) > MAX_BATCH_BYTES)
+      const verified = allowDuplicates
+        ? options.getVerifiedSource?.(file)
+        : null;
+      if (
+        retainedBytes(verified?.file) + (verified ? 0 : (file?.size ?? 0)) >
+        MAX_BATCH_BYTES
+      )
         throw new ImageLimitError(
           "The batch, retained duplicates and Undo files must fit within 256 MiB. Clear the batch or dismiss Undo before adding more.",
         );
-      const inspected = await inspectImageFile(file, { signal });
+      const inspected = verified ?? (await inspectImageFile(file, { signal }));
       await refreshIndex();
       signal?.throwIfAborted();
-      if (retainedBytes() + inspected.file.size > MAX_BATCH_BYTES)
+      if (retainedBytes(inspected.file) > MAX_BATCH_BYTES)
         throw new ImageLimitError(
           "The batch, retained duplicates and Undo files must fit within 256 MiB.",
         );
@@ -293,10 +304,12 @@ export async function partitionImageFiles(
         if (duplicate) {
           duplicates.push(filename);
           duplicateFiles.push(inspected.file);
+          options.onDuplicate?.(inspected.file, inspected);
           continue;
         }
       }
-      accepted.push(inspected);
+      if (options.onAccepted) await options.onAccepted(inspected);
+      else accepted.push(inspected);
     } catch (error) {
       signal?.throwIfAborted();
       errors.push({
@@ -306,6 +319,7 @@ export async function partitionImageFiles(
             ? `Could not import "${filename}": ${error.message}`
             : error.message,
       });
+      options.onError?.(errors[errors.length - 1]);
     } finally {
       completed++;
       options.onProgress?.({ completed, total: incoming.length, filename });

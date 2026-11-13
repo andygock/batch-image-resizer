@@ -8,13 +8,17 @@ export default function Modal({
   children,
   className = "",
   onKeyDown,
+  onOpen,
 }) {
   const dialog = useRef(null);
+  const opened = useRef(onOpen);
+  opened.current = onOpen;
   const titleId = useId();
   useEffect(() => {
     const element = dialog.current;
     const previousFocus = document.activeElement;
     element.showModal();
+    opened.current?.();
     return () => {
       element.close();
       previousFocus?.focus({ preventScroll: true });

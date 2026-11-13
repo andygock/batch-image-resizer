@@ -60,9 +60,6 @@ export default function OutputImages({
           GIFs use the first frame, TIFFs the first page. Input-only formats use
           PNG output by default.
         </p>
-        <p>
-          Images stay in this tab. Closing or reloading it discards the batch.
-        </p>
         <label className="button buttonPrimary">
           <input
             type="file"

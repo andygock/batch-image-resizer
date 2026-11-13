@@ -7,6 +7,7 @@ import AdvancedSettings from "./AdvancedSettings.jsx";
 import styles from "./App.module.css";
 import { resolveSettings, settingsKey } from "./batchProcessor.js";
 import CompressionSelect from "./CompressionSelect";
+import { createComparisonSessions } from "./comparisonSessions.js";
 import { archiveFilename } from "./downloads.js";
 import Errors from "./Errors";
 import ImageInspector from "./ImageInspector.jsx";
@@ -59,7 +60,15 @@ function App() {
   const [retry, setRetry] = useState({ ids: [] });
   const [sizeDraft, setSizeDraft] = useState({ invalid: false, dirty: false });
   const nameAssignments = useRef(new Map());
-  const removal = useRemovalUndo();
+  const removal = useRemovalUndo(() => {
+    if (document.activeElement?.closest("[data-undo-actions]"))
+      document
+        .querySelector('[aria-label="Batch activity"]')
+        ?.focus({ preventScroll: true });
+  });
+  const comparisonSessions = useRef(null);
+  if (!comparisonSessions.current)
+    comparisonSessions.current = createComparisonSessions();
   const [selected, setSelected] = useState(new Set());
   const [inspectedId, setInspectedId] = useState(null);
   const [dataMessage, setDataMessage] = useState("");
@@ -142,7 +151,6 @@ function App() {
     dismissDuplicates,
   } = useImageImports(
     (accepted) => {
-      invalidate();
       setImages((current) => [
         ...current,
         ...accepted.map((source) => ({ ...source, id: crypto.randomUUID() })),
@@ -200,6 +208,7 @@ function App() {
     const removed = new Set(ids);
     const removedImages = images.filter(({ id }) => removed.has(id));
     if (!removedImages.length) return;
+    comparisonSessions.current.remove(ids);
     removal.remember({
       images: removedImages,
       order: images.map(({ id }) => id),
@@ -272,6 +281,7 @@ function App() {
   const isEmpty = images.length === 0;
   const clearBatch = () => {
     cancelImports();
+    comparisonSessions.current.clear();
     if (images.length)
       removal.remember({
         images,
@@ -490,7 +500,7 @@ function App() {
             </p>
           )}
         {removal.snapshot && (
-          <div className={styles.statusBar}>
+          <div className={styles.statusBar} data-undo-actions>
             <span role="status">
               Removed {removal.snapshot.images.length} images. Undo is available
               for 30 seconds.
@@ -622,6 +632,7 @@ function App() {
         </section>
         {inspectedSource && (
           <ImageInspector
+            sessions={comparisonSessions.current}
             source={inspectedSource}
             batchResult={records[inspectedId]?.result}
             settings={settings}

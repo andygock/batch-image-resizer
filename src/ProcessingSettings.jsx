@@ -1,22 +1,15 @@
 import styles from "./AdvancedSettings.module.css";
-import { DEFAULT_PROCESSING } from "./processingSettings.js";
+import {
+  DEFAULT_PROCESSING,
+  SHARPENING_FIELDS,
+  validProcessingField,
+} from "./processingSettings.js";
 
 export default function ProcessingSettings({
   value: draft,
   onChange: setDraft,
 }) {
   const advanced = draft.method === "lanczos3" || draft.method === "mitchell";
-  const sharpeningFields = [
-    { key: "amount", label: "Sharpening amount", min: 0, max: 2, step: 0.1 },
-    {
-      key: "radius",
-      label: "Radius (output pixels)",
-      min: 0.3,
-      max: 3,
-      step: 0.1,
-    },
-    { key: "threshold", label: "Threshold (0–255)", min: 0, max: 255, step: 1 },
-  ];
   return (
     <div className={styles.body}>
       <p>
@@ -83,7 +76,7 @@ export default function ProcessingSettings({
         amount; the threshold leaves small colour differences untouched.
         Transparency is preserved.
       </p>
-      {sharpeningFields.map(({ key, label, min, max, step }) => (
+      {SHARPENING_FIELDS.map(({ key, label, min, max, step }) => (
         <div className={styles.field} key={key}>
           <label htmlFor={`sharpen-${key}`}>{label}</label>
           <input
@@ -95,11 +88,7 @@ export default function ProcessingSettings({
             disabled={!draft.sharpen}
             aria-invalid={
               draft.sharpen &&
-              (draft[key] === "" ||
-                !Number.isFinite(draft[key]) ||
-                draft[key] < min ||
-                draft[key] > max ||
-                (step === 1 && !Number.isInteger(draft[key])))
+              !validProcessingField({ min, max, step }, draft[key])
             }
             value={draft[key]}
             onChange={(event) =>

@@ -246,3 +246,58 @@ test("Undo bounds retained output bytes and regenerates oversized results", asyn
   assert.equal(removed.b.result, undefined);
   assert.equal(removed.a.status, "pending");
 });
+
+test("incremental imports append to active processing without cancelling or repeating it", async () => {
+  let release;
+  let runningSignal;
+  const calls = [];
+  const processor = createBatchProcessor(async ({ id }, _options, signal) => {
+    calls.push(id);
+    if (id === "a") {
+      runningSignal = signal;
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+    }
+    return { id };
+  });
+  let state;
+  const publish = (next) => {
+    state = next;
+  };
+  const first = processor.run(sources.slice(0, 1), settings, {}, publish);
+  const appended = processor.run(sources, settings, {}, publish);
+  assert.equal(runningSignal.aborted, false);
+  assert.equal(state.records.a.status, "processing");
+  assert.equal(state.records.b.status, "pending");
+  release();
+  await Promise.all([first, appended]);
+  assert.deepEqual(calls, ["a", "b"]);
+  assert.equal(state.progress, 2);
+  assert.equal(state.isProcessing, false);
+});
+
+test("pausing an appended batch cancels its running task and suppresses late publication", async () => {
+  let release;
+  let signal;
+  const processor = createBatchProcessor(async ({ id }, _, running) => {
+    signal = running;
+    await new Promise((resolve) => {
+      release = resolve;
+    });
+    return { id };
+  });
+  let state;
+  const publish = (next) => {
+    state = next;
+  };
+  const first = processor.run(sources.slice(0, 1), settings, {}, publish);
+  const appended = processor.run(sources, settings, {}, publish);
+  await processor.run(sources, settings, { paused: true }, publish);
+  assert.equal(signal.aborted, true);
+  const paused = state;
+  release();
+  await Promise.all([first, appended]);
+  assert.equal(state, paused);
+  assert.equal(state.isProcessing, false);
+});

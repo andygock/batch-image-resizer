@@ -13,12 +13,15 @@ export function restoreImageOrder(current, snapshot) {
   return [...ordered, ...current.filter(({ id }) => !previous.has(id))];
 }
 
-export default function useRemovalUndo() {
+export default function useRemovalUndo(onDiscard) {
   const [snapshot, setSnapshot] = useState(null);
   const latest = useRef(null);
   const timer = useRef(null);
+  const notify = useRef(onDiscard);
+  notify.current = onDiscard;
   const discard = useCallback(() => {
     clearTimeout(timer.current);
+    if (latest.current) notify.current?.();
     latest.current = null;
     setSnapshot(null);
   }, []);

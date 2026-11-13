@@ -243,6 +243,21 @@ test("Undo files count towards the aggregate source budget", async () => {
   assert.match(result.errors[0].message, /Undo/);
 });
 
+test("adding a verified duplicate transfers its retained copy without reading or allocating another source", async () => {
+  const source = await inspectImageFile(imageFile("copy.jpg", jpeg));
+  source.file.slice = () => {
+    throw new Error("Verified copies must not be read again");
+  };
+  const existing = [{ size: 256 * 1024 * 1024 - source.file.size }];
+  const result = await partitionImageFiles([source.file], existing, {
+    allowDuplicates: true,
+    getRetainedFiles: () => [source.file],
+    getVerifiedSource: (file) => (file === source.file ? source : null),
+  });
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.accepted[0], source);
+});
+
 test("BMP signatures are accepted and MIME is normalised regardless of filename", async () => {
   const bytes = new Uint8Array(58);
   const view = new DataView(bytes.buffer);
